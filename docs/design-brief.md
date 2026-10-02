@@ -34,27 +34,23 @@ In the prototype, only the 24 hours to 2026-10-02 10:35 UTC are real. Older hist
 
 ## 4. Remaining work
 
+Scope at launch: English only, with the code set up so translations can be added later; the network menu keeps Base and the three upcoming networks the design lists (Ethereum, Arbitrum, Gnosis), and more are added as they launch.
+
 Not in the design yet:
 
 1. Verifiability: solver addresses (prod and barn) with copy and Basescan links, each solver's latest settlements with CoW Explorer and Basescan links, and auctions in the strip linking to their settlement.
-2. A language switcher for the 11 locales.
-3. Loading, empty, error and stale-data states.
-4. All nine upcoming networks in the network menu (the design lists three).
-5. Code-only: a 404 page, a link preview image, keyboard-operable table rows, Methodology text aligned with section 7, and names for the unnamed solvers.
+2. Loading, empty, error and stale-data states.
+3. Code-only: a 404 page, a link preview image, keyboard-operable table rows, Methodology text aligned with section 7, and names for the unnamed solvers.
 
-These are built in code following the design's patterns. To see items 1–4 in Claude Design first, send this in the v3 project:
+Items 1 and 2 are designed in the v3 project with this message:
 
 ```text
-Keep everything that exists exactly as it is. Add only what is missing:
+Keep everything that exists exactly as it is. Add only:
 1. In the expanded solver row: prod and barn addresses with copy and
    Basescan links, and the solver's latest settlements (time, trades, pair,
    volume, gas, links to CoW Explorer and Basescan). Each auction in the
    latest-auctions strip links to its settlement on CoW Explorer.
-2. A language switcher: English, Türkçe, Deutsch, Español, Français, 日本語,
-   Polski, Русский, Українська, Tiếng Việt, 中文.
-3. Loading, empty, error and stale-data states, switchable in Tweaks.
-4. All nine upcoming networks in the network menu: Ethereum, Gnosis,
-   Arbitrum, Polygon, Avalanche, BNB, Linea, Plasma, Ink.
+2. Loading, empty, error and stale-data states, switchable in Tweaks.
 ```
 
 ## 5. Review, share, hand off

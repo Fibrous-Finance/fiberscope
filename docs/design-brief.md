@@ -8,7 +8,7 @@ How Fiberscope's UI is designed in [Claude Design](https://claude.com/product/de
 |---|---|---|
 | v1 | Fibrous design system generated from `fibrous-interface` | Assembled from the Fibrous app's own components. The team found its navbar, footer, logo and charts weak; the review found solver colours that were hard to tell apart and light-theme text below WCAG AA. |
 | v2 | No design system; a long brief that prescribed the visuals (glow, background pattern, frosted surfaces, gradient fills, value chips, eight sparkline KPI cards, bubble chart, …) | Claude Design applied them literally and the result looked generic: a 4,065px page with 18 cards and 9-colour stacked charts. |
-| v3 | No design system; a short brief with the product context, the readers, the Fibrous brand basics and real data | Design decisions are left to Claude Design. The main page comes in two directions to choose from. |
+| v3 | No design system; a short brief with the product context, the readers, the Fibrous brand basics and real data | Chosen: a single editorial page with solvers in greyscale and teal only for the interface. It uses Geist and Geist Mono instead of Urbanist and Rubik (pending kermo's decision). |
 
 ## 2. Start the project
 
@@ -24,23 +24,38 @@ Start a new project; the v2 project's chat carries the old brief.
 
 Paste the brief from section 6 and send.
 
-## 3. Choose a direction
+## 3. Result
 
-Compare the two directions in both themes and at 390px width, then:
+One page, in this order: a headline generated from the data with a waffle chart (one square per batch), headline figures, **Who is winning** (sortable table; clicking a row opens the solver's details), **Is it changing** (top-8 small multiples), **Who enters, who wins** (participation and win rate, latest-auctions strip), **How efficiently** (gas per trade against the network average) and **Methodology** (definitions and a disclosure that Fibrous also runs a solver).
+
+The table, the expanded row and the Methodology section replace the separate ranking, solver and methodology pages planned earlier.
+
+In the prototype, only the 24 hours to 2026-10-02 10:35 UTC are real. Older history, rank changes, previous-period deltas and the auction strip are synthetic.
+
+## 4. Remaining work
+
+Not in the design yet:
+
+1. Verifiability: solver addresses (prod and barn) with copy and Basescan links, each solver's latest settlements with CoW Explorer and Basescan links, and auctions in the strip linking to their settlement.
+2. A language switcher for the 11 locales.
+3. Loading, empty, error and stale-data states.
+4. All nine upcoming networks in the network menu (the design lists three).
+5. Code-only: a 404 page, a link preview image, keyboard-operable table rows, Methodology text aligned with section 7, and names for the unnamed solvers.
+
+These are built in code following the design's patterns. To see items 1–4 in Claude Design first, send this in the v3 project:
 
 ```text
-Go with direction <A/B>. <Anything to keep from the other one.>
+Keep everything that exists exactly as it is. Add only what is missing:
+1. In the expanded solver row: prod and barn addresses with copy and
+   Basescan links, and the solver's latest settlements (time, trades, pair,
+   volume, gas, links to CoW Explorer and Basescan). Each auction in the
+   latest-auctions strip links to its settlement on CoW Explorer.
+2. A language switcher: English, Türkçe, Deutsch, Español, Français, 日本語,
+   Polski, Русский, Українська, Tiếng Việt, 中文.
+3. Loading, empty, error and stale-data states, switchable in Tweaks.
+4. All nine upcoming networks in the network menu: Ethereum, Gnosis,
+   Arbitrum, Polygon, Avalanche, BNB, Linea, Plasma, Ink.
 ```
-
-## 4. Next prompts
-
-One at a time, each once the previous result looks right:
-
-1. `Build the ranking page: every solver with all its metrics, sortable.`
-2. `Build the page for a single solver, with Helixbox as the example.`
-3. `Build a page listing recent settlements, with links to CoW Explorer and Basescan.`
-4. `Build a methodology page from these definitions and link every metric label to it:` followed by the definitions in section 7.
-5. `Check every page at 390px width and in both themes, and fix what breaks.`
 
 ## 5. Review, share, hand off
 

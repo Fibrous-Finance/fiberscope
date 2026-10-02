@@ -250,7 +250,7 @@ Helixbox | 402 | 11.0% | 450 | 258,376 | 847k | 61% | 10%
 Rizzolver | 301 | 8.2% | 301 | 1,488,889 | 264k | 26% | 33%
 Fibrous | 232 | 6.4% | 232 | 166,074 | 774k | 54% | 22%
 0x5c35…fce1 (unnamed) | 209 | 5.7% | 228 | 972,275 | 996k | 63% | 11%
-0x9da8…b484 (unnamed) | 195 | 5.3% | 203 | 183,784 | 1.03M | — | —
+0x9da8…2c69 (unnamed) | 195 | 5.3% | 203 | 183,784 | 1.03M | — | —
 Arc | 168 | 4.6% | 168 | 43,443 | 1.36M | 46% | 14%
 Wraxyn | 131 | 3.6% | 131 | 378,603 | 766k | 45% | 6%
 BRRRolver | 109 | 3.0% | 114 | 313,598 | 723k | 57% | 4%
@@ -265,6 +265,15 @@ Tsolver | 4 | 0.1% | 4 | 138,508 | 2.04M | 38% | 0%
 Elfomo | 2 | 0.1% | 2 | 1,529 | 842k | — | —
 Gnosis_BalancerSOR | 2 | 0.1% | 2 | 13 | 449k | 3% | 0%
 OKX | 1 | <0.1% | 1 | 56 | 885k | 31% | 0%
+
+Prod addresses not visible in the Dune screenshots:
+0x588e…5e30 = 0x588ef3de14875ff9c4fc74c9e2c308767d665e30
+0x5c35…fce1 = 0x5c3593481cba011737e36ded62f1797c9f6afce1
+0x9da8…2c69 = 0x9da8b48441583a2b93e2ef8213aad0ec0b392c69
+Rizzolver = 0x8f5835e9d756c9bd934bce527157a4b0ef3c5cb7
+Horadrim = 0xea270e6cad15c5bafa35b9019bec7087ff82d8e8
+Rosato = 0x70f5474ea078a63f874695ea2ed99aebc4ad4393
+  (barn 0x728a498a1ff4c7d64f48b5b7fefd72fdde010613)
 
 Start with the Overview page only.
 ```

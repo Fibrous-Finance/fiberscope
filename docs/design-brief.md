@@ -2,71 +2,11 @@
 
 How Fiberscope's UI is designed in [Claude Design](https://claude.com/product/design), and the brief to paste into it.
 
-## 1. Design system: "Fibrous"
+## 1. Why there is no design system
 
-Fiberscope uses the Fibrous visual language with neutral content (see the neutrality rules in the brief).
+The first prototype used a "Fibrous Design System" generated from `fibrous-interface`. Its bundle ships the app's own components (`Navbar`, `NetworkSwitch`, `SegmentedControl`, `StatCard`, `BarChart`, `LineChart`, `Table`, …), and the prototype was assembled from them. The team found its navbar, footer, logo and charts weak, and the review found indistinguishable solver colours and light-theme text below WCAG AA.
 
-Use **Create here**, not **Create using Claude Code**:
-
-- *Create using Claude Code* runs `/design-sync`, which compiles a React component library (a package with a built `dist/`, or a Storybook) and uploads it. `fibrous-interface` is a Next.js app with neither, and its components depend on app-level providers (stores, i18n, wallet). A first sync on a large repository can also take hours.
-- Fiberscope needs the Fibrous look (colors, type, surfaces), not its swap components. *Create here* extracts that from code and screenshots.
-
-Fill in the **Set up your design system** form:
-
-| Field | What goes in |
-|---|---|
-| Company name and blurb | The blurb below |
-| Link code from GitHub | Empty |
-| Link code from your computer | A folder with only the design-relevant parts of `fibrous-interface` (the form recommends a frontend-focused subfolder for large codebases): `styles/globals.css`, `tailwind.config.js`, `hero.ts`, `config/fonts.ts`, and general components (navbar, footer, network and locale switches, cards, tables, chips, tooltips, modals, skeletons, leaderboard, icons). It is private `fibrous-interface` code, so it is not committed here. |
-| Upload a .fig file | Empty |
-| Add fonts, logos and assets | Fibrous mark (`public/favicon.svg`), `public/og-image.png`, Urbanist and Rubik font files, and screenshots of the app.fibrous.finance swap and leaderboard pages in light and dark mode |
-| Any other notes | The notes below |
-
-Company name and blurb:
-
-```text
-Fibrous — multi-chain DEX aggregator (app.fibrous.finance) on Starknet, Base,
-HyperEVM and Monad, and a CoW Protocol solver on Base. Web app with swap and
-route visualization, Predict, a points leaderboard and settings, in light and
-dark themes. This design system will also be used for Fiberscope, a public
-analytics dashboard for CoW Protocol solvers.
-```
-
-Any other notes:
-
-```text
-Source of truth for color: the CSS variables in styles/globals.css (light and
-dark sets). Accent teal #11B2BA (hover #0FA0A7, muted #1C6F7C).
-Light: page #F7F8F8, cards #FFFFFF. Dark: page #1B1F2C, cards #272D3E.
-Status: success #3BC171, warning #FFB800, error #FF647C.
-Fonts: Urbanist for UI text, Rubik for numbers.
-Look: calm and technical; rounded cards (~16px) on a subtle line-pattern
-background; darker inset wells for inputs; small pill badges; soft icon
-buttons. Teal is reserved for primary actions, active states and key figures.
-Built with HeroUI + Tailwind CSS v4.
-Extract the visual language and general components: navbar, cards, KPI stat
-cards, tables with rank badges and identicon avatars, search inputs,
-chips/segmented controls, dropdowns, switches, tooltips, modals, skeletons,
-empty states. Ignore wallet and swap business logic.
-For dashboards: a categorical chart palette that does not reuse the accent
-teal, and tabular figures for all numbers.
-```
-
-Then **Continue to generation**. Compare the result with the table below, fix differences in the chat, and publish it.
-
-| Token | Light | Dark |
-|---|---|---|
-| Page (`bg-primary`) | `#F7F8F8` | `#1B1F2C` |
-| Card (`bg-secondary`) | `#FFFFFF` | `#272D3E` |
-| `bg-tertiary` | `#EDEEF1` | `#151924` |
-| `bg-quaternary` | `#E2E3E5` | `#0D1016` |
-| Text primary | `#272D3E` | `#FFFFFF` |
-| Text secondary | `#8E95A2` | `#B6BAC3` |
-| Text muted | `#7D7F82` | `#7D7F82` |
-| Border | `#EDEEF1` | `#445371` |
-| Accent | `#11B2BA`, hover `#0FA0A7`, muted `#1C6F7C` | same |
-| Success / warning / error | `#3BC171` / `#FFB800` / `#FF647C` | same |
-| Fonts | Urbanist (UI), Rubik (numbers) | same |
+Version 2 starts without a design system. The brief (section 7) carries a light-touch Fibrous identity instead: fonts, accent, theme colours and the fiber-strand background. The design system stays in Claude Design for other Fibrous work.
 
 ## 2. Start the project
 
@@ -75,54 +15,52 @@ On the Claude Design home screen:
 | Control | Setting |
 |---|---|
 | Template | **Blank** |
-| Design system | **Fibrous Design System** |
-| `+` (attach) | Screenshots of Dune's [Solver Info](https://dune.com/cowprotocol/solver-info?aggregate_by_ec268c=Day&blockchain_edb9f7=base) dashboard for Base: the top section (active solvers, rewards), the ranked solver table and the daily solver charts. They show the content Fiberscope replaces, not a visual style. Dune's UI is third-party, so they are not committed here. |
-| `</>` (attach code) | Empty. The design system already carries the Fibrous look, and this repository has no UI code yet. |
+| Design system | **None** |
+| `+` (attach) | Screenshots of Dune's [Solver Info](https://dune.com/cowprotocol/solver-info?aggregate_by_ec268c=Day&blockchain_edb9f7=base) dashboard for Base (content reference); a dark Fibrous app screenshot with its navbar cropped out (colour, type and background only); the Fibrous mark SVG; the Urbanist and Rubik font files. None of them are committed here: Dune's UI is third-party and the rest comes from the private `fibrous-interface` repository. |
+| `</>` (attach code) | Empty |
 | Model | Default |
 
-Paste the brief from section 7 and send. Generation can take several minutes: Claude plans, builds, then checks its own output.
+Paste the brief from section 7 and send. Keep the first project for comparison.
 
 ## 3. Review the first version
 
-- Header: Fiberscope wordmark, network selector (Base active, the rest "soon"), period selector, last-updated time, theme toggle, language switcher.
-- Neutrality: no solver drawn in the accent teal; Fibrous neither highlighted nor pinned; "Built by Fibrous" only in the footer.
-- Numbers in Rubik with tabular figures (Rubik has `tnum`, Urbanist does not), right-aligned in tables.
-- Charts stay readable: top 8 solvers plus "Other", and each solver has the same color everywhere.
-- Light and dark themes both work.
+- Navbar: one slim bar; the period selector and the updated status sit in the page header.
+- Logo: `#/brand` shows three options.
+- Charts: rounded bars with gaps, gradient areas, subtle grid, rich tooltips; top 8 + "Other"; palette options in Tweaks.
+- Density: every Overview section exists (leader, 8 KPIs, activity, competition, efficiency, top 10, latest settlements).
+- Neutrality: no Fibrous branding in the header; Fibrous never highlighted; teal never a solver colour.
+- Accessibility: text meets WCAG AA in both themes; text on teal is dark.
+- 390px: no horizontal page scroll; sticky bar at most 56px; tables readable.
+- Numbers in Rubik with tabular figures.
 
-Fix single elements with inline comments and keep the chat for structural changes; a full re-prompt regenerates parts that were already right. Every variant draws on the same usage limits, so ask for alternatives only where the direction is unclear:
-
-```text
-Show two alternative Overview layouts side by side: one chart-first, one
-table-first. Keep the header, footer and solver colors identical.
-```
+Fix single elements with inline comments and keep the chat for structural changes; a full re-prompt regenerates parts that were already right. Every variant draws on the same usage limits, so ask for alternatives only where the direction is unclear.
 
 ## 4. Follow-up prompts
 
 Send them in order, each once the previous result looks right.
 
 1. ```text
-   Build page 2, Ranking, as described in the brief. Reuse the header, footer,
-   components and solver colors from the Overview.
+   Use logo option <A/B/C> everywhere (header, footer, favicon) and remove the
+   #/brand route.
    ```
 2. ```text
-   Build page 3, Solver detail, for Helixbox. Clicking a solver name, table row
-   or chart legend entry anywhere opens that solver's page.
+   Build page 2, Ranking, as described in the brief. Reuse the header, footer,
+   components and solver colours from the Overview.
    ```
 3. ```text
-   Build page 4, Settlements, as described in the brief.
+   Build page 3, Solver detail, for Helixbox. Clicking a solver name, table row,
+   chart mark or legend chip anywhere opens that solver's page.
    ```
 4. ```text
-   Build page 5, Methodology, from the metric definitions in the brief, and make
-   the metric labels on the other pages link to their definitions.
+   Build page 4, Settlements, as described in the brief.
    ```
 5. ```text
-   Add a small review-only state switcher in the bottom-right corner that
-   toggles Loaded, Loading, Empty and Error on every page.
+   Build page 5, Methodology, from the metric definitions in the brief, and make
+   sure every metric label on the other pages links to its definition.
    ```
 6. ```text
-   Make the language switcher swap the visible UI strings to German and
-   Japanese (sample translations) so we can check long strings and CJK layout.
+   Check every page in German, Russian and Japanese and fix strings that
+   overflow, wrap badly or get truncated.
    ```
 7. ```text
    Check every page at 390px width and in both themes and fix what breaks.
@@ -138,26 +76,29 @@ Share links only open for members of your Claude organization. For reviewers out
 
 ## 6. Handoff
 
-After approval: **Export → Handoff to Claude Code**. It bundles the design files, the chat and a README, and gives a prompt with the bundle URL; paste that prompt into a coding-agent session in this repository.
+After approval: **Export → Handoff to Claude Code**. It bundles the design files, the chat and a README, and gives a prompt with the bundle URL; paste that prompt into a coding-agent session in this repository. Without a design-system bundle, the implementation uses Fiberscope's own Tailwind tokens and chart components.
 
-The chat travels with the bundle, so state design decisions there, and make sure loading, empty and error states exist (follow-up prompt 5) before handing off.
+The chat travels with the bundle, so state design decisions there before handing off.
 
 ## 7. Brief
 
 ```text
-Design a public analytics dashboard: "Fiberscope" —
-CoW Protocol solver analytics for Base.
-Logo: simple "Fiberscope" wordmark with a minimal lens/aperture icon drawn from
-thin fiber lines, in the accent color. Tagline: "CoW Protocol solver analytics".
+Design a public analytics dashboard: "Fiberscope" — CoW Protocol solver
+analytics, starting with Base.
+
+No design system is attached on purpose. An earlier version built on the
+Fibrous app's design system inherited its navbar, flat charts and tables.
+This brief defines a light-touch Fibrous identity; design everything else
+(navbar, footer, logo, charts, tables) fresh, as a polished data product.
 
 Context
 - CoW Protocol settles user orders via batch auctions; "solvers" compete to
   win each auction and settle it on-chain.
 - Replaces the Dune dashboard "CoW Protocol Solver Info", which can no longer
-  be refreshed on Dune's free plan. Screenshots attached for content
-  reference only; do not copy Dune's visual style.
+  be refreshed on Dune's free plan. The Dune screenshots are attached for
+  content only: match or exceed their information density, not their look.
 - Audience: solver teams, CoW DAO grants committee, researchers.
-  Data-dense but scannable. Desktop-first, usable on mobile.
+  Data-dense but scannable. Desktop-first, fully usable at 390px.
 - Primary job: within ten seconds a visitor sees who is winning Base auctions
   in the selected period, by how much, and whether that is changing. It must
   stay trustworthy: every metric links to its definition on the Methodology
@@ -166,114 +107,246 @@ Context
 Output
 - An interactive, responsive web prototype. It will be handed off to Claude
   Code and built in Next.js with next-intl, so name components clearly
-  (KpiCard, SolverBadge, PeriodSelector, RankingTable, ...) and reuse them
-  across pages.
+  (AppHeader, KpiCard, SolverBadge, PeriodSelector, StackedBarChart,
+  RankingTable, ...) and reuse them across pages.
 - Header navigation switches pages (pages not built yet can be placeholders),
-  the theme toggle works, and clicking a solver opens its detail page.
+  the theme toggle works, and clicking a solver anywhere opens its page.
+- Tweaks: dataState (live / loading / empty / error), minutesSinceUpdate,
+  and 2–3 solver palette options to compare.
 
-Visual language: Fibrous Design System (selected for this project)
-- Accent #11B2BA (hover #0FA0A7).
-  Light: page #F7F8F8, card #FFFFFF, subtle #EDEEF1, text #272D3E / #8E95A2.
-  Dark: page #1B1F2C, card #272D3E, deep #151924, text #FFFFFF / #B6BAC3,
-  border #445371.
-  Status: success #3BC171, warning #FFB800, error #FF647C.
-- Fonts: Urbanist for UI, Rubik for numbers (tabular figures).
-- Rounded cards (~16px radius). Light + dark theme, following system setting.
+Identity: a sibling of app.fibrous.finance, not a copy
+- Fonts (attached): Urbanist for UI; Rubik for every number, with tabular
+  figures.
+- Accent teal #11B2BA (hover #0FA0A7). Use it with confidence for brand
+  moments, the active nav item, focus rings, links, primary buttons and
+  protocol-wide series such as KPI sparklines. Text on teal surfaces is
+  #1B1F2C (white on teal is only 2.6:1).
+- Dark theme: page #1B1F2C, cards #272D3E, deep #151924, border #445371,
+  text #FFFFFF / #B6BAC3. A soft teal glow at the top of the page and a very
+  faint fiber-strand line pattern in the page background (see the attached
+  Fibrous screenshot: colour, type and background only; never behind chart
+  plots).
+- Light theme: page #F7F8F8, cards #FFFFFF, subtle #EDEEF1, text #272D3E,
+  secondary text #646B78.
+- Status: success #3BC171, warning #FFB800, error #FF647C. On tinted badges,
+  text uses darker shades in the light theme (red #C42B48, green #157A3E)
+  and #FF7A8F for red in the dark theme, so all text meets WCAG AA.
+- 16px card radius, clear elevation in dark mode, dense but airy spacing.
+- The theme follows the system setting by default.
 
 Neutrality rules (important)
-- The product has its own name; no Fibrous logo in the header.
-  Footer only: "Built by Fibrous" + GitHub + Methodology.
-- Fibrous is just one solver in the data: never highlighted, pinned or given
-  a special color. The accent color is for UI controls only, never for a
-  solver. Solvers use a neutral categorical palette; each solver keeps the
-  same color across all charts.
+- No Fibrous logo or name in the header. The attached Fibrous mark appears
+  only in the footer, next to "Built by Fibrous".
+- Fibrous is just one solver in the data: never highlighted, pinned, or
+  given a special colour or position.
+- Teal is never a solver colour.
 - No promotional CTAs.
 
-Internationalization
-- Default English; language switcher in the header
-  (en, tr, de, es, fr, ja, pl, ru, uk, vi, zh).
-- Layout must handle longer strings (de, ru) and CJK. Solver names,
-  addresses and token symbols are never translated; numbers and dates use
-  locale formatting.
+Logo
+- Replace the earlier lens icon. Add a route #/brand that shows three
+  options at 16, 32 and 64px on both themes, and use A in the header until
+  one is chosen:
+  A) a scope ring drawn by one continuous fiber strand ending in a small
+     dot, echoing the line-and-dot style of the attached Fibrous mark;
+  B) three parallel fiber strands bending into a reticle;
+  C) a wordmark whose "o" in "scope" is a reticle.
+  Each must work as a favicon and in a single colour.
 
-Global
-- Header: product name; network selector (Base active; Ethereum, Gnosis,
-  Arbitrum, Polygon, Avalanche, BNB, Linea, Plasma, Ink marked "soon");
-  period selector 24h / 7d / 30d / All; "Updated 2 min ago"; theme toggle;
-  language switcher.
-- Addresses shortened (0x588e…5e30) with copy button + Basescan link.
+Navbar
+- One slim top bar (56–64px), translucent with backdrop blur; a hairline
+  border appears once the page scrolls.
+- Left: logo + "Fiberscope", then Overview, Ranking, Settlements,
+  Methodology; the active item uses the accent.
+- Right: network switcher (chain logo + name; Base active; Ethereum, Gnosis,
+  Arbitrum, Polygon, Avalanche, BNB, Linea, Plasma and Ink disabled with a
+  "Soon" tag), language switcher, theme toggle.
+- The period selector (24h / 7d / 30d / All) and the live "Updated 2 min
+  ago" status (pulsing dot; tooltip with the data timestamp and refresh
+  interval) sit in the page header row beside the title, not in the navbar.
+- Mobile: only the top bar is sticky (at most 56px); a menu sheet holds the
+  nav, network, language and theme; the network chip always shows the chain
+  name.
+
+Footer
+- Four columns on desktop, stacked on mobile:
+  1) logo, "Open-source analytics for CoW Protocol solvers." and
+     "Independent project, not affiliated with CoW DAO."
+  2) Product: Overview, Ranking, Settlements, Methodology.
+  3) Data: data timestamp, sources (GPv2Settlement events, CoW Orderbook
+     API), GitHub (MIT licence).
+  4) Ecosystem: CoW Protocol, CoW Explorer, CoW Swap, the original Dune
+     dashboard.
+- Bottom row: "© 2026 Fiberscope · MIT" on the left; "Built by Fibrous" with
+  the Fibrous mark on the right.
+
+Charts
+- Polished, modern, dark-first data visualisation in the spirit of Linear,
+  Vercel or Stripe dashboards. Nothing flat or blocky.
+- Bars: rounded top corners and 2px gaps between stacked segments; hovering
+  a column highlights it and dims the rest.
+- Lines and areas: smooth monotone curves, 2px strokes, vertical gradient
+  fills (35% → 0%).
+- Horizontal gridlines only, very subtle; small muted axis labels; no chart
+  borders.
+- Tooltip: frosted card with the time range, rows sorted by value with
+  colour dots, and a total row.
+- Legends are chips that show values; clicking one isolates that series.
+- 300ms transitions when the period changes; respect prefers-reduced-motion.
 - Charts show the top 8 solvers of the selected period and group the rest as
-  "Other" in gray; a solver's color belongs to the solver, not its rank.
-- Loading skeletons, empty and error states.
+  "Other" in neutral gray. A solver's colour belongs to the solver, not to
+  its rank.
+- Solver palette: vivid but harmonious, readable on both themes, colour-blind
+  safe (check deuteranopia and protanopia), no hue close to the teal accent,
+  distinct from the status colours. Assign colours by all-time rank so the
+  largest solvers get the most distinct hues.
+- Every chart has role="img" and a one-sentence aria-label summary.
+- Buckets: clock hours for 24h (10:00–11:00 UTC), UTC days for 7d and 30d,
+  ISO weeks for All.
+
+Internationalization
+- Default English; 11 locales: en, tr, de, es, fr, ja, pl, ru, uk, vi, zh.
+- Layouts handle long strings (de, ru) and CJK. Solver names, addresses and
+  token symbols are never translated; numbers and dates use locale
+  formatting.
+- Turkish terms: trade = "takas" (Takaslar, Takas başına ort. gas,
+  Gas/takas); transaction = "işlem" (İşlem maliyeti); percentage points =
+  "yüzde puan" (short "yp"), never "puan" alone; the environments "Prod" and
+  "Barn" stay untranslated; relative time "3 dk önce" without a full stop.
+
+States
+- Loading skeletons per section; one page-level error banner with a single
+  Retry while cards quietly show "—"; an empty state; a stale-data warning
+  when no update has arrived for a while.
+- No horizontal page scroll at 390px: tooltips and popovers stay inside the
+  viewport. Wide tables become card lists on mobile, or show Solver, Batches
+  and Share with a visible scroll affordance.
 
 Pages
-1. Overview: KPI cards (Batches, Trades, Volume USD, Active solvers,
-   Avg gas per trade); stacked bars "Batches per day by solver"; stacked area
-   "Volume per day by solver"; batch share chart; top-10 ranking preview.
-2. Ranking: sortable table — Rank, Solver, Batches, Share %, Trades,
-   Volume $, Avg trade $, Gas/trade, DEX swaps/trade, Participation %,
-   Win rate %, Last settlement. Search + period filter.
+1. Overview, in sections:
+   a) Page header: title, context line (Base · Last 24 hours · Oct 1, 10:35
+      – Oct 2, 10:35 UTC), period selector, updated status.
+   b) Leader: leading solver, its batch share, the multiple over the next
+      solver, the change vs the previous period, and a share strip of the
+      top 8 + Other.
+   c) KPI grid (2 rows of 4): Batches, Trades, Volume, Active solvers, Avg
+      batch value, Trades per batch, Avg gas per trade, Tx cost (total and
+      per trade). Each shows the change vs the previous period and a teal
+      sparkline.
+   d) Activity: "Batch share over time" (100% stacked) at full width;
+      "Batches by solver" and "Volume by solver" (stacked bars) side by side.
+   e) Competition: a "Participation vs win rate" bubble chart (x =
+      participation %, y = win rate %, bubble size = batches, labels for the
+      top 8), next to auction stats: auctions, average solutions per
+      auction, share of auctions with several winners, filtered-out
+      solutions.
+   f) Efficiency: "Gas per trade by solver" and "DEX swaps per trade by
+      solver" as sorted horizontal bars with a Base-wide average line.
+   g) Top 10 table: Rank, Solver, Batches, Share, Trades, Volume, Avg batch
+      value, Gas/trade, DEX swaps/trade, Participation, Win rate, Last
+      settlement; a "Full ranking" link.
+   h) Latest settlements: the 8 rows below (time, solver, trades, token pair,
+      volume, gas, tx cost, links to CoW Explorer and Basescan).
+2. Ranking: the full sortable table with every column above plus Tx cost and
+   Flash-loan settlements, search and a period filter.
 3. Solver detail (example: Helixbox): name, prod/barn addresses, KPI cards,
    time series (batches, volume, win rate, gas/trade), competition panel
-   (participation, win rate, avg rank, solutions per auction, filtered-out),
-   recent settlements.
-4. Settlements: paginated table — time, solver, trades, token pair, volume $,
-   gas used, tx cost $ (L2+L1), links to CoW Explorer + Basescan;
-   filter by solver.
-5. Methodology: text page using the definitions below.
+   (participation, win rate, average best rank, solutions per auction,
+   filtered-out), recent settlements.
+4. Settlements: paginated table — time, solver, trades, token pair, volume,
+   gas used, tx cost (L2+L1), links to CoW Explorer and Basescan; filter by
+   solver.
+5. Methodology: the definitions below; every metric label elsewhere links to
+   its definition.
 
-Metric definitions (Methodology page)
-- Batch: one settlement transaction with at least one trade
-  (zero-trade buffer/withdrawal settlements are excluded).
+Metric definitions
+- Batch: one settlement transaction with at least one trade (zero-trade
+  buffer/withdrawal settlements are excluded).
 - Trade: one filled order (Trade event) inside a settlement.
-- Volume (USD): per trade, the lower of sell-side and buy-side value, priced
-  with the auction's native prices x ETH/USD (guards against mispriced tokens).
+- Volume (USD): per trade, the lower of the sell-side and buy-side value,
+  priced with the auction's native prices × ETH/USD (guards against
+  mispriced tokens).
+- Avg batch value: volume / batches. Trades per batch: trades / batches.
 - Gas per trade: settlement gas used / trades in it.
 - Tx cost: L2 execution fee + L1 data fee, in USD.
 - DEX swaps per trade: settlement interactions excluding token approvals and
   WETH unwraps, / trades.
-- Participation: share of auctions where the solver submitted >=1 solution.
+- Participation: share of auctions in which the solver submitted at least
+  one solution.
 - Win rate: auctions won / auctions entered (an auction can have several
   winners).
+- Solutions per auction, average best rank and filtered-out solutions come
+  from the same auction data.
 - Solver names: on-chain allow-list + open name registry; unknown addresses
-  shown shortened.
+  are shown shortened.
+- Solver attribution: settlements executed through CoW's flash-loan router
+  (0x9da8…2c69) are credited to the solver that won the auction, not to
+  the router.
+- Flash-loan settlements: settlements that went through the flash-loan
+  router.
 - Sources: GPv2Settlement events on Base (0x9008…ab41) + CoW Orderbook API.
+All auction metrics are regular per-period metrics; "—" means there is no
+auction data for that solver.
 
-Sample data (real, Base, 24h ending 2026-10-02 10:35 UTC).
-Totals: 3,652 batches, 3,849 trades, $4.93M volume, 20 solvers.
-Participation and win rate come from a 183-auction sample in the last
-82 minutes of that window.
-Generate plausible 30-day series around these daily values (±20%).
-Solver | Batches | Share | Trades | Volume $ | Gas/trade | Particip. | Win rate
-0x588e…5e30 (unnamed) | 1652 | 45.2% | 1745 | 446,811 | 458k | 87% | 58%
-Helixbox | 402 | 11.0% | 450 | 258,376 | 847k | 61% | 10%
-Rizzolver | 301 | 8.2% | 301 | 1,488,889 | 264k | 26% | 33%
-Fibrous | 232 | 6.4% | 232 | 166,074 | 774k | 54% | 22%
-0x5c35…fce1 (unnamed) | 209 | 5.7% | 228 | 972,275 | 996k | 63% | 11%
-0x9da8…2c69 (unnamed) | 195 | 5.3% | 203 | 183,784 | 1.03M | — | —
-Arc | 168 | 4.6% | 168 | 43,443 | 1.36M | 46% | 14%
-Wraxyn | 131 | 3.6% | 131 | 378,603 | 766k | 45% | 6%
-BRRRolver | 109 | 3.0% | 114 | 313,598 | 723k | 57% | 4%
-Kipseli | 106 | 2.9% | 115 | 449,689 | 786k | 45% | 13%
-Kaisersolver | 52 | 1.4% | 52 | 2,057 | 271k | 54% | 1%
-Horadrim | 31 | 0.8% | 41 | 24,706 | 503k | 37% | 1%
-Baseline | 20 | 0.5% | 25 | 60 | 186k | 15% | 7%
-Rosato | 14 | 0.4% | 14 | 3,582 | 1.52M | 28% | 17%
-BitgetWallet | 11 | 0.3% | 11 | 53,632 | 2.29M | 57% | 0%
-Dsolver | 10 | 0.3% | 10 | 1,494 | 477k | 53% | 1%
-Tsolver | 4 | 0.1% | 4 | 138,508 | 2.04M | 38% | 0%
-Elfomo | 2 | 0.1% | 2 | 1,529 | 842k | — | —
-Gnosis_BalancerSOR | 2 | 0.1% | 2 | 13 | 449k | 3% | 0%
-OKX | 1 | <0.1% | 1 | 56 | 885k | 31% | 0%
+Sample data: real, Base, 24h ending 2026-10-02 10:35 UTC. Generate plausible
+7d, 30d and All series around these daily values (±20%).
+Totals: 3,652 batches · 3,849 trades · $4.87M volume · 19 solvers · avg batch
+value $1,334 · 1.05 trades per batch · 644K gas per trade · 1.83 DEX swaps per
+trade · $68.99 tx cost ($0.018 per trade) · 195 flash-loan settlements.
+Auction metrics were measured on 183 auctions in the last 82 minutes of the
+window: 9.3 solutions per auction, 9.8% with several winners, 20 solutions
+filtered out. Use these rates for the 24h view and scale the counts to each
+period (about 3,300 auctions in 24h).
+Solver | Batches | Trades | Volume $ | Gas/trade | DEX swaps/trade | Tx cost $ | Flash-loan settl. | Particip. | Win rate | Sol./auction | Avg best rank | Filtered
+0x588e…5e30 (unnamed) | 1,711 | 1,808 | 444,238 | 468K | 2.26 | 13.30 | 59 | 87% | 58% | 1.00 | 2.6 | 3
+Helixbox | 474 | 525 | 285,674 | 884K | 1.28 | 19.01 | 72 | 61% | 10% | 1.00 | 6.3 | 3
+Rizzolver | 317 | 317 | 1,572,725 | 302K | 1.25 | 15.80 | 16 | 26% | 33% | 1.00 | 4.0 | 0
+Fibrous | 232 | 232 | 165,217 | 774K | 1.16 | 2.82 | 0 | 54% | 22% | 1.06 | 4.0 | 0
+0x5c35…fce1 (unnamed) | 210 | 229 | 953,776 | 999K | 1.97 | 3.99 | 1 | 63% | 11% | 1.13 | 4.0 | 2
+Arc | 169 | 169 | 52,998 | 1.37M | 1.20 | 3.63 | 1 | 46% | 14% | 1.00 | 6.0 | 0
+Wraxyn | 131 | 131 | 374,989 | 766K | 1.20 | 1.56 | 0 | 45% | 6% | 1.00 | 8.5 | 0
+BRRRolver | 126 | 132 | 322,659 | 805K | 2.62 | 2.14 | 17 | 57% | 4% | 1.08 | 3.9 | 4
+Kipseli | 120 | 129 | 476,706 | 873K | 1.50 | 4.71 | 14 | 45% | 13% | 1.06 | 4.9 | 1
+Kaisersolver | 65 | 65 | 2,357 | 383K | 1.34 | 0.39 | 13 | 54% | 1% | 2.79 | 7.2 | 5
+Horadrim | 31 | 41 | 24,564 | 503K | 2.05 | 0.33 | 0 | 37% | 1% | 1.00 | 10.8 | 0
+Baseline | 21 | 26 | 53 | 196K | 1.46 | 0.08 | 1 | 15% | 7% | 1.00 | 9.3 | 0
+Rosato | 14 | 14 | 3,559 | 1.52M | 1.00 | 0.35 | 0 | 28% | 17% | 1.00 | 4.9 | 0
+BitgetWallet | 12 | 12 | 52,994 | 2.15M | 1.92 | 0.42 | 1 | 57% | 0% | 1.00 | 9.7 | 0
+Dsolver | 10 | 10 | 1,475 | 477K | 1.30 | 0.07 | 0 | 53% | 1% | 1.03 | 8.2 | 0
+Tsolver | 4 | 4 | 137,586 | 2.04M | 1.75 | 0.34 | 0 | 38% | 0% | 1.47 | 8.3 | 2
+Elfomo | 2 | 2 | 1,520 | 842K | 10.50 | 0.03 | 0 | — | — | — | — | —
+Gnosis_BalancerSOR | 2 | 2 | 13 | 449K | 1.50 | 0.01 | 0 | 3% | 0% | 1.00 | 11.8 | 0
+OKX | 1 | 1 | 56 | 885K | 1.00 | 0.01 | 0 | 31% | 0% | 1.00 | 8.8 | 0
 
-Prod addresses not visible in the Dune screenshots:
-0x588e…5e30 = 0x588ef3de14875ff9c4fc74c9e2c308767d665e30
-0x5c35…fce1 = 0x5c3593481cba011737e36ded62f1797c9f6afce1
-0x9da8…2c69 = 0x9da8b48441583a2b93e2ef8213aad0ec0b392c69
-Rizzolver = 0x8f5835e9d756c9bd934bce527157a4b0ef3c5cb7
-Horadrim = 0xea270e6cad15c5bafa35b9019bec7087ff82d8e8
-Rosato = 0x70f5474ea078a63f874695ea2ed99aebc4ad4393
-  (barn 0x728a498a1ff4c7d64f48b5b7fefd72fdde010613)
+Addresses (prod / barn)
+0x588e…5e30: 0x588ef3de14875ff9c4fc74c9e2c308767d665e30
+Helixbox: 0xffd98b05962fca73cdfd22ed73198dfb2e5241eb / 0x2ee19d575d58ddfde8086078323e50f34f0d7a70
+Rizzolver: 0x8f5835e9d756c9bd934bce527157a4b0ef3c5cb7 / 0x707dfa95835542a6528fd077c351446f497276cf
+Fibrous: 0xa95157266e0f53d2762fd8a885d4cdb2409eb29e / 0x3ace981a4bef82fd123257bf9b3fc304191a6fd8
+0x5c35…fce1: 0x5c3593481cba011737e36ded62f1797c9f6afce1
+Arc: 0x4566961fa9a5f38a7ef18ca2bd6459869305f010 / 0xfff69057784015fb6bd36767ae632c435e0346d1
+Wraxyn: 0xa2e28dedaab59d732ae375832fb855510aa7fe57 / 0x0c4aef2fc24529b08dad1bcabf4537cb1e0b5157
+BRRRolver: 0xb222da0155640eb2f604164d4a3684139dcc1f95 / 0xb222da076c21b7784a975dd54fd09c0f7c21262f
+Kipseli: 0xbee162fa5ae892be74f3f3e01c23da89adbccccc / 0x9775be2bb0b72d4ea98bfd38024ef733dc048a30
+Kaisersolver: 0x4c7bdd2d75050c4fdb84ad47dd328dc5c07d7743 / 0x68ebc0d91c951ec9471b7ece57558315fced84f6
+Horadrim: 0xea270e6cad15c5bafa35b9019bec7087ff82d8e8
+Baseline: 0x69d7f96dfd091652f317d0734a5f2b492accbe07 / 0x8d98057b8c3d6c7cb02f1c1be7e37d416f2d3e96
+Rosato: 0x70f5474ea078a63f874695ea2ed99aebc4ad4393 / 0x728a498a1ff4c7d64f48b5b7fefd72fdde010613
+BitgetWallet: 0x48573687867c72957926c4eb1a6e95e7ce6cf2fb / 0xa1789d24ede2d75b737cc180df762e31dfaf64ed
+Dsolver: 0x0195214d609edc3032366eb5c977d26d46d0a661 / 0x7627043a5ccd976bad8d6ab8a7003c7bd5703b86
+Tsolver: 0x3980daa7eaad0b7e0c53cfc5c2760037270da54d / 0xac73db8296f6be1836288da8a57c0f29379741e2
+Elfomo: 0x2c975c34d54ad06607f8ea14519c36f91275349d / 0x07cad32e40a92a86e7f2e7b373baaf4704d92c5b
+Gnosis_BalancerSOR: 0x983ac485620e265730e367b2c7bcbf6eb9d62a21 / 0x9451d27c993f7a61096bfc33e0241644a7566f66
+OKX: 0xd875cd50b179a046512c80edf6cb2c1fc3f3072d / 0x4ead087d78c21fd95d30411928a2ade7456f56f4
 
-Start with the Overview page only.
+Latest settlements (UTC | solver | trades | pair | volume | gas | tx cost | tx hash)
+10:35:49 | 0x588e…5e30 | 1 | MEZO→USDC | $56 | 436K | $0.0070 | 0x301ddf0dd9351e99e6eb9f9cc5b2402968d704892769777127e39339113167ef
+10:35:37 | 0x588e…5e30 | 1 | USDT→USDC | $10 | 373K | $0.0063 | 0xe11035d932f5dcbd3907c1ae0d8d04332899668ea8919f2d5e490f2b466f57d9
+10:34:25 | 0x588e…5e30 | 1 | DAI→USDC | $5 | 369K | $0.0057 | 0xf01106ec08288b7ba7b4434225c73d6d90977374dacd6c723db8e5471091911a
+10:33:43 | 0x588e…5e30 | 2 | USDS→USDC +1 | $95 | 849K | $0.0135 | 0x40aee93d073a5881132e1c63f574295a78168b09c12571f28a1abce927e340b2
+10:32:25 | 0x588e…5e30 | 1 | BASE→ETH | $9 | 204K | $0.0033 | 0xf73520cb6c7a5b2ee241ac4821df26d7a612171f73d6b10c47c073cc08067275
+10:32:03 | Rizzolver (flash loan) | 1 | USDC→WETH | $820 | 1,016K | $0.1693 | 0x2e3c357c7b0c1eb51595fa1a5bc02f84d2ee7dc653c13bf1281d2cf00898f5a8
+10:31:49 | 0x588e…5e30 | 1 | OFC→USDC | $1 | 370K | $0.0058 | 0x3077cab76920d7bf8ef7eed421ae067f9deb3e47341eee382b05a24672be62f1
+10:31:31 | 0x5c35…fce1 | 1 | USDT→USDbC | $100 | 313K | $0.0055 | 0x9a3133cd89f58e02079af4db7c8dc52d84be0fd233d9bbffd6c670f285a274b4
+
+Start with the Overview page and the #/brand logo page.
 ```

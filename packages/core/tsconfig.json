@@ -1,0 +1,8 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"lib": ["es2023", "es2023.intl"],
+		"types": ["node"]
+	},
+	"include": ["src"]
+}

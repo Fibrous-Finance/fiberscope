@@ -11,13 +11,48 @@ Use **Create here**, not **Create using Claude Code**:
 - *Create using Claude Code* runs `/design-sync`, which compiles a React component library (a package with a built `dist/`, or a Storybook) and uploads it. `fibrous-interface` is a Next.js app with neither, and its components depend on app-level providers (stores, i18n, wallet). A first sync on a large repository can also take hours.
 - Fiberscope needs the Fibrous look (colors, type, surfaces), not its swap components. *Create here* extracts that from code and screenshots.
 
-Steps:
+Fill in the **Set up your design system** form:
 
-1. Claude Design → **Set up your design system** → **Create here**.
-2. **Connect GitHub** → `Fibrous-Finance/fibrous-interface`. The relevant sources are `styles/globals.css` (light and dark tokens), `tailwind.config.js`, `hero.ts` (HeroUI theme) and `config/fonts.ts`.
-   If the Claude GitHub app cannot access the organization, skip this step and paste the token table below into the chat instead.
-3. Upload screenshots of [app.fibrous.finance](https://app.fibrous.finance) in light and dark mode.
-4. Name it **Fibrous**, compare the generated palette and type with the table below, fix differences in the chat, then publish it.
+| Field | What goes in |
+|---|---|
+| Company name and blurb | The blurb below |
+| Link code from GitHub | Empty |
+| Link code from your computer | A folder with only the design-relevant parts of `fibrous-interface` (the form recommends a frontend-focused subfolder for large codebases): `styles/globals.css`, `tailwind.config.js`, `hero.ts`, `config/fonts.ts`, and general components (navbar, footer, network and locale switches, cards, tables, chips, tooltips, modals, skeletons, leaderboard, icons). It is private `fibrous-interface` code, so it is not committed here. |
+| Upload a .fig file | Empty |
+| Add fonts, logos and assets | Fibrous mark (`public/favicon.svg`), `public/og-image.png`, Urbanist and Rubik font files, and screenshots of the app.fibrous.finance swap and leaderboard pages in light and dark mode |
+| Any other notes | The notes below |
+
+Company name and blurb:
+
+```text
+Fibrous — multi-chain DEX aggregator (app.fibrous.finance) on Starknet, Base,
+HyperEVM and Monad, and a CoW Protocol solver on Base. Web app with swap and
+route visualization, Predict, a points leaderboard and settings, in light and
+dark themes. This design system will also be used for Fiberscope, a public
+analytics dashboard for CoW Protocol solvers.
+```
+
+Any other notes:
+
+```text
+Source of truth for color: the CSS variables in styles/globals.css (light and
+dark sets). Accent teal #11B2BA (hover #0FA0A7, muted #1C6F7C).
+Light: page #F7F8F8, cards #FFFFFF. Dark: page #1B1F2C, cards #272D3E.
+Status: success #3BC171, warning #FFB800, error #FF647C.
+Fonts: Urbanist for UI text, Rubik for numbers.
+Look: calm and technical; rounded cards (~16px) on a subtle line-pattern
+background; darker inset wells for inputs; small pill badges; soft icon
+buttons. Teal is reserved for primary actions, active states and key figures.
+Built with HeroUI + Tailwind CSS v4.
+Extract the visual language and general components: navbar, cards, KPI stat
+cards, tables with rank badges and identicon avatars, search inputs,
+chips/segmented controls, dropdowns, switches, tooltips, modals, skeletons,
+empty states. Ignore wallet and swap business logic.
+For dashboards: a categorical chart palette that does not reuse the accent
+teal, and tabular figures for all numbers.
+```
+
+Then **Continue to generation**. Compare the result with the table below, fix differences in the chat, and publish it.
 
 | Token | Light | Dark |
 |---|---|---|

@@ -132,6 +132,8 @@ Send them in order, each once the previous result looks right.
 
 ## 5. Share for review
 
+Review at two checkpoints: once the Overview is fixed, so the visual direction is confirmed before the other pages copy it; and once every page exists, before the handoff. For each one, export the prototype as standalone HTML and check it at desktop and 390px widths, in both themes, against section 3.
+
 Share links only open for members of your Claude organization. For reviewers outside it, use **Export → Export as standalone HTML** and send the file, or send it to Vercel from the Export menu for a link. Say it is a prototype with sample data every time you share it.
 
 ## 6. Handoff

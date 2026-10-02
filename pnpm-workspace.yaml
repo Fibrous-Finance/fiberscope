@@ -1,0 +1,14 @@
+packages:
+    - "apps/*"
+    - "packages/*"
+
+ignoredBuiltDependencies:
+    - "@parcel/watcher"
+    - "@swc/core"
+    - sharp
+    - unrs-resolver
+
+# The Cloudflare toolchain needs its native binaries (wrangler bundles with esbuild, runs workerd).
+onlyBuiltDependencies:
+    - esbuild
+    - workerd

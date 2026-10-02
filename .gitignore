@@ -9,6 +9,16 @@ coverage/
 !.env.example
 .vercel/
 .DS_Store
+next-env.d.ts
+
+# Cloudflare build output and local secrets
+.open-next/
+.wrangler/
+.dev.vars*
+
+# Generated data: the indexer database and the snapshot it writes for the web app
+/apps/indexer/.data/
+/apps/web/data/
 
 # Claude Design handoff package: local reference only, never committed
 /design/

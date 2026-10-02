@@ -9,3 +9,6 @@ coverage/
 !.env.example
 .vercel/
 .DS_Store
+
+# Claude Design handoff package: local reference only, never committed
+/design/

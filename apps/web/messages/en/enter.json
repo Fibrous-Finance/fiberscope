@@ -1,0 +1,25 @@
+{
+	"title": "Who enters, who wins",
+	"new": "NEW",
+	"sentence": "On average {entrants} solvers enter each auction, about {solutions, plural, one {# competing solution} other {# competing solutions}}.",
+	"top": "{solver} enters {participation} of auctions and wins {winRate} of those.",
+	"empty": "No auction data for the last {period}, so entries and wins can’t be shown yet.",
+	"legend": {
+		"entered": "Entered",
+		"won": "Won"
+	},
+	"bar": "Entered {participation} of auctions, won {wonShare} of all auctions",
+	"rates": "{participation} · <win>{winRate}</win>",
+	"axis": {
+		"end": "{value} of auctions",
+		"rates": "in · win rate"
+	},
+	"tape": {
+		"title": "{count, plural, one {Latest auction} other {Latest # auctions}}",
+		"label": "{count, plural, one {Latest auction} other {Latest # auctions}}. Left and right arrow keys move between auctions, Home and End jump to the first and last, and Enter opens the selected one in CoW Explorer.",
+		"readout": "#{id} · {time} UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
+	},
+	"note": "Click an auction to open its settlement in CoW Explorer.",
+	"noAuctions": "{names}: no auction data in this window.",
+	"source": "Source: CoW Protocol solver-competition API"
+}

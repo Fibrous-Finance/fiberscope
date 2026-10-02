@@ -1,0 +1,18 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "fiberscope",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2026-10-02",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS",
+	},
+	"observability": {
+		"enabled": true,
+	},
+	// SNAPSHOT_URL (where the indexer publishes snapshot.json, e.g. a public R2 bucket) and
+	// SITE_URL (the site's origin, for absolute link-preview URLs) are set in the Cloudflare
+	// dashboard per environment; keep_vars stops deploys from removing them.
+	"keep_vars": true,
+}

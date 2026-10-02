@@ -1,0 +1,39 @@
+{
+	"home": "Fiberscope",
+	"nav": {
+		"label": "Sections",
+		"overview": "Overview",
+		"solvers": "Solvers",
+		"auctions": "Auctions",
+		"methodology": "Methodology"
+	},
+	"network": {
+		"label": "Network: {name}",
+		"live": "LIVE",
+		"soon": "SOON",
+		"ethereum": "Ethereum",
+		"arbitrum": "Arbitrum One",
+		"gnosis": "Gnosis Chain"
+	},
+	"status": {
+		"live": "Updated {time} UTC",
+		"liveTitle": "Data to block {block} · refreshed every {minutes, plural, one {minute} other {# minutes}}",
+		"stale": "Delayed {minutes} min",
+		"staleHours": "Delayed {hours} h",
+		"staleShort": "Delayed",
+		"staleTitle": "Last update {time} UTC, {minutes, plural, one {# minute} other {# minutes}} ago · retrying every minute",
+		"loading": "Loading…",
+		"loadingTitle": "Loading the latest data",
+		"error": "Data unavailable",
+		"errorShort": "Unavailable",
+		"errorTitle": "Fiberscope’s data service did not respond · last attempt {time} UTC"
+	},
+	"banner": {
+		"label": "Delayed",
+		"text": "Last update {time} UTC, {minutes, plural, one {# minute} other {# minutes}} ago. The indexer is behind; newer batches will appear when it catches up.",
+		"retrying": "Retrying every minute"
+	},
+	"appearance": {
+		"title": "Appearance: {mode, select, light {Light} dark {Dark} other {Auto ({theme, select, dark {dark} other {light}})}} · click to change"
+	}
+}

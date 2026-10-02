@@ -1,0 +1,54 @@
+{
+	"eyebrow": "Solver competition · CoW Protocol on {network}",
+	"headline": "{fraction, select, moreThanHalf {More than half} half {Half} nearlyHalf {Nearly half} twoInFive {Two in five} aThird {A third} overAQuarter {Over a quarter} aQuarter {A quarter} oneInFive {One in five} other {One in {n}}} of all {network} {measure} went to one solver in the last {days, plural, =1 {24 hours} other {# days}}.",
+	"totals": "{batches, plural, one {#\u00a0batch} other {#\u00a0batches}} · {trades, plural, one {#\u00a0trade} other {#\u00a0trades}} · {volume}\u00a0volume · {solvers, plural, one {#\u00a0solver} other {#\u00a0solvers}} · to\u00a0{time}\u00a0UTC",
+	"controls": {
+		"period": "Period",
+		"measure": "Measure"
+	},
+	"mosaic": {
+		"label": {
+			"batches": "Mosaic of {total, plural, one {# batch} other {# batches}}, one square per {unit, plural, one {batch} other {# batches}}: {solvers}.",
+			"trades": "Mosaic of {total, plural, one {# trade} other {# trades}}, one square per {unit, plural, one {trade} other {# trades}}: {solvers}.",
+			"volume": "Mosaic of {total} in volume, one square per {unit, number, ::currency/USD precision-integer}: {solvers}."
+		},
+		"item": "{name} {share}",
+		"unit": {
+			"batches": "1 square = {unit, plural, one {# batch} other {# batches}}",
+			"trades": "1 square = {unit, plural, one {# trade} other {# trades}}",
+			"volume": "1 square = {unit, number, ::currency/USD precision-integer}"
+		},
+		"readout": {
+			"batches": "{name} · {value, plural, one {# batch} other {# batches}} · {share}",
+			"trades": "{name} · {value, plural, one {# trade} other {# trades}} · {share}",
+			"volume": "{name} · {value} · {share}"
+		},
+		"rest": "{count, plural, one {# smaller solver} other {# smaller solvers}} · {share}",
+		"others": "{count, plural, one {# other} other {# others}}"
+	},
+	"facts": {
+		"share": "Leader’s share",
+		"lead": "Lead over #2",
+		"versus": "vs {name}",
+		"alone": "No other solver",
+		"since": "Leading since",
+		"run": "{days, plural, one {# day in a row} other {# days in a row}}",
+		"runAtLeast": "{days, plural, other {#+ days in a row}}",
+		"noRun": "No leader today",
+		"gas": "Lowest gas / trade",
+		"noGas": "No gas data"
+	},
+	"empty": {
+		"headline": "No batches settled on {network} in the last {period}.",
+		"totals": "{batches, plural, one {#\u00a0batch} other {#\u00a0batches}} · {trades, plural, one {#\u00a0trade} other {#\u00a0trades}} · {volume} · {solvers, plural, one {#\u00a0solver} other {#\u00a0solvers}} · checked\u00a0{time}\u00a0UTC",
+		"title": "Nothing settled in this window",
+		"text": "No solver settled a batch on {network} in the last {period}. A new network or a quiet stretch can look like this.",
+		"action": "Show last {period}"
+	},
+	"error": {
+		"headline": "We couldn’t load the latest data.",
+		"attempt": "Last attempt {time} UTC · Fiberscope’s data service did not respond",
+		"noAttempt": "Fiberscope’s data service did not respond",
+		"retry": "Retry"
+	}
+}

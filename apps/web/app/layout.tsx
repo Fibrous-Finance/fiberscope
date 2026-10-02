@@ -1,0 +1,53 @@
+import type { Metadata } from "next";
+
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getTranslations } from "next-intl/server";
+
+import { themeScript } from "@/lib/theme";
+
+import "./globals.css";
+
+// The full Geist fonts, self-hosted (`--font-geist-sans`, `--font-geist-mono`). Google's Geist
+// subsets lack →, ↗, ▲ and ▼, which then came from a metric-adjusted Arial, oversized.
+
+export async function generateMetadata(): Promise<Metadata> {
+	const t = await getTranslations("Meta");
+	return {
+		metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
+		title: t("title"),
+		description: t("description"),
+		openGraph: {
+			title: t("title"),
+			description: t("ogDescription"),
+			type: "website",
+			siteName: "Fiberscope",
+		},
+		twitter: {
+			card: "summary_large_image",
+			title: t("title"),
+			description: t("ogDescription"),
+		},
+	};
+}
+
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+	const locale = await getLocale();
+	return (
+		// The theme script sets data-theme before React hydrates.
+		<html
+			lang={locale}
+			className={`${GeistSans.variable} ${GeistMono.variable}`}
+			suppressHydrationWarning
+		>
+			<head>
+				<meta name="theme-color" content="#F7F8F8" />
+				<script dangerouslySetInnerHTML={{ __html: themeScript }} />
+			</head>
+			<body>
+				<NextIntlClientProvider>{children}</NextIntlClientProvider>
+			</body>
+		</html>
+	);
+}

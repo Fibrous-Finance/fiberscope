@@ -1,0 +1,64 @@
+{
+	"title": "Methodology",
+	"terms": {
+		"batches": {
+			"term": "Batches",
+			"text": "Settlement transactions a solver executed on Base in the window that filled at least one order. One auction can settle as several batches."
+		},
+		"trades": {
+			"term": "Trades",
+			"text": "User orders filled inside those batches."
+		},
+		"volume": {
+			"term": "Volume",
+			"text": "USD value of filled orders. Each trade counts at the lower of its sell and buy value, priced with the token prices CoW used in that auction and Chainlink’s ETH/USD rate at settlement."
+		},
+		"share": {
+			"term": "Share",
+			"text": "A solver’s portion of all batches, trades or volume in the window."
+		},
+		"gas": {
+			"term": "Gas/trade",
+			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost."
+		},
+		"networkAverage": {
+			"term": "Network avg",
+			"text": "Gas per trade across all solvers, weighted by trades."
+		},
+		"entered": {
+			"term": "Entered",
+			"text": "Share of the window’s auctions in which the solver submitted at least one solution. Only auctions that ended in a settlement count."
+		},
+		"winRate": {
+			"term": "Win rate",
+			"text": "Share of the auctions a solver entered that it won, alone or with other winners."
+		},
+		"leadingSince": {
+			"term": "Leading since",
+			"text": "First day of the current unbroken run in which the same solver ranked #1 by daily share."
+		},
+		"sources": {
+			"term": "Sources",
+			"text": "Settlement events and receipts on Base, CoW Protocol’s solver-competition API and Chainlink’s ETH/USD feed."
+		},
+		"attribution": {
+			"term": "Attribution",
+			"text": "Settlements sent through CoW’s flash-loan router are credited to the solver that won the auction."
+		},
+		"freshness": {
+			"term": "Freshness",
+			"text": "Refreshed every {minutes, plural, one {minute} other {# minutes}}. Last run {date}, {time} UTC, to block {block}.",
+			"unknown": "Refreshed every {minutes, plural, one {minute} other {# minutes}}."
+		},
+		"windows": {
+			"term": "Windows",
+			"text": "Rolling, ending at the last indexed block. Longer windows add up daily windows; rates are averaged per auction."
+		},
+		"names": {
+			"term": "Names",
+			"text": "From CoW’s public solver registry, checked against the on-chain allow-list. Solvers without a public name are shown by address."
+		}
+	},
+	"disclosureLabel": "Disclosure.",
+	"disclosure": "Fiberscope is built by Fibrous, which also runs a solver on CoW Protocol. Every solver, Fibrous included, is measured by the same open-source code."
+}

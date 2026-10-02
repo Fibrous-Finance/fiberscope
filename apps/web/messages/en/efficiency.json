@@ -1,0 +1,12 @@
+{
+	"title": "How efficiently",
+	"sentence": "{solver} uses the least gas per trade among solvers with {minBatches}+ batches: {gas}, against a {average} network average.",
+	"sentenceAll": "{solver} uses the least gas per trade: {gas}, against a {average} network average.",
+	"legend": {
+		"average": "Network average {value}",
+		"few": "Fewer than {count} trades",
+		"size": "Dot size: trades"
+	},
+	"dot": "{gas} gas per trade over {trades, plural, one {# trade} other {# trades}}",
+	"source": "Source: Base settlement transactions"
+}

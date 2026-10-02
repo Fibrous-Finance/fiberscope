@@ -1,0 +1,67 @@
+{
+	"title": "Who is winning",
+	"answer": "{leader} leads with {share} of {measure}{rival, select, yes {, {ratio} {runnerUp}} other {}}.{byVolume, select, yes { By volume, {volumeLeader} leads with {volumeShare}.} other {}}",
+	"copyMarkdown": "Copy as Markdown",
+	"downloadCsv": "Download CSV",
+	"markdownSource": "Fiberscope · {network} · {window}",
+	"columns": {
+		"rank": "#",
+		"solver": "Solver",
+		"share": "Share",
+		"gas": "Gas/trade",
+		"participation": "Entered",
+		"winRate": "Win rate",
+		"sorted": "{label} {direction, select, ascending {↑} other {↓}}",
+		"spark": "{days}d share"
+	},
+	"rankChange": {
+		"short": "{direction, select, up {▲{places}} down {▼{places}} other {NEW}}",
+		"spoken": "{direction, select, up {up {places, plural, one {# place} other {# places}}} down {down {places, plural, one {# place} other {# places}}} other {new}}"
+	},
+	"meta": "{value} · {entered} in · {winRate} win · {gas} gas",
+	"metaNoAuctions": "{value} · {gas} gas · no auction data",
+	"note": "Click a row for details. {earlier, select, yes {▲▼ rank change against {previous}.} other {No earlier window to compare yet.}} {window}.",
+	"source": "Source: CoW Protocol API · {network} settlement events",
+	"detail": {
+		"shareOf": "Share of {measure} · last {days, plural, one {# day} other {# days}}",
+		"trend": "{points} since {date}",
+		"chart": "Daily share of {measure}, {start} to {end}: from {first} to {last}",
+		"stats": {
+			"batches": "{share} of all batches",
+			"trades": "{count} per batch",
+			"volume": "{value} average trade",
+			"gas": "{percent} {direction, select, below {below} other {above}} network avg",
+			"participation": "Average solver {percent}",
+			"winRate": "Won {percent} of all auctions",
+			"noAuctionData": "No auction data"
+		},
+		"auctions": "{count, plural, =0 {Latest auctions} one {Latest auction} other {Latest # auctions}}",
+		"auctionsNote": "Entered {entered}, won {won} of the latest {count}",
+		"auctionsAndRanks": "{auctions} · {ranks}",
+		"auction": "Auction #{id} · {time} · {state, select, won {won} entered {entered, not won} other {not entered}}{link, select, yes { · open the settlement in CoW Explorer} other {}}",
+		"ranks": "Rank by measure",
+		"rankLine": "{batches} batches · {trades} trades · {volume} volume",
+		"rank": "#{rank}",
+		"gasVsNetwork": "Gas per trade vs network",
+		"gasScale": "{gas} gas per trade against a {average} network average",
+		"lower": "Lower",
+		"networkAverage": "Dashed: network avg",
+		"higher": "Higher",
+		"addresses": "Submission addresses",
+		"env": {
+			"prod": "Prod",
+			"barn": "Barn"
+		},
+		"settlements": "Latest settlements",
+		"settlementColumns": {
+			"time": "Time UTC",
+			"trades": "Trades",
+			"pair": "Pair",
+			"volume": "Volume",
+			"gas": "Gas",
+			"links": "Links"
+		},
+		"pair": "{sell} → {buy}{more, plural, =0 {} other { +#}}",
+		"settlementLine": "{trades, plural, one {# trade} other {# trades}} · {volume} · {gas} gas"
+	}
+}

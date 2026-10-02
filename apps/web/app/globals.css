@@ -1,0 +1,239 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens (handoff → Design tokens). Each token holds its light and dark value; the root's
+ * color-scheme picks one. Auto follows the system; the appearance button pins light or dark by
+ * setting data-theme before first paint (see lib/theme.ts).
+ */
+:root {
+	color-scheme: light dark;
+	--bg: light-dark(#f7f8f8, #1b1f2c);
+	--fg: light-dark(#1b1f2c, #f1f3f6);
+	--mu: light-dark(#5d6372, #9aa1ae);
+	--fa: light-dark(#6b7180, #7f8795);
+	--ln: light-dark(#e3e6e9, #2a3041);
+	--ln2: light-dark(#d2d7db, #363d51);
+	--hov: light-dark(#eef1f3, #232839);
+	--act: light-dark(#0a7a81, #3cc9cf);
+	--acg: light-dark(#0e9aa1, #11b2ba);
+	--warn: light-dark(#8a5a00, #f2b544);
+	--err: light-dark(#b42318, #ff8a7a);
+}
+
+:root[data-theme="light"] {
+	color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+	color-scheme: dark;
+}
+
+@theme inline {
+	--breakpoint-*: initial;
+	/* The design's single breakpoint: below it the page uses the compact layout. */
+	--breakpoint-wide: 760px;
+
+	--color-*: initial;
+	--color-bg: var(--bg);
+	--color-fg: var(--fg);
+	--color-mu: var(--mu);
+	--color-fa: var(--fa);
+	--color-ln: var(--ln);
+	--color-ln2: var(--ln2);
+	--color-hov: var(--hov);
+	--color-act: var(--act);
+	--color-acg: var(--acg);
+	--color-warn: var(--warn);
+	--color-err: var(--err);
+	/* Brand teal: thumbs, buttons, hover highlight, logo, live dot. Text on teal is navy. */
+	--color-teal: #11b2ba;
+	--color-navy: #1b1f2c;
+	--color-base: #0052ff;
+	--color-transparent: transparent;
+	--color-current: currentColor;
+
+	--font-sans: var(--font-geist-sans), system-ui, sans-serif;
+	--font-mono: var(--font-geist-mono), monospace;
+
+	--animate-pulse-dot: pulse-dot 2.2s ease-out infinite;
+	--ease-thumb: cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+@keyframes pulse-dot {
+	0% {
+		box-shadow: 0 0 0 0 rgb(17 178 186 / 0.55);
+	}
+	70% {
+		box-shadow: 0 0 0 7px rgb(17 178 186 / 0);
+	}
+	100% {
+		box-shadow: 0 0 0 0 rgb(17 178 186 / 0);
+	}
+}
+
+@layer base {
+	html {
+		scroll-behavior: smooth;
+	}
+
+	body {
+		min-height: 100vh;
+		background: var(--bg);
+		color: var(--fg);
+		font-family: var(--font-sans);
+		font-size: 15px;
+		line-height: 1.5;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		transition:
+			background-color 0.35s ease,
+			color 0.35s ease;
+	}
+
+	a {
+		color: var(--act);
+		text-decoration: none;
+	}
+
+	a:hover {
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+
+	::selection {
+		background: rgb(17 178 186 / 0.3);
+	}
+
+	/* One ring in both themes: teal alone is 2.4:1 on the light background, the navy edge carries it. */
+	:focus-visible {
+		outline: 2px solid #11b2ba;
+		outline-offset: 2px;
+		box-shadow: 0 0 0 2px #1b1f2c;
+	}
+
+	button {
+		cursor: pointer;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		html {
+			scroll-behavior: auto;
+		}
+
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+		}
+	}
+}
+
+/* Shared type roles (handoff → Typography). */
+
+/* Page width: 1200px of content plus the side padding. */
+@utility page {
+	box-sizing: content-box;
+	max-width: 1200px;
+	margin-inline: auto;
+	padding-inline: clamp(20px, 5vw, 48px);
+}
+
+@utility eyebrow {
+	font: 500 12px/1.5 var(--font-mono);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--mu);
+}
+
+@utility label {
+	font: 500 11px var(--font-mono);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--mu);
+}
+
+@utility headline {
+	font: 600 clamp(38px, 5.4vw, 70px) / 1.02 var(--font-sans);
+	letter-spacing: -0.045em;
+	text-wrap: balance;
+}
+
+@utility section-title {
+	font: 600 clamp(28px, 3vw, 38px) / 1.1 var(--font-sans);
+	letter-spacing: -0.035em;
+}
+
+@utility answer {
+	font-size: clamp(16px, 1.5vw, 18px);
+	line-height: 1.5;
+	color: var(--mu);
+	text-wrap: pretty;
+}
+
+/* The row under every chart: a note on the left, the source on the right. */
+@utility foot-line {
+	font: 500 11.5px var(--font-mono);
+	color: var(--fa);
+}
+
+/* Quiet links and text buttons: muted, full colour on hover, never underlined. */
+@utility quiet {
+	color: var(--mu);
+	text-decoration: none;
+	transition: color 0.2s;
+
+	&:hover {
+		color: var(--fg);
+		text-decoration: none;
+	}
+}
+
+@utility btn-teal {
+	display: inline-flex;
+	align-items: center;
+	height: 32px;
+	padding: 0 16px;
+	border: 0;
+	border-radius: 9px;
+	background: #11b2ba;
+	color: #1b1f2c;
+	font: 500 12px var(--font-mono);
+	letter-spacing: 0.04em;
+	text-decoration: none;
+
+	&:hover {
+		text-decoration: none;
+	}
+}
+
+/* Placeholder blocks in the loading state. */
+@utility skeleton {
+	display: block;
+	background: color-mix(in oklab, var(--fg) 8%, transparent);
+}
+
+/*
+ * Rows that open a detail draw their focus ring inside themselves, above the sticky columns.
+ * The auction tape draws it on the selected column instead (see the tape).
+ */
+@utility focus-inset {
+	position: relative;
+
+	&:focus-visible {
+		outline: none;
+		box-shadow: none;
+	}
+
+	&:focus-visible::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		z-index: 6;
+		pointer-events: none;
+		box-shadow:
+			inset 0 0 0 2px #11b2ba,
+			inset 0 0 0 4px #1b1f2c;
+	}
+}

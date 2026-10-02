@@ -1,0 +1,14 @@
+{
+	"title": "Is it changing",
+	"leader": {
+		"after": "{solver} has topped daily {measure} for {days, plural, one {# day} other {# straight days}}, taking over from {previous}.",
+		"atLeast": "{solver} has topped daily {measure} for at least {days, plural, one {# day} other {# straight days}}.",
+		"alone": "{solver} has topped daily {measure} for {days, plural, one {# day} other {# straight days}}."
+	},
+	"gain": "Biggest gain against {previousPeriod}: {solver}, {points}.",
+	"leaderGain": "It also gained the most share against {previousPeriod}: {points}.",
+	"rank": "#{rank}",
+	"chart": "{solver}: daily share of {measure} from {first} on {start} to {last} on {end}.",
+	"note": "Daily share of {measure}, top {count}, same scale (0–{max}). Change since {start}.",
+	"range": "{start} – {end}"
+}

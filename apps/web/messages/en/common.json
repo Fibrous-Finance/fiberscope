@@ -1,0 +1,43 @@
+{
+	"network": "Base",
+	"measure": {
+		"batches": "batches",
+		"trades": "trades",
+		"volume": "volume"
+	},
+	"measureLabel": {
+		"batches": "Batches",
+		"trades": "Trades",
+		"volume": "Volume"
+	},
+	"period": {
+		"24h": "24 hours",
+		"7d": "7 days",
+		"30d": "30 days",
+		"90d": "90 days"
+	},
+	"periodLabel": {
+		"24h": "24h",
+		"7d": "7d",
+		"30d": "30d",
+		"90d": "90d"
+	},
+	"previousPeriod": {
+		"24h": "the previous 24 hours",
+		"7d": "the previous 7 days",
+		"30d": "the previous 30 days",
+		"90d": "the previous 90 days"
+	},
+	"utc": "{time} UTC",
+	"points": "{value} pp",
+	"window": "{start} – {end} UTC",
+	"cowExplorer": "CoW Explorer ↗",
+	"explorer": "Explorer ↗",
+	"basescan": "Basescan ↗",
+	"copy": "Copy",
+	"copied": "Copied ✓",
+	"coverage": {
+		"auction": "Volume, Entered and Win rate cover the last {covered} of {days, plural, one {# day} other {# days}}.",
+		"chain": "Batches, trades and gas cover the last {covered} of {days, plural, one {# day} other {# days}}."
+	}
+}

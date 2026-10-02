@@ -1,95 +1,106 @@
 # Design brief
 
-How Fiberscope's UI is designed in [Claude Design](https://claude.com/product/design), and the brief to paste into it.
+How Fiberscope's UI is designed in [Claude Design](https://claude.com/product/design).
 
-## 1. Why there is no design system
+## 1. What we learned
 
-The first prototype used a "Fibrous Design System" generated from `fibrous-interface`. Its bundle ships the app's own components (`Navbar`, `NetworkSwitch`, `SegmentedControl`, `StatCard`, `BarChart`, `LineChart`, `Table`, …), and the prototype was assembled from them. The team found its navbar, footer, logo and charts weak, and the review found indistinguishable solver colours and light-theme text below WCAG AA.
+| Attempt | Setup | Result |
+|---|---|---|
+| v1 | Fibrous Design System attached | Sound structure, but assembled from the Fibrous app's own components (navbar, charts, tables), which do not suit a data product. Solver colours were hard to tell apart and light-theme text failed WCAG AA. |
+| v2 | No design system; a 270-line specification | Generic "AI slop". The brief asked for decorative effects (teal glow, background pattern, frosted tooltips, gradient fills, a pulsing dot, an accent "used with confidence"), eight Overview sections, three logos and palette options at once, with all data pasted inline. |
 
-Version 2 starts without a design system. The brief (section 7) carries a light-touch Fibrous identity instead: fonts, accent, theme colours and the fiber-strand background. The design system stays in Claude Design for other Fibrous work.
+The look is now set by reference screenshots rather than described effects, and settled on a small slice before any page is built. Prompts stay short and take one step at a time; detail fixes go through inline comments. A weak result is replaced, not repaired by further prompts, which keep its base.
 
-## 2. Start the project
+## 2. Style tiles
 
-On the Claude Design home screen:
+Start a new project: **Blank** template, no design system, nothing in `</>`. Attach the Urbanist and Rubik font files and the three reference screenshots below. They are screenshots of third-party products, so they are not committed here.
 
-| Control | Setting |
-|---|---|
-| Template | **Blank** |
-| Design system | **None** |
-| `+` (attach) | Screenshots of Dune's [Solver Info](https://dune.com/cowprotocol/solver-info?aggregate_by_ec268c=Day&blockchain_edb9f7=base) dashboard for Base (content reference); a dark Fibrous app screenshot with its navbar cropped out (colour, type and background only); the Fibrous mark SVG; the Urbanist and Rubik font files. None of them are committed here: Dune's UI is third-party and the rest comes from the private `fibrous-interface` repository. |
-| `</>` (attach code) | Empty |
-| Model | Default |
+| File | Direction | Source |
+|---|---|---|
+| `ref-a-plausible.png` | A · Quiet | [Plausible live demo](https://plausible.io/plausible.io), dark |
+| `ref-b-cloudflare-radar.png` | B · Dense | [Cloudflare Radar](https://radar.cloudflare.com/), dark, promo banner cropped |
+| `ref-c-tremor.png` | C · Product | [Tremor dashboard demo](https://dashboard.tremor.so/), dark |
 
-Paste the brief from section 7 and send. Keep the first project for comparison.
+```text
+Fiberscope: a style exploration, not a page yet.
 
-## 3. Review the first version
+Fiberscope is a public dashboard that shows which solvers win CoW Protocol
+batch auctions on Base. Its readers (solver teams, the CoW DAO grants
+committee) come to compare solvers by their numbers, so the numbers and the
+ranking are the product and everything else steps back. An earlier attempt
+looked like generic AI output; restraint matters more than effects.
 
-- Navbar: one slim bar; the period selector and the updated status sit in the page header.
-- Logo: `#/brand` shows three options.
-- Charts: rounded bars with gaps, gradient areas, subtle grid, rich tooltips; top 8 + "Other"; palette options in Tweaks.
-- Density: every Overview section exists (leader, 8 KPIs, activity, competition, efficiency, top 10, latest settlements).
-- Neutrality: no Fibrous branding in the header; Fibrous never highlighted; teal never a solver colour.
-- Accessibility: text meets WCAG AA in both themes; text on teal is dark.
-- 390px: no horizontal page scroll; sticky bar at most 56px; tables readable.
-- Numbers in Rubik with tabular figures.
+On one canvas, show the same small slice in three directions side by side,
+labelled A, B and C, dark theme only, about 720px wide each:
+- top bar: "Fiberscope" as plain text (no logo yet), Overview, Ranking,
+  Settlements, Methodology, the network "Base", and the period control
+  24h / 7d / 30d / All;
+- the four headline numbers below;
+- one chart that shows who settled the most batches over the last 24 hours
+  and whether that changed (the five solvers below plus Other); each
+  direction picks its own chart form;
+- the five ranking rows below.
 
-Fix single elements with inline comments and keep the chat for structural changes; a full re-prompt regenerates parts that were already right. Every variant draws on the same usage limits, so ask for alternatives only where the direction is unclear.
+Directions (the attached screenshots set the quality bar; do not copy their
+layouts, colours or branding):
+A) Quiet, like ref-a-plausible.png: near-monochrome, solvers in grays with
+   only the leader in one calm colour, large numbers, generous space.
+B) Dense, like ref-b-cloudflare-radar.png: compact rows and small type, many
+   numbers visible at once, minimal chrome.
+C) Product, like ref-c-tremor.png: borderless sections separated by
+   hairlines, five distinct colour-blind-safe solver colours.
 
-## 4. Follow-up prompts
+All directions:
+- Fonts (attached): Urbanist for text; Rubik with tabular figures for every
+  number; numbers right-aligned in tables.
+- Page #1B1F2C. Teal #11B2BA only for the active nav item, the selected
+  period, links and focus; never a solver colour.
+- No gradients, glows, blur or glass, background patterns, heavy shadows,
+  animated or pulsing elements, emoji, illustrations or decorative icons.
+- No Fibrous branding.
 
-Send them in order, each once the previous result looks right.
+Data: Base, last 24 hours
+Batches 3,652 · Trades 3,849 · Volume $4.87M · Active solvers 19
+Rank | Solver | Batches | Share | Volume | Gas/trade | Win rate
+1 | 0x588e…5e30 | 1,711 | 46.9% | $444K | 468K | 58%
+2 | Helixbox | 474 | 13.0% | $286K | 884K | 10%
+3 | Rizzolver | 317 | 8.7% | $1.57M | 302K | 33%
+4 | Fibrous | 232 | 6.4% | $165K | 774K | 22%
+5 | 0x5c35…fce1 | 210 | 5.8% | $954K | 999K | 11%
+Other (14 solvers): 708 batches, 19.4%, $1.45M
+Make up a plausible hourly split. Static is fine: no interactivity, light
+theme or other pages yet.
+```
 
-1. ```text
-   Use logo option <A/B/C> everywhere (header, footer, favicon) and remove the
-   #/brand route.
-   ```
-2. ```text
-   Build page 2, Ranking, as described in the brief. Reuse the header, footer,
-   components and solver colours from the Overview.
-   ```
-3. ```text
-   Build page 3, Solver detail, for Helixbox. Clicking a solver name, table row,
-   chart mark or legend chip anywhere opens that solver's page.
-   ```
-4. ```text
-   Build page 4, Settlements, as described in the brief.
-   ```
-5. ```text
-   Build page 5, Methodology, from the metric definitions in the brief, and make
-   sure every metric label on the other pages links to its definition.
-   ```
-6. ```text
-   Check every page in German, Russian and Japanese and fix strings that
-   overflow, wrap badly or get truncated.
-   ```
-7. ```text
-   Check every page at 390px width and in both themes and fix what breaks.
-   Then audit the prototype for the neutrality rules and accessibility
-   (contrast, focus states, keyboard navigation): list the issues, then fix them.
-   ```
+Pick one direction, or a named mix such as "B's density with A's use of colour". Refine it with inline comments until it feels right; it then sets the look of every page.
 
-## 5. Share for review
+## 3. After a direction is chosen
 
-Review at two checkpoints: once the Overview is fixed, so the visual direction is confirmed before the other pages copy it; and once every page exists, before the handoff. For each one, export the prototype as standalone HTML and check it at desktop and 390px widths, in both themes, against section 3.
+1. Overview: built in the chosen direction from the content reference (section 6), with the sample data attached as a file instead of pasted. Its prompt is written once the direction is known.
+2. Logo: a separate, small exploration once the Overview exists.
+3. Ranking, Solver detail, Settlements and Methodology: one prompt each, reusing the Overview's components.
+4. Checks: German, Russian and Japanese strings; 390px width; light theme; neutrality and accessibility.
+
+If the style tiles miss as well, the fallback is to design directly in code in this repository, reviewed through screenshots and a preview deployment.
+
+## 4. Share for review
+
+Review at two checkpoints: once the Overview is settled, so the visual direction is confirmed before the other pages copy it; and once every page exists, before the handoff. For each one, export the prototype as standalone HTML and check it at desktop and 390px widths, in both themes.
 
 Share links only open for members of your Claude organization. For reviewers outside it, use **Export → Export as standalone HTML** and send the file, or send it to Vercel from the Export menu for a link. Say it is a prototype with sample data every time you share it.
 
-## 6. Handoff
+## 5. Handoff
 
-After approval: **Export → Handoff to Claude Code**. It bundles the design files, the chat and a README, and gives a prompt with the bundle URL; paste that prompt into a coding-agent session in this repository. Without a design-system bundle, the implementation uses Fiberscope's own Tailwind tokens and chart components.
+After approval: **Export → Handoff to Claude Code**. It bundles the design files, the chat and a README, and gives a prompt with the bundle URL; paste that prompt into a coding-agent session in this repository. The implementation uses Fiberscope's own Tailwind tokens and chart components.
 
 The chat travels with the bundle, so state design decisions there before handing off.
 
-## 7. Brief
+## 6. Content reference
+
+Pages, behaviour, metric definitions and verified sample data for the steps in section 3. It is not a prompt to paste whole: the look comes from the chosen style tile.
 
 ```text
-Design a public analytics dashboard: "Fiberscope" — CoW Protocol solver
-analytics, starting with Base.
-
-No design system is attached on purpose. An earlier version built on the
-Fibrous app's design system inherited its navbar, flat charts and tables.
-This brief defines a light-touch Fibrous identity; design everything else
-(navbar, footer, logo, charts, tables) fresh, as a polished data product.
+Fiberscope — CoW Protocol solver analytics, starting with Base.
 
 Context
 - CoW Protocol settles user orders via batch auctions; "solvers" compete to
@@ -114,24 +125,20 @@ Output
 - Tweaks: dataState (live / loading / empty / error), minutesSinceUpdate,
   and 2–3 solver palette options to compare.
 
-Identity: a sibling of app.fibrous.finance, not a copy
-- Fonts (attached): Urbanist for UI; Rubik for every number, with tabular
-  figures.
-- Accent teal #11B2BA (hover #0FA0A7). Use it with confidence for brand
-  moments, the active nav item, focus rings, links, primary buttons and
-  protocol-wide series such as KPI sparklines. Text on teal surfaces is
+Identity
+- Fonts: Urbanist for UI; Rubik for every number, with tabular figures.
+- Accent teal #11B2BA (hover #0FA0A7), used sparingly: the active nav item,
+  selected controls, focus rings, links and primary buttons. Text on teal is
   #1B1F2C (white on teal is only 2.6:1).
 - Dark theme: page #1B1F2C, cards #272D3E, deep #151924, border #445371,
-  text #FFFFFF / #B6BAC3. A soft teal glow at the top of the page and a very
-  faint fiber-strand line pattern in the page background (see the attached
-  Fibrous screenshot: colour, type and background only; never behind chart
-  plots).
+  text #FFFFFF / #B6BAC3.
 - Light theme: page #F7F8F8, cards #FFFFFF, subtle #EDEEF1, text #272D3E,
   secondary text #646B78.
-- Status: success #3BC171, warning #FFB800, error #FF647C. On tinted badges,
-  text uses darker shades in the light theme (red #C42B48, green #157A3E)
-  and #FF7A8F for red in the dark theme, so all text meets WCAG AA.
-- 16px card radius, clear elevation in dark mode, dense but airy spacing.
+- Status: success #3BC171, warning #FFB800, error #FF647C. As text on tinted
+  backgrounds: red #C42B48 and green #157A3E in the light theme, red #FF7A8F
+  in the dark theme, so all text meets WCAG AA.
+- No gradients, glows, blur or glass, background patterns, animated or
+  pulsing elements, emoji, illustrations or decorative icons.
 - The theme follows the system setting by default.
 
 Neutrality rules (important)
@@ -153,16 +160,16 @@ Logo
   Each must work as a favicon and in a single colour.
 
 Navbar
-- One slim top bar (56–64px), translucent with backdrop blur; a hairline
-  border appears once the page scrolls.
+- One slim top bar (56–64px); a hairline border appears once the page
+  scrolls.
 - Left: logo + "Fiberscope", then Overview, Ranking, Settlements,
   Methodology; the active item uses the accent.
 - Right: network switcher (chain logo + name; Base active; Ethereum, Gnosis,
   Arbitrum, Polygon, Avalanche, BNB, Linea, Plasma and Ink disabled with a
   "Soon" tag), language switcher, theme toggle.
-- The period selector (24h / 7d / 30d / All) and the live "Updated 2 min
-  ago" status (pulsing dot; tooltip with the data timestamp and refresh
-  interval) sit in the page header row beside the title, not in the navbar.
+- The period selector (24h / 7d / 30d / All) and the "Updated 2 min ago"
+  status (tooltip with the data timestamp and refresh interval) sit in the
+  page header row beside the title, not in the navbar.
 - Mobile: only the top bar is sticky (at most 56px); a menu sheet holds the
   nav, network, language and theme; the network chip always shows the chain
   name.
@@ -180,22 +187,19 @@ Footer
   the Fibrous mark on the right.
 
 Charts
-- Polished, modern, dark-first data visualisation in the spirit of Linear,
-  Vercel or Stripe dashboards. Nothing flat or blocky.
 - Bars: rounded top corners and 2px gaps between stacked segments; hovering
   a column highlights it and dims the rest.
-- Lines and areas: smooth monotone curves, 2px strokes, vertical gradient
-  fills (35% → 0%).
+- Lines: smooth monotone curves, 2px strokes, no gradient fills.
 - Horizontal gridlines only, very subtle; small muted axis labels; no chart
   borders.
-- Tooltip: frosted card with the time range, rows sorted by value with
-  colour dots, and a total row.
+- Tooltip: the time range, rows sorted by value with colour dots, and a
+  total row.
 - Legends are chips that show values; clicking one isolates that series.
 - 300ms transitions when the period changes; respect prefers-reduced-motion.
 - Charts show the top 8 solvers of the selected period and group the rest as
   "Other" in neutral gray. A solver's colour belongs to the solver, not to
   its rank.
-- Solver palette: vivid but harmonious, readable on both themes, colour-blind
+- Solver palette: calm, readable on both themes, colour-blind
   safe (check deuteranopia and protanopia), no hue close to the teal accent,
   distinct from the status colours. Assign colours by all-time rank so the
   largest solvers get the most distinct hues.
@@ -347,6 +351,4 @@ Latest settlements (UTC | solver | trades | pair | volume | gas | tx cost | tx h
 10:32:03 | Rizzolver (flash loan) | 1 | USDC→WETH | $820 | 1,016K | $0.1693 | 0x2e3c357c7b0c1eb51595fa1a5bc02f84d2ee7dc653c13bf1281d2cf00898f5a8
 10:31:49 | 0x588e…5e30 | 1 | OFC→USDC | $1 | 370K | $0.0058 | 0x3077cab76920d7bf8ef7eed421ae067f9deb3e47341eee382b05a24672be62f1
 10:31:31 | 0x5c35…fce1 | 1 | USDT→USDbC | $100 | 313K | $0.0055 | 0x9a3133cd89f58e02079af4db7c8dc52d84be0fd233d9bbffd6c670f285a274b4
-
-Start with the Overview page and the #/brand logo page.
 ```

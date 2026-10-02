@@ -2,43 +2,126 @@
 
 Open-source analytics for [CoW Protocol](https://cow.fi) solvers, starting with Base.
 
-CoW Protocol settles user orders through batch auctions in which solvers compete to find the best settlement. Fiberscope shows who competes, who wins, and how efficiently each solver settles: batches, trades, volume, gas, and auction-level competition metrics.
+CoW Protocol settles user orders through batch auctions in which solvers compete to find the best
+settlement. Fiberscope shows who wins those auctions, by how much, whether that is changing, and
+how efficiently each solver settles: batches, trades, volume, gas, and the auction-level
+competition (who enters and who wins).
 
 ## Why
 
-CoW's [Solver Info](https://dune.com/cowprotocol/solver-info) dashboard lives on Dune. Since 10 September 2026, Dune's legacy free accounts are view-only, so most viewers can no longer refresh the dashboard or change its parameters. Fiberscope rebuilds that view on public data sources, free to view and continuously updated, and adds competition metrics the Dune dashboard does not have: participation, win rate, ranking and filtered-out solutions.
+CoW's [Solver Info](https://dune.com/cowprotocol/solver-info) dashboard lives on Dune. Since
+10 September 2026, Dune's legacy free accounts are view-only, so most viewers can no longer refresh
+it or change its parameters. Fiberscope rebuilds that view from public data, free to view and
+updated every few minutes, and adds what the Dune dashboard never showed: which solvers enter each
+auction and how often they win.
 
-## Scope
+## What the page shows
 
-- **Now:** Base.
-- **Next:** the other CoW Protocol networks: Ethereum, Gnosis, Arbitrum, Polygon, Avalanche, BNB, Linea, Plasma and Ink. The protocol contracts share the same addresses on every network and the Orderbook API has the same shape, so each network is mostly configuration.
+- **Who is winning:** share of batches, trades or volume per solver over 24 hours, 7, 30 or 90 days,
+  with rank changes, entry and win rates, and each solver's addresses and latest settlements.
+- **Is it changing:** the daily share of the leading solvers.
+- **Who enters, who wins:** participation and win rate from CoW's solver-competition data, and a
+  tape of the latest auctions.
+- **How efficiently:** gas per trade against the network average.
+- **Methodology:** every definition, on the page itself.
 
-## Data sources
-
-| Source | Provides |
-|---|---|
-| `GPv2Settlement` (`0x9008D19f58AAbD9eD0D60971565AA8510560ab41`) events `Settlement`, `Trade`, `Interaction`, plus transaction receipts | Batches, trades, DEX interactions, gas, L2 and L1 fees |
-| `GPv2AllowListAuthentication` (`0x2c4c28DDBdAc9C5E7055b4C863b72eA0149D8aFE`) events `SolverAdded`, `SolverRemoved` | Which addresses are solvers |
-| CoW Orderbook API `GET /api/v2/solver_competition/by_tx_hash/{tx}` | Every solution submitted to the auction (solver, score, ranking, winner, filtered-out) and native token prices |
-
-Page specs and metric definitions: [docs/design-brief.md](docs/design-brief.md).
-
-## Planned layout
+## How it works
 
 ```text
-apps/web        Next.js dashboard (next-intl, Fibrous visual language)
-apps/indexer    Base indexer: settlement events, receipts, auction data
-packages/core   Network config, solver registry, metric logic
-packages/db     Postgres schema and migrations
+Base RPC (settlement events, receipts, Chainlink ETH/USD) ─┐
+CoW API (solver competition, native prices)               ─┼─> apps/indexer ─> snapshot.json ─> apps/web
+CoW solver registry + on-chain allow-list                 ─┘      (SQLite)
 ```
+
+| Package         | What it is                                                                                                                                                                                          |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/indexer`  | Node 24, no dependencies (`node:sqlite`). Each run catches up with the chain head, writes the snapshot, then backfills history within a time budget, so the site stays fresh during long backfills. |
+| `packages/core` | The snapshot contract, the view model (windows, shares, ranks, competition), number and date formatting, and the chart geometry. Tested with `node:test`.                                           |
+| `apps/web`      | Next.js 16 (App Router, React Compiler), Tailwind CSS 4 and next-intl. English only for now; every string goes through next-intl. Runs on Cloudflare Workers through OpenNext.                      |
+
+### Data sources
+
+| Source                                                                                                     | Provides                                                               |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `GPv2Settlement` (`0x9008D19f58AAbD9eD0D60971565AA8510560ab41`): `Settlement` and `Trade` events, receipts | Batches, trades, gas, and the transaction's sender and recipient       |
+| CoW API `GET /api/v2/solver_competition/by_tx_hash/{tx}`                                                   | Every solution in the auction (solver, ranking, winner), native prices |
+| [CoW's solver registry](https://cms.cow.fi/api/solver-networks) and `GPv2AllowListAuthentication`          | Solver names and their prod and barn addresses                         |
+| Chainlink ETH/USD on Base                                                                                  | The dollar rate at each settlement                                     |
+
+### Methodology in brief
+
+- **Batch:** a settlement transaction that filled at least one order. Zero-trade settlements
+  (buffer movements) are not counted.
+- **Volume:** each trade counts at the lower of its sell and buy value, priced with the token
+  prices CoW used in that auction and Chainlink's ETH/USD rate at settlement.
+- **Attribution:** settlements sent through CoW's flash-loan router are credited to the solver
+  behind them: the transaction's recipient when it is a solver contract, otherwise its sender, and
+  as a last resort the auction's winner from CoW's API.
+- **Entered / win rate:** the share of auctions (that ended in a settlement) in which a solver
+  submitted a solution, and the share of those it won, alone or with other winners.
+- **Windows:** rolling, ending at the last indexed block. When the history behind a window is
+  shorter than the window, the page says so instead of extrapolating.
+
+The full definitions are in the page's Methodology section
+(`apps/web/messages/en/methodology.json`).
+
+## Running it locally
+
+Requires Node 24 and pnpm 10.
+
+```sh
+pnpm install
+
+# Index Base from the public RPC. The first run backfills; later runs catch up in seconds.
+cd apps/indexer
+node src/cli.ts sync --chain-days 30 --auction-days 7 --snapshot ../web/data/snapshot.json
+cd ../..
+
+# The web app reads apps/web/data/snapshot.json.
+pnpm dev   # http://localhost:3000
+```
+
+To keep the data live, rerun `sync` on a schedule, e.g. every 10 minutes with
+`--budget-minutes 8` so long backfills never hold up fresh data.
+
+| Variable                      | Used by | Purpose                                                                    |
+| ----------------------------- | ------- | -------------------------------------------------------------------------- |
+| `BASE_RPC_URL`                | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                     |
+| `BASE_RPC_RPS`, `COW_API_RPS` | indexer | Request rates for the RPC and CoW's API                                    |
+| `REFRESH_MINUTES`             | indexer | The schedule the page expects; data older than three runs shows as delayed |
+| `SNAPSHOT_URL`                | web     | Where to fetch the snapshot in production                                  |
+| `SNAPSHOT_PATH`               | web     | A local snapshot file (default `data/snapshot.json`)                       |
+| `SITE_URL`                    | web     | The site's origin, for absolute link-preview URLs                          |
+
+## Checks
+
+```sh
+pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build
+```
+
+The same run on every pull request (`.github/workflows/ci.yml`).
+
+## Deploying
+
+The web app deploys to Cloudflare Workers with
+[OpenNext](https://opennext.js.org/cloudflare): `pnpm --filter @fiberscope/web deploy`, or
+`preview` to run the Workers build locally. `.github/workflows/deploy.yml` deploys `main` and
+uploads a preview version for each pull request once the `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` secrets and the `CLOUDFLARE_WORKERS_SUBDOMAIN` variable are set. Set
+`SNAPSHOT_URL` and `SITE_URL` on the Worker.
+
+The indexer runs anywhere Node 24 runs. It needs a persistent disk for its database and must
+publish `snapshot.json` where `SNAPSHOT_URL` points (for example an R2 bucket).
 
 ## Status
 
-- [x] Data feasibility check against Base mainnet (public RPC and CoW Orderbook API)
-- [ ] Design in Claude Design ([docs/design-brief.md](docs/design-brief.md))
-- [ ] Indexer and API for Base
-- [ ] Web app
+- [x] Data feasibility check against Base mainnet
+- [x] Design ([docs/design-brief.md](docs/design-brief.md))
+- [x] Indexer for Base, validated against an independent 24-hour measurement
+- [x] Web app
+- [ ] Hosting for the indexer and the site
 - [ ] Public launch and CoW Grants application
+- [ ] More CoW Protocol networks: Ethereum, Arbitrum One, Gnosis Chain, and others
 
 ## License
 

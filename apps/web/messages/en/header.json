@@ -17,7 +17,7 @@
 	},
 	"status": {
 		"live": "Updated {time}\u00a0UTC",
-		"liveTitle": "Data to block {block} · updated every {minutes, plural, one {minute} other {# minutes}}",
+		"liveTitle": "Data to block {block} · updated every {minutes, plural, one {minute} other {#\u00a0minutes}}",
 		"delayed": "Delayed",
 		"delayedTitle": "Last updated {age}, at {asOf}{polling, select, yes { · the page checks for new data every minute} other {}}",
 		"loading": "Loading…",

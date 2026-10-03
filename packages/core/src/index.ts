@@ -4,3 +4,4 @@ export * from "./format.ts";
 export * from "./view/view.ts";
 export * from "./view/charts.ts";
 export * from "./view/efficiency.ts";
+export * from "./view/network.ts";

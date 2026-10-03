@@ -289,6 +289,7 @@ function useDetail(row: Row) {
 			address: a.address,
 			medium: mediumAddress(a.address),
 			short: shortAddress(a.address),
+			copyLabel: t("detail.copyAddress", { env: a.env }),
 			retired: !a.active,
 			href: `${BASE.scan}/address/${a.address}`,
 		})),
@@ -384,6 +385,11 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 												<button
 													type="button"
 													onClick={() => copy(a.address)}
+													aria-label={
+														copied === a.address
+															? undefined
+															: a.copyLabel
+													}
 													className="-my-1 py-1 whitespace-nowrap quiet"
 												>
 													{copied === a.address
@@ -607,6 +613,7 @@ export function DetailCompact({ row }: { row: Row }) {
 									<button
 										type="button"
 										onClick={() => copy(a.address)}
+										aria-label={copied === a.address ? undefined : a.copyLabel}
 										className="-my-[15px] py-[15px] whitespace-nowrap quiet"
 									>
 										{copied === a.address ? tc("copied") : tc("copy")}

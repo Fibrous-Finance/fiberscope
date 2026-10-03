@@ -6,8 +6,8 @@ import { arrow } from "@/components/ui/Section";
 const SOURCE_URL = "https://github.com/Fibrous-Finance/fiberscope";
 
 /**
- * The same footer on every page. The Fibrous credit sits in the small print: the only place
- * Fibrous appears, besides the disclosure in Methodology. Its mark is monochrome, in the link's
+ * The same footer on every page. The Fibrous credit sits in the small print, the one place the
+ * builder is named, and says that Fibrous also runs a solver. Its mark is monochrome, in the link's
  * colour: teal is the page's accent for hover and selection, never a solver's. Compact:
  * everything stacks on the left and every link is a 44px target.
  */

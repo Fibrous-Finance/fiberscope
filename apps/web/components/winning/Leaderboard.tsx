@@ -10,7 +10,7 @@ import type { Measure, Row } from "@fiberscope/core";
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { BAR_MIN_TONE, isHot, TEAL, tone } from "@/components/dashboard/tones";
-import { Caret } from "@/components/ui/Section";
+import { arrow, Caret } from "@/components/ui/Section";
 import { cellText, COLUMNS, useHeaderLabels } from "@/components/winning/columns";
 import { DetailCompact, DetailWide } from "@/components/winning/Detail";
 
@@ -54,6 +54,7 @@ export function Table({ rows }: { rows: Row[] }) {
 	const { sort, setSort, open, setOpen } = useDashboard();
 	const { hovered, setHovered } = useHover();
 	const t = useTranslations("Winning.columns");
+	const tw = useTranslations("Winning");
 	const scroller = useRef<HTMLDivElement>(null);
 	const [scroll, setScroll] = useState<Scroll>({ width: 0, scrolled: false, more: false });
 
@@ -75,50 +76,62 @@ export function Table({ rows }: { rows: Row[] }) {
 				onScroll={(event) => measure(event.currentTarget, setScroll)}
 				className="overflow-x-auto"
 			>
-				<div className="min-w-[1000px] tabular-nums">
+				{/* A table to assistive tech: the sorted column says so with aria-sort. */}
+				<div role="table" aria-label={tw("title")} className="min-w-[1000px] tabular-nums">
 					<div
+						role="row"
 						className={`${GRID} box-content h-10 border-b border-ln2 label whitespace-nowrap`}
 					>
-						<span className="sticky left-0 z-1 flex items-center self-stretch bg-bg">
+						<span
+							role="columnheader"
+							className="sticky left-0 z-1 flex items-center self-stretch bg-bg"
+						>
 							{t("rank")}
 						</span>
 						<span
+							role="columnheader"
 							className={`sticky left-9 z-1 -ml-4 flex items-center self-stretch bg-bg pl-4 ${scroll.scrolled ? EDGE : ""}`}
 						>
 							{t("solver")}
 						</span>
 						{COLUMNS.map((key) => {
 							const active = sort.key === key;
+							const direction = sort.direction === 1 ? "ascending" : "descending";
 							const label = labels[key];
 							return (
-								<button
+								<span
 									key={key}
-									type="button"
-									onClick={() =>
-										setSort({
-											key,
-											direction: active
-												? sort.direction === 1
-													? -1
-													: 1
-												: FIRST_DIRECTION[key],
-										})
+									role="columnheader"
+									aria-sort={active ? direction : undefined}
+									className={
+										key === "share" ? "justify-self-start" : "justify-self-end"
 									}
-									className={`uppercase ${key === "share" ? "justify-self-start" : "justify-self-end"} ${active ? "text-fg" : "text-mu"}`}
 								>
-									{active
-										? t("sorted", {
-												label,
-												direction:
-													sort.direction === 1
-														? "ascending"
-														: "descending",
+									<button
+										type="button"
+										onClick={() =>
+											setSort({
+												key,
+												direction: active
+													? sort.direction === 1
+														? -1
+														: 1
+													: FIRST_DIRECTION[key],
 											})
-										: label}
-								</button>
+										}
+										className={`uppercase ${active ? "text-fg" : "text-mu"}`}
+									>
+										{active
+											? t.rich("sorted", { label, direction, arrow })
+											: label}
+									</button>
+								</span>
 							);
 						})}
-						<span className="text-right">{t("spark", { days: view.sparkDays })}</span>
+						{/* The sparkline column only pictures the share column: not read out. */}
+						<span aria-hidden="true" className="text-right">
+							{t("spark", { days: view.sparkDays })}
+						</span>
 					</div>
 					{rows.map((row) => (
 						<TableRow
@@ -175,14 +188,18 @@ function TableRow({
 	return (
 		<>
 			<RowButton
+				role="row"
 				open={open}
 				onToggle={() => setOpen(open ? null : row.id)}
 				onMouseEnter={() => setHovered(row.id)}
 				onMouseLeave={() => setHovered(null)}
 				className={`${GRID} focus-inset box-content h-[50px] cursor-pointer border-b border-ln font-mono text-[13px] leading-[normal] font-medium transition-colors duration-150 ${hot || open ? "bg-hov" : ""}`}
 			>
-				<span className={`${pinned} left-0 text-mu`}>{row.rank}</span>
+				<span role="cell" className={`${pinned} left-0 text-mu`}>
+					{row.rank}
+				</span>
 				<span
+					role="cell"
 					className={`${pinned} left-9 -ml-4 min-w-0 gap-2.5 pr-2 pl-4 ${scrolled ? EDGE : ""}`}
 				>
 					<span className={`truncate text-[14px] ${row.unnamed ? "" : "font-sans"}`}>
@@ -191,7 +208,7 @@ function TableRow({
 					<RankChange row={row} />
 					<Caret open={open} className="ml-auto size-[13px] text-fa" />
 				</span>
-				<span className="flex items-center gap-3">
+				<span role="cell" className="flex items-center gap-3">
 					<span className="h-[3px] flex-1 rounded-[2px] bg-ln">
 						<span
 							style={bar(row, hot, leaderShare)}
@@ -201,7 +218,7 @@ function TableRow({
 					<span className="flex-[0_0_46px] text-right">{f.percent(row.share, 1)}</span>
 				</span>
 				{COLUMNS.slice(1).map((key) => (
-					<span key={key} className="text-right">
+					<span key={key} role="cell" className="text-right">
 						{cellText(row, key, f)}
 					</span>
 				))}
@@ -221,7 +238,14 @@ function TableRow({
 					/>
 				</svg>
 			</RowButton>
-			{open ? <DetailWide row={row} width={width} /> : null}
+			{open ? (
+				// The detail spans the row, so the table stays a table to assistive tech.
+				<div role="row">
+					<div role="cell" aria-colspan={COLUMNS.length + 2}>
+						<DetailWide row={row} width={width} />
+					</div>
+				</div>
+			) : null}
 		</>
 	);
 }
@@ -335,19 +359,23 @@ function RankChange({ row }: { row: Row }) {
 	);
 }
 
-/** A row that opens its detail: a click, Enter or Space toggles it. */
+/**
+ * A row that opens its detail: a click, Enter or Space toggles it. A "row" in the desktop table,
+ * a "button" in the compact list.
+ */
 function RowButton({
 	open,
 	onToggle,
+	role = "button",
 	...props
-}: { open: boolean; onToggle: () => void } & Omit<
+}: { open: boolean; onToggle: () => void; role?: "button" | "row" } & Omit<
 	HTMLAttributes<HTMLDivElement>,
 	"role" | "tabIndex" | "onClick" | "onKeyDown"
 >) {
 	return (
 		<div
 			{...props}
-			role="button"
+			role={role}
 			tabIndex={0}
 			aria-expanded={open}
 			onClick={onToggle}

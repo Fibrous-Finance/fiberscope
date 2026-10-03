@@ -36,8 +36,11 @@ export const HISTORY_DAYS: Record<Period, number> = {
 };
 /** The table's sparkline covers at least this many days. */
 const SPARK_MIN_DAYS = 14;
-/** "Lowest gas / trade" only considers solvers with this many batches per day of the window. */
-const MIN_BATCHES_PER_DAY = 100;
+/**
+ * "Lowest gas / trade" only considers solvers with this many batches per day of the window;
+ * Methodology states it.
+ */
+export const MIN_BATCHES_PER_DAY = 100;
 /** A gain smaller than this (percentage points) is not worth a sentence. */
 const MIN_GAIN_POINTS = 0.1;
 /** Solvers with fewer trades are drawn as hollow dots in the gas chart. */

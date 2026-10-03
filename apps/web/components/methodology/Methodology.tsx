@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 
+import { MIN_BATCHES_PER_DAY } from "@fiberscope/core";
+
 import { useDashboard } from "@/components/dashboard/context";
 import { Section } from "@/components/ui/Section";
 
@@ -61,6 +63,7 @@ export function Methodology() {
 					})
 				: t("terms.coverage.noData");
 		}
+		if (key === "gas") return t("terms.gas.text", { minBatches: MIN_BATCHES_PER_DAY });
 		return t(`terms.${key}.text`);
 	};
 	// Compact: one column, each term 14px above its definition.

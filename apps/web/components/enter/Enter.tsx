@@ -26,7 +26,7 @@ export function Enter() {
 	const tc = useTranslations("Common");
 	const f = useFormat();
 	const view = useView();
-	const { snapshot, layout } = useDashboard();
+	const { snapshot, layout, status } = useDashboard();
 	const competition = view.competition;
 	const hasTape = view.tape.auctions.length > 0;
 	// Auction data covers fewer days than the window: the sentence and a footnote say so.
@@ -59,7 +59,12 @@ export function Enter() {
 			]
 				.filter(Boolean)
 				.join(" ")
-		: t("empty", { period: tc(`period.${view.period}`) });
+		: t("empty", {
+				period: tc(`period.${view.period}`),
+				// While delayed: "the 24 hours to 09:49 UTC".
+				delayed: status.delayed ? "yes" : "no",
+				asOf: status.asOf ?? "",
+			});
 
 	const missing = competition?.withoutAuctions ?? [];
 	const note = [

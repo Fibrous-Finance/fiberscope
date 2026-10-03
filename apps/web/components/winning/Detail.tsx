@@ -14,6 +14,7 @@ import {
 import type { LinePath, Row, TapeCell } from "@fiberscope/core";
 
 import { useDashboard, useView } from "@/components/dashboard/context";
+import { arrow } from "@/components/ui/Section";
 import { cellText, useColumnLabels } from "@/components/winning/columns";
 import { useCopy } from "@/components/winning/useCopy";
 
@@ -399,7 +400,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 												rel="noopener"
 												className="whitespace-nowrap quiet"
 											>
-												{tc("basescan")}
+												{tc.rich("basescan", { arrow })}
 											</a>
 										</>
 									)}
@@ -439,7 +440,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 									rel="noopener"
 									className="whitespace-nowrap quiet"
 								>
-									{tc("cowExplorer")}
+									{tc.rich("cowExplorer", { arrow })}
 								</a>
 								<a
 									href={s.scan}
@@ -447,7 +448,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 									rel="noopener"
 									className="whitespace-nowrap quiet"
 								>
-									{tc("basescan")}
+									{tc.rich("basescan", { arrow })}
 								</a>
 							</span>
 						</div>
@@ -544,7 +545,7 @@ export function DetailCompact({ row }: { row: Row }) {
 										rel="noopener"
 										className="-my-[15px] py-[15px] whitespace-nowrap quiet"
 									>
-										{tc("basescan")}
+										{tc.rich("basescan", { arrow })}
 									</a>
 								</>
 							)}
@@ -570,7 +571,7 @@ export function DetailCompact({ row }: { row: Row }) {
 									rel="noopener"
 									className="flex min-h-11 items-center whitespace-nowrap quiet"
 								>
-									{tc("explorer")}
+									{tc.rich("explorer", { arrow })}
 								</a>
 								<a
 									href={s.scan}
@@ -578,7 +579,7 @@ export function DetailCompact({ row }: { row: Row }) {
 									rel="noopener"
 									className="flex min-h-11 items-center whitespace-nowrap quiet"
 								>
-									{tc("basescan")}
+									{tc.rich("basescan", { arrow })}
 								</a>
 							</span>
 						</div>

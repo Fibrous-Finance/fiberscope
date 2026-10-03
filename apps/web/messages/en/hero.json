@@ -1,6 +1,6 @@
 {
 	"eyebrow": "Solver competition · CoW Protocol on {network}",
-	"headline": "{fraction, select, all {All} moreThanHalf {More than half of all} half {Half of all} nearlyHalf {Nearly half of all} twoInFive {{kind, select, volume {Two-fifths} other {Two in five}} of all} aThird {A third of all} overAQuarter {Over a quarter of all} aQuarter {A quarter of all} oneInFive {{kind, select, volume {A fifth} other {One in five}} of all} other {{kind, select, volume {{n, select, 6 {A sixth} 7 {A seventh} 8 {An eighth} 9 {A ninth} 10 {A tenth} other {Less than a tenth}}} other {One in {n}}} of all}} {network} {measure} went to one solver in {span}.",
+	"headline": "{fraction, select, all {All} moreThanHalf {More than half of all} half {Half of all} nearlyHalf {Nearly half of all} twoInFive {{kind, select, volume {Two-fifths} other {Two in five}} of all} aThird {A third of all} overAQuarter {Over a quarter of all} aQuarter {A quarter of all} oneInFive {{kind, select, volume {A fifth} other {One in five}} of all} other {{kind, select, volume {{n, select, 6 {A sixth} 7 {A seventh} 8 {An eighth} 9 {A ninth} 10 {A tenth} other {Less than a tenth}}} other {One in {n, select, 6 {six} 7 {seven} 8 {eight} 9 {nine} other {{n}}}}} of all}} {network} {measure} went to one solver in {span}.",
 	"span": {
 		"last": "the last {days, plural, =1 {24\u00a0hours} other {#\u00a0days}}",
 		"to": "the {days, plural, =1 {24\u00a0hours} other {#\u00a0days}} to {asOf}"

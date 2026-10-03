@@ -19,7 +19,7 @@
 		},
 		"gas": {
 			"term": "Gas/trade",
-			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost."
+			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas / trade” considers only solvers with at least {minBatches} batches per day of the window."
 		},
 		"swaps": {
 			"term": "DEX swaps",
@@ -35,7 +35,7 @@
 		},
 		"entered": {
 			"term": "Entered",
-			"text": "Share of the window’s auctions in which the solver submitted at least one solution. Only auctions that ended in a settlement count."
+			"text": "Share of the window’s auctions in which the solver submitted at least one solution. Only auctions that ended in a settlement count. “Average solver” is the mean over the table’s solvers that entered at least one auction."
 		},
 		"winRate": {
 			"term": "Win rate",

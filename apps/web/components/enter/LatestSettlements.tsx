@@ -8,7 +8,7 @@ import { latestSettlements, NETWORKS } from "@fiberscope/core";
 
 import { useDashboard, useHover } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
-import { Caret, FootLine } from "@/components/ui/Section";
+import { arrow, Caret, FootLine } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
 
@@ -105,7 +105,7 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 								rel="noopener"
 								className="whitespace-nowrap quiet"
 							>
-								{tc("cowExplorer")}
+								{tc.rich("cowExplorer", { arrow })}
 							</a>
 							<a
 								href={row.scan}
@@ -113,7 +113,7 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 								rel="noopener"
 								className="whitespace-nowrap quiet"
 							>
-								{tc("basescan")}
+								{tc.rich("basescan", { arrow })}
 							</a>
 						</span>
 					</div>
@@ -147,7 +147,7 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 									rel="noopener"
 									className="flex min-h-11 items-center whitespace-nowrap quiet"
 								>
-									{tc("explorer")}
+									{tc.rich("explorer", { arrow })}
 								</a>
 								<a
 									href={row.scan}
@@ -155,7 +155,7 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 									rel="noopener"
 									className="flex min-h-11 items-center whitespace-nowrap quiet"
 								>
-									{tc("basescan")}
+									{tc.rich("basescan", { arrow })}
 								</a>
 							</span>
 						</div>

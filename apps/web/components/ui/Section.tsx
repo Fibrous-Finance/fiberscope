@@ -32,6 +32,14 @@ export function FootLine({ children, source }: { children?: ReactNode; source?: 
 	);
 }
 
+/**
+ * The `<arrow>` chunk of a message ("CoW Explorer ↗", "Back to the overview →", a sort arrow):
+ * decorative, so screen readers skip it.
+ */
+export function arrow(chunks: ReactNode) {
+	return <span aria-hidden="true">{chunks}</span>;
+}
+
 /** A 12px chevron that points down; rotate it to show an open state. */
 export function Caret({ open, className = "" }: { open?: boolean; className?: string }) {
 	return (

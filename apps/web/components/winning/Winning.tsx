@@ -6,7 +6,7 @@ import { BASE, sortRows } from "@fiberscope/core";
 import type { Row } from "@fiberscope/core";
 
 import { useDashboard, useView } from "@/components/dashboard/context";
-import { FootLine, Section } from "@/components/ui/Section";
+import { arrow, FootLine, Section } from "@/components/ui/Section";
 import { cellText, COLUMNS, useHeaderLabels } from "@/components/winning/columns";
 import { List, Table } from "@/components/winning/Leaderboard";
 import { Registry } from "@/components/winning/Registry";
@@ -62,7 +62,12 @@ export function Winning() {
 				...COLUMNS.map((key) => cellText(row, key, f)),
 			]),
 		].map((cells) => `| ${cells.join(" | ")} |`);
-		const source = t("markdownSource", { network: tc("network"), window: span });
+		// Pasted elsewhere, "Share" needs its measure.
+		const source = t("markdownSource", {
+			network: tc("network"),
+			measure: tc(`measure.${view.measure}`),
+			window: span,
+		});
 		copy(
 			[
 				head,
@@ -115,10 +120,11 @@ export function Winning() {
 			<Table rows={rows} />
 			<List rows={rows} />
 			<FootLine source={t("source", { network: tc("network") })}>
-				{t("note", {
+				{t.rich("note", {
 					earlier: view.hasEarlierWindow ? "yes" : "no",
 					previous: tc(`previousPeriod.${view.period}`),
 					window: span,
+					arrow,
 				})}
 			</FootLine>
 			{notes.map((note) => (

@@ -15,4 +15,4 @@ COPY apps/indexer apps/indexer
 RUN pnpm install --frozen-lockfile --prod --filter @fiberscope/indexer...
 
 ENV DB_PATH=/data/base.db
-CMD ["sh", "apps/indexer/loop.sh", "--snapshot", "/data/snapshot.json", "--chain-days", "180", "--auction-days", "90", "--budget-minutes", "8"]
+CMD ["sh", "apps/indexer/loop.sh", "--snapshot", "/data/snapshot.json", "--chain-days", "180", "--auction-days", "90", "--budget-minutes", "10"]

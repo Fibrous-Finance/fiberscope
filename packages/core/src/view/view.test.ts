@@ -39,7 +39,7 @@ function snapshot(chainDays: number, auctionDays: number, solvers: SnapshotSolve
 		solvers,
 		latestAuctions: [],
 		latestSettlements: [],
-		directory: [],
+		registry: [],
 	};
 }
 
@@ -49,6 +49,7 @@ describe("buildView", () => {
 			solver("a", "A", {
 				batches: [10, 20, 30],
 				trades: [11, 22, 33],
+				swaps: [5, 6, 7],
 				gas: [1000, 2000, 3000],
 				volume: [500],
 				entered: [80],
@@ -64,6 +65,11 @@ describe("buildView", () => {
 		assert.equal(a?.volume, 500);
 		// Average trade divides by the trades of the auction-covered day only.
 		assert.equal(a?.averageTrade, 500 / 11);
+		// So does batch value; swaps and trades per batch use every chain day.
+		assert.equal(a?.batchValue, 500 / 10);
+		assert.equal(a?.swapsPerTrade, 18 / 66);
+		assert.equal(a?.tradesPerBatch, 66 / 60);
+		assert.equal(v.swaps.average, 18 / 66);
 		assert.equal(a?.participation, 0.8);
 		assert.equal(a?.winRate, 0.5);
 		assert.equal(a?.wonShare, 0.4);

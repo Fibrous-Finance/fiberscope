@@ -7,6 +7,29 @@
 	},
 	"gain": "Biggest gain against {previousPeriod}: {solver}, {points}.",
 	"leaderGain": "It also gained the most share against {previousPeriod}: {points}.",
+	"trend": "Across all solvers, {daily, select, yes {daily } other {}}{noun} {measure, select, volume {is} other {are}} {direction, select, up {up {change}%} down {down {change}%} other {flat}} on {previousPeriod}.",
+	"network": {
+		"title": "All solvers",
+		"idle": "Daily {noun} · {days, plural, one {# day} other {# days}}",
+		"day": {
+			"batches": "{date} · {value, plural, one {# batch} other {# batches}}",
+			"trades": "{date} · {value, plural, one {# trade} other {# trades}}",
+			"volume": "{date} · {value}"
+		},
+		"noData": "{date} · no data",
+		"unit": {
+			"batches": "{count, plural, one {batch} other {batches}}",
+			"trades": "{count, plural, one {trade} other {trades}}",
+			"volume": "volume"
+		},
+		"span": "{days, plural, =1 {in the last 24 hours} other {a day, last # days}}",
+		"spanTo": "{days, plural, =1 {in the 24 hours to {asOf}} other {a day, # days to {asOf}}}",
+		"caption": "{unit} {span} · {change}% on {previousPeriod}",
+		"captionFirst": "{unit} {span} · no earlier window to compare yet",
+		"darker": "Darker: the last {days, plural, =1 {24 hours} other {# days}}",
+		"starts": "{measure, select, volume {Volume data starts {date}} other {Data starts {date}}}",
+		"chart": "Daily {noun} across all solvers, {start} to {end}: between {min} and {max} a day."
+	},
 	"rank": "#{rank}",
 	"chart": "{solver}: daily share of {measure} from {first} on {start} to {last} on {end}.",
 	"note": "Daily share of {measure}, top {count}, same scale (0–{max}). Change since {start}.",

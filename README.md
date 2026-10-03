@@ -107,7 +107,7 @@ configuration, checks and deployment.
 | `apps/indexer`      | The indexer: Node 24 with no third-party dependencies, SQLite through `node:sqlite`; runs in Docker  |
 | `packages/core`     | The snapshot contract and the view model (windows, shares, ranks), formatting and chart geometry     |
 | `docs`              | [Methodology](docs/methodology.md), [development](docs/development.md) and these screenshots         |
-| `.github/workflows` | CI checks, and deploys with a preview for each pull request                                          |
+| `.github/workflows` | CI checks, and deploys with a preview for each pull request from this repository                     |
 
 ## Contributing
 

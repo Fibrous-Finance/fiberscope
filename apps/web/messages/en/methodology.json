@@ -19,7 +19,7 @@
 		},
 		"gas": {
 			"term": "Gas/trade",
-			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas/trade” considers only solvers with at least {minBatches}\u00a0batches per day of the window, or every solver when none has that many."
+			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas/trade” considers only solvers with at least {minBatches}\u00a0batches per day of settlement data in the window, or every solver when none has that many."
 		},
 		"cost": {
 			"term": "Transaction cost",
@@ -35,7 +35,7 @@
 		},
 		"surplus": {
 			"term": "Surplus",
-			"text": "The USD value of a trade’s improvement over its user’s signed limit price, valued like Volume. Dune’s formula: value × (bought × limit sell − sold × limit buy) ÷ (bought × limit sell), with the limits read from the settlement’s calldata. Compared in basis points (hundredths of a percent) of volume."
+			"text": "The USD value of a trade’s improvement over its user’s signed limit price, valued like Volume. Dune’s formula: value × (bought × limit sell − sold × limit buy) ÷ (bought × limit sell), where bought and sold are the executed amounts (sold without the fee) and the limits come from the settlement’s calldata. Compared in basis points (hundredths of a percent) of volume."
 		},
 		"unusual": {
 			"term": "Unusual surplus",
@@ -67,11 +67,11 @@
 		},
 		"attribution": {
 			"term": "Attribution",
-			"text": "Settlements sent through CoW’s flash-loan router are credited to the solver that won the auction."
+			"text": "Settlements sent through CoW’s flash-loan router go to the transaction’s recipient when it is a registered or allow-listed solver, else to its sender when that is one, else to the auction’s winner; as a last resort, to the sender."
 		},
 		"registry": {
 			"term": "Registry",
-			"text": "Status and submission addresses from CoW’s solver registry for Base, plus addresses that settle on Base and are on the settlement contract’s on-chain solver allow-list but are not listed as active. These additional addresses are shown as active. A retired address is one the registry marks inactive."
+			"text": "Status and submission addresses from CoW’s solver registry for Base, plus addresses that settle on Base and are on the settlement contract’s on-chain solver allow-list but are not listed as active. These additional addresses are shown as active; today there is one, Rizzolver’s 0x8f58…5cb7. A retired address is one the registry marks inactive."
 		},
 		"freshness": {
 			"term": "Freshness",
@@ -81,7 +81,7 @@
 		},
 		"windows": {
 			"term": "Windows",
-			"text": "Rolling, ending at the newest block in the data. Longer windows add up daily windows; rates are averaged per auction."
+			"text": "Rolling, ending at the newest block in the data. Longer windows add up daily windows; rates such as Entered and Win rate are taken over all of a window’s auctions together."
 		},
 		"coverage": {
 			"term": "Coverage",

@@ -85,7 +85,8 @@ server answers that the rate is too high.
 `apps/indexer/loop.sh` runs `sync` with its arguments every `REFRESH_MINUTES` (whole minutes,
 default 10), counted from the start of each run; a failed run is logged and the next one runs on
 schedule. Set `--budget-minutes` to the interval: the backfill stops when the next run is due, so
-fresh data never waits for a long backfill and no time between runs is idle.
+fresh data never waits for a long backfill, and while history is being filled no time between runs
+is idle.
 
 ```sh
 REFRESH_MINUTES=10 sh apps/indexer/loop.sh --chain-days 30 --auction-days 7 --budget-minutes 10 \

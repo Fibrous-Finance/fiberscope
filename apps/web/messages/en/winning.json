@@ -115,6 +115,6 @@
 	"markdownFootnotes": {
 		"auction": "{covered, plural, =0 {† Volume, Entered and Win rate need auction data, and this window has none yet.} other {† Volume, Entered and Win rate cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
 		"auctionAndSurplus": "{covered, plural, =0 {† Volume, Entered, Win rate and surplus need auction data, and this window has none yet.} other {† Volume, Entered, Win rate and surplus cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
-		"surplus": "{covered, plural, =0 {‡ Surplus needs auction data, and this window has none yet.} other {‡ Surplus covers the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}"
+		"surplus": "{covered, plural, =0 {‡ Surplus also needs signed order terms, and this window has none yet.} other {‡ Surplus covers the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}"
 	}
 }

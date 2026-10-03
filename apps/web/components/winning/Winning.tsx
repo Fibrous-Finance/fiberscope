@@ -9,6 +9,7 @@ import { useDashboard, useView } from "@/components/dashboard/context";
 import { FootLine, Section } from "@/components/ui/Section";
 import { cellText, COLUMNS, useColumnLabels } from "@/components/winning/columns";
 import { List, Table } from "@/components/winning/Leaderboard";
+import { Registry } from "@/components/winning/Registry";
 import { useCopy } from "@/components/winning/useCopy";
 
 import { useFormat } from "@/lib/format";
@@ -19,13 +20,15 @@ const COPIED_MS = 1600;
 const MARKDOWN_ALIGN = "|--:|---|--:|--:|--:|--:|--:|--:|--:|";
 /** Machine-readable, so the same in every language. */
 const CSV_HEADER =
-	"rank,solver,share_pct,batches,trades,volume_usd,gas_per_trade,entered_pct,win_rate_pct";
+	"rank,solver,share_pct,batches,trades,volume_usd,gas_per_trade,dex_swaps_per_trade,avg_batch_value_usd,trades_per_batch,entered_pct,win_rate_pct";
+/** Copy as Markdown and Download CSV: 44px targets in the compact layout. */
+const ACTION = "-my-1.5 py-2.5 quiet max-wide:-my-[15px] max-wide:py-[15px]";
 /** The download link's object URL is released after this. */
 const REVOKE_MS = 1500;
 /** Loading placeholder rows: the name bar's width in %. */
 const SKELETON_NAMES = [62, 48, 55, 40, 51, 44, 58, 37];
 
-/** "Who is winning": the leaderboard, with an expandable detail per solver. */
+/** "Who is winning": the leaderboard, with an expandable detail per solver, then the registry. */
 export function Winning() {
 	const view = useView();
 	const { sort } = useDashboard();
@@ -74,8 +77,8 @@ export function Winning() {
 						})}
 					</p>
 				</div>
-				<div className="flex gap-[18px] font-mono text-[12px] leading-[normal] font-medium">
-					<button type="button" onClick={copyMarkdown} className="-my-1.5 py-2.5 quiet">
+				<div className="flex gap-6 font-mono text-[12px] leading-[normal] font-medium">
+					<button type="button" onClick={copyMarkdown} className={ACTION}>
 						{copied === null ? t("copyMarkdown") : tc("copied")}
 					</button>
 					<button
@@ -86,7 +89,7 @@ export function Winning() {
 								`fiberscope-${BASE.id}-${view.period}-${view.measure}.csv`
 							)
 						}
-						className="-my-1.5 py-2.5 quiet"
+						className={ACTION}
 					>
 						{t("downloadCsv")}
 					</button>
@@ -108,21 +111,25 @@ export function Winning() {
 			) : null}
 			{view.coverage.auction < view.days ? (
 				<div className="mt-1.5 foot-line">
-					{tc("coverage.auction", { covered: view.coverage.auction, days: view.days })}
+					{t("auctionCoverage", { covered: view.coverage.auction, days: view.days })}
 				</div>
 			) : null}
+			<Registry />
 		</Section>
 	);
 }
 
-/** The loading state: the heading and eight placeholder rows. */
+/**
+ * The loading state: the heading and eight placeholder rows, shaped like the table on desktop
+ * and like the list in the compact layout.
+ */
 export function WinningSkeleton() {
 	const t = useTranslations("Winning");
 	return (
 		<Section busy>
 			<h2 className="section-title">{t("title")}</h2>
 			<span className="mt-4 skeleton h-4 w-[min(520px,90%)] rounded-[7px]" />
-			<div className="mt-8 border-t border-ln2">
+			<div className="mt-8 hidden border-t border-ln2 wide:block">
 				{SKELETON_NAMES.map((name, i) => (
 					<div
 						key={name}
@@ -143,6 +150,29 @@ export function WinningSkeleton() {
 					</div>
 				))}
 			</div>
+			<div className="mt-6 border-t border-ln2 wide:hidden">
+				{SKELETON_NAMES.map((name, i) => (
+					<div
+						key={name}
+						className="grid grid-cols-[24px_minmax(0,1fr)_52px] items-center gap-2.5 border-b border-ln py-3.5"
+					>
+						<span className="skeleton h-[11px] w-3 rounded-[4px]" />
+						<span
+							style={{ width: `${name}%` }}
+							className="skeleton h-3.5 rounded-[6px]"
+						/>
+						<span className="skeleton h-[13px] rounded-[6px]" />
+						<span
+							style={{ width: `${Math.max(8, 92 - i * 12)}%` }}
+							className="col-[2/4] skeleton h-[3px] rounded-[2px]"
+						/>
+						<span
+							style={{ width: `${70 - i * 3}%` }}
+							className="col-[2/4] skeleton h-[11px] rounded-[5px]"
+						/>
+					</div>
+				))}
+			</div>
 		</Section>
 	);
 }
@@ -160,6 +190,9 @@ function downloadCsv(rows: readonly Row[], file: string) {
 			row.trades,
 			row.volume === null ? "" : Math.round(row.volume),
 			row.gasPerTrade === null ? "" : Math.round(row.gasPerTrade),
+			row.swapsPerTrade === null ? "" : row.swapsPerTrade.toFixed(2),
+			row.batchValue === null ? "" : Math.round(row.batchValue),
+			row.tradesPerBatch === null ? "" : row.tradesPerBatch.toFixed(2),
 			percent(row.participation, 1),
 			percent(row.winRate, 1),
 		].join(",")

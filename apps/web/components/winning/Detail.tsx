@@ -9,6 +9,7 @@ import {
 	linePath,
 	mediumAddress,
 	registrationOf,
+	surplusAndCost,
 	tapeCell,
 } from "@fiberscope/core";
 import type { LinePath, Row, TapeCell } from "@fiberscope/core";
@@ -22,10 +23,7 @@ import { useFormat } from "@/lib/format";
 
 /** The detail under an open row: two blocks on desktop, one stack in the compact list. */
 
-/**
- * Below this visible table width, the first block moves its third column underneath and the
- * second stacks.
- */
+/** Below this visible table width, the first block moves its third column underneath. */
 const NARROW_TABLE = 1120;
 /** The share chart's y-range spans at least 4 percentage points. */
 const MIN_SPAN = 0.04;
@@ -42,9 +40,14 @@ const SMALL_LABEL =
 	"font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-mu uppercase";
 /** "Retired" in place of an address's actions. */
 const RETIRED = "text-[10.5px] tracking-[.06em] text-fa uppercase";
-/** Time, trades, swaps, pair, volume, gas and links; the header and every settlement share it. */
+/**
+ * Time, trades, swaps, pair, volume, surplus, cost, gas and links; the header and every
+ * settlement share it.
+ */
 const SETTLEMENT_GRID =
-	"grid grid-cols-[96px_46px_46px_minmax(0,1fr)_76px_56px_200px] items-center gap-3";
+	"grid grid-cols-[96px_46px_46px_minmax(0,1fr)_76px_72px_56px_56px_200px] items-center gap-3";
+/** The compact settlement's figures, in order, as one wrapping list. */
+const SETTLEMENT_ITEMS = ["trades", "swaps", "volume", "surplus", "cost", "gas"] as const;
 
 /** A won auction is a square, an entered one a dot, one it did not enter a faint speck. */
 const DOT: Record<TapeCell["state"], string> = {
@@ -95,8 +98,14 @@ function useDetail(row: Row) {
 			? view.totals.volume / pricedBatches
 			: null;
 	const swaps = view.swaps.average;
+	// Cost per trade and typical surplus, the solver's and the network's.
+	const { rows: figures, network } = surplusAndCost(snapshot!, view);
+	const own = figures.get(row.id);
+	const typical = own?.typicalSurplusRate ?? null;
+	const auctionData = view.coverage.auction > 0;
 
-	const cells: AuctionCell[] = (snapshot?.latestAuctions ?? [])
+	// Without auction data in the window the strip stays empty, as the auction stats do.
+	const cells: AuctionCell[] = (auctionData ? (snapshot?.latestAuctions ?? []) : [])
 		.slice(-LATEST_AUCTIONS)
 		.map((auction) => {
 			const { state, tx } = tapeCell(auction, row.id);
@@ -138,7 +147,7 @@ function useDetail(row: Row) {
 		}),
 		start,
 		end,
-		/** Eight stats, two to a row. */
+		/** Ten stats, two to a row: cost next to gas, typical surplus after the swaps. */
 		stats: [
 			{
 				key: "batches",
@@ -182,8 +191,23 @@ function useDetail(row: Row) {
 						? DASH
 						: t("detail.stats.gas", {
 								percent: f.percent(Math.abs(gasDiff)),
-								direction: gasDiff < 0 ? "below" : gasDiff > 0 ? "above" : "same",
+								// Within half a percent the difference would read "0%": the same.
+								direction:
+									Math.round(Math.abs(gasDiff) * 100) === 0
+										? "same"
+										: gasDiff < 0
+											? "below"
+											: "above",
 							}),
+			},
+			{
+				key: "cost",
+				label: t("detail.labels.cost"),
+				value: f.cost(own?.costPerTrade ?? null),
+				note:
+					network.costPerTrade === null
+						? DASH
+						: t("detail.stats.cost", { value: f.cost(network.costPerTrade) }),
 			},
 			{
 				key: "swaps",
@@ -191,6 +215,21 @@ function useDetail(row: Row) {
 				value: row.swapsPerTrade === null ? DASH : f.fixed(row.swapsPerTrade, 2),
 				note:
 					swaps === null ? DASH : t("detail.stats.average", { value: f.fixed(swaps, 2) }),
+			},
+			{
+				key: "surplus",
+				label: t("detail.labels.surplus"),
+				value:
+					typical === null
+						? DASH
+						: t("detail.stats.surplusValue", { bps: f.bps(typical) }),
+				note: !auctionData
+					? noData
+					: typical === null
+						? t("detail.stats.noSurplusData")
+						: t("detail.stats.surplus", {
+								share: own?.unusualShare ? f.percent(own.unusualShare) : "none",
+							}),
 			},
 			{
 				key: "participation",
@@ -251,7 +290,10 @@ function useDetail(row: Row) {
 		})),
 		settlements: row.latestSettlements.map((s) => {
 			const volume = f.usd(s.volume);
+			const surplus = f.usdCents(s.surplus);
+			const cost = f.cost(s.cost);
 			const gas = f.gas(s.gas);
+			const values = { trades: s.trades, swaps: s.swaps, volume, surplus, cost, gas };
 			return {
 				tx: s.tx,
 				time: view.end.time - s.time < RECENT_MS ? f.clock(s.time) : f.dayTime(s.time),
@@ -259,13 +301,13 @@ function useDetail(row: Row) {
 				swaps: f.int(s.swaps),
 				pair: t("detail.pair", { sell: s.pair.sell, buy: s.pair.buy, more: s.trades - 1 }),
 				volume,
+				surplus,
+				cost,
 				gas,
-				summary: t("detail.settlementLine", {
-					trades: s.trades,
-					swaps: s.swaps,
-					volume,
-					gas,
-				}),
+				items: SETTLEMENT_ITEMS.map((key) => ({
+					key,
+					text: t(`detail.settlementItems.${key}`, values),
+				})),
 				cow: COW_TX + s.tx,
 				scan: `${BASE.scan}/tx/${s.tx}`,
 			};
@@ -305,6 +347,57 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 					<div className="mt-1.5 flex justify-between font-mono text-[11px] leading-[normal] font-medium text-fa">
 						<span>{d.start}</span>
 						<span>{d.end}</span>
+					</div>
+					<div className="mt-7">
+						<div className="flex items-baseline justify-between gap-3">
+							<span className="label">{t("detail.addresses")}</span>
+							{d.registry === null ? null : (
+								<span className="font-mono text-[11px] leading-[normal] font-medium whitespace-nowrap text-fa">
+									{d.registry}
+								</span>
+							)}
+						</div>
+						<div className="mt-2">
+							{d.addresses.map((a) => (
+								<div
+									key={a.key}
+									className="box-content grid h-10 grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 border-b border-ln"
+								>
+									<span className="label">{a.label}</span>
+									<span
+										title={a.address}
+										className={`truncate font-mono text-[12.5px] leading-[normal] font-medium ${a.retired ? "text-fa" : ""}`}
+									>
+										{a.address}
+									</span>
+									<span className="flex gap-3.5 font-mono text-[12px] leading-[normal] font-medium">
+										{a.retired ? (
+											<span className={RETIRED}>{t("retired")}</span>
+										) : (
+											<>
+												<button
+													type="button"
+													onClick={() => copy(a.address)}
+													className="whitespace-nowrap quiet"
+												>
+													{copied === a.address
+														? tc("copied")
+														: tc("copy")}
+												</button>
+												<a
+													href={a.href}
+													target="_blank"
+													rel="noopener"
+													className="whitespace-nowrap quiet"
+												>
+													{tc.rich("basescan", { arrow })}
+												</a>
+											</>
+										)}
+									</span>
+								</div>
+							))}
+						</div>
 					</div>
 				</div>
 				<div className="grid grid-cols-2 content-start gap-x-5 gap-y-[18px]">
@@ -351,7 +444,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 								/>
 							)}
 						</div>
-						<div className="mt-1 flex justify-between font-mono text-[11px] leading-[normal] font-medium text-fa">
+						<div className="mt-1 flex justify-between gap-2 font-mono text-[11px] leading-[normal] font-medium text-fa">
 							<span>{t("detail.lower")}</span>
 							<span>{t("detail.networkAverage")}</span>
 							<span>{t("detail.higher")}</span>
@@ -361,101 +454,71 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 			</div>
 			<div
 				style={pinned}
-				className={`sticky left-0 z-3 grid cursor-default border-b border-ln bg-bg pt-1 pb-[30px] pl-[52px] ${narrow ? "grid-cols-1 gap-7" : "grid-cols-[minmax(0,1fr)_minmax(0,1.75fr)] gap-9"}`}
+				className="sticky left-0 z-3 cursor-default border-b border-ln bg-bg pt-1 pb-[30px] pl-[52px]"
 			>
-				<div className="min-w-0">
-					<div className="flex items-baseline justify-between gap-3">
-						<span className="label">{t("detail.addresses")}</span>
-						{d.registry === null ? null : (
-							<span className="font-mono text-[11px] leading-[normal] font-medium whitespace-nowrap text-fa">
-								{d.registry}
+				<div className="label">{t("detail.settlements")}</div>
+				{/* Narrower than the grid, the settlements scroll sideways rather than squeeze the pair. */}
+				<div className="mt-1 overflow-x-auto">
+					<div className="min-w-[860px]">
+						<div
+							className={`${SETTLEMENT_GRID} box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-fa uppercase`}
+						>
+							<span>{t("detail.settlementColumns.time")}</span>
+							<span className="text-right">
+								{t("detail.settlementColumns.trades")}
 							</span>
-						)}
-					</div>
-					<div className="mt-2">
-						{d.addresses.map((a) => (
+							<span className="text-right">
+								{t("detail.settlementColumns.swaps")}
+							</span>
+							<span className="pl-1.5">{t("detail.settlementColumns.pair")}</span>
+							<span className="text-right">
+								{t("detail.settlementColumns.volume")}
+							</span>
+							<span className="text-right">
+								{t("detail.settlementColumns.surplus")}
+							</span>
+							<span className="text-right">{t("detail.settlementColumns.cost")}</span>
+							<span className="text-right">{t("detail.settlementColumns.gas")}</span>
+							<span className="text-right">
+								{t("detail.settlementColumns.links")}
+							</span>
+						</div>
+						{d.settlements.map((s) => (
 							<div
-								key={a.key}
-								className="box-content grid h-10 grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 border-b border-ln"
+								key={s.tx}
+								className={`${SETTLEMENT_GRID} box-content h-[38px] border-b border-ln font-mono text-[12.5px] leading-[normal] font-medium`}
 							>
-								<span className="label">{a.label}</span>
-								<span
-									title={a.address}
-									className={`truncate font-mono text-[12.5px] leading-[normal] font-medium ${a.retired ? "text-fa" : ""}`}
-								>
-									{a.address}
+								<span>{s.time}</span>
+								<span className="text-right">{s.trades}</span>
+								<span className="text-right">{s.swaps}</span>
+								<span className="truncate pl-1.5 font-sans text-[13px]">
+									{s.pair}
 								</span>
-								<span className="flex gap-3.5 font-mono text-[12px] leading-[normal] font-medium">
-									{a.retired ? (
-										<span className={RETIRED}>{t("retired")}</span>
-									) : (
-										<>
-											<button
-												type="button"
-												onClick={() => copy(a.address)}
-												className="whitespace-nowrap quiet"
-											>
-												{copied === a.address ? tc("copied") : tc("copy")}
-											</button>
-											<a
-												href={a.href}
-												target="_blank"
-												rel="noopener"
-												className="whitespace-nowrap quiet"
-											>
-												{tc.rich("basescan", { arrow })}
-											</a>
-										</>
-									)}
+								<span className="text-right">{s.volume}</span>
+								<span className="text-right">{s.surplus}</span>
+								<span className="text-right">{s.cost}</span>
+								<span className="text-right">{s.gas}</span>
+								<span className="flex justify-end gap-3.5 text-[12px]">
+									<a
+										href={s.cow}
+										target="_blank"
+										rel="noopener"
+										className="whitespace-nowrap quiet"
+									>
+										{tc.rich("cowExplorer", { arrow })}
+									</a>
+									<a
+										href={s.scan}
+										target="_blank"
+										rel="noopener"
+										className="whitespace-nowrap quiet"
+									>
+										{tc.rich("basescan", { arrow })}
+									</a>
 								</span>
 							</div>
 						))}
 					</div>
-				</div>
-				<div className="min-w-0">
-					<div className="label">{t("detail.settlements")}</div>
-					<div
-						className={`${SETTLEMENT_GRID} mt-1 box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-fa uppercase`}
-					>
-						<span>{t("detail.settlementColumns.time")}</span>
-						<span className="text-right">{t("detail.settlementColumns.trades")}</span>
-						<span className="text-right">{t("detail.settlementColumns.swaps")}</span>
-						<span className="pl-1.5">{t("detail.settlementColumns.pair")}</span>
-						<span className="text-right">{t("detail.settlementColumns.volume")}</span>
-						<span className="text-right">{t("detail.settlementColumns.gas")}</span>
-						<span className="text-right">{t("detail.settlementColumns.links")}</span>
-					</div>
-					{d.settlements.map((s) => (
-						<div
-							key={s.tx}
-							className={`${SETTLEMENT_GRID} box-content h-[38px] border-b border-ln font-mono text-[12.5px] leading-[normal] font-medium`}
-						>
-							<span>{s.time}</span>
-							<span className="text-right">{s.trades}</span>
-							<span className="text-right">{s.swaps}</span>
-							<span className="truncate pl-1.5 font-sans text-[13px]">{s.pair}</span>
-							<span className="text-right">{s.volume}</span>
-							<span className="text-right">{s.gas}</span>
-							<span className="flex justify-end gap-3.5 text-[12px]">
-								<a
-									href={s.cow}
-									target="_blank"
-									rel="noopener"
-									className="whitespace-nowrap quiet"
-								>
-									{tc.rich("cowExplorer", { arrow })}
-								</a>
-								<a
-									href={s.scan}
-									target="_blank"
-									rel="noopener"
-									className="whitespace-nowrap quiet"
-								>
-									{tc.rich("basescan", { arrow })}
-								</a>
-							</span>
-						</div>
-					))}
 				</div>
 			</div>
 		</>
@@ -464,7 +527,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 
 /**
  * The compact detail: one stack, the auction strip as a picture only, shortened addresses and
- * two-line settlements. Every link and button is a 44px target.
+ * settlements whose figures wrap as one list. Every link and button is a 44px target.
  */
 export function DetailCompact({ row }: { row: Row }) {
 	const d = useDetail(row);
@@ -564,27 +627,40 @@ export function DetailCompact({ row }: { row: Row }) {
 							<span>{s.time}</span>
 							<span className="truncate font-sans text-[13px]">{s.pair}</span>
 						</div>
-						{/* The links share the figures' line when they fit, else take their own. */}
-						<div className="flex flex-wrap items-center justify-between gap-x-4 font-mono text-[11.5px] leading-[normal] font-medium text-mu">
-							<span className="max-w-full truncate py-1.5">{s.summary}</span>
-							<span className="ml-auto flex gap-[18px]">
-								<a
-									href={s.cow}
-									target="_blank"
-									rel="noopener"
-									className="flex min-h-11 items-center whitespace-nowrap quiet"
-								>
-									{tc.rich("explorer", { arrow })}
-								</a>
-								<a
-									href={s.scan}
-									target="_blank"
-									rel="noopener"
-									className="flex min-h-11 items-center whitespace-nowrap quiet"
-								>
-									{tc.rich("basescan", { arrow })}
-								</a>
-							</span>
+						{/*
+						 * One wrapping list. Each figure carries its "·", clipped where it would start a
+						 * line; the links end it, 44px tall without spacing the lines apart. Only the
+						 * sides clip, so the links' overhang above and below stays tappable.
+						 */}
+						<div className="overflow-x-clip">
+							<div className="-ml-3.5 flex flex-wrap items-center font-mono text-[11.5px] leading-[normal] font-medium text-mu">
+								{s.items.map((item) => (
+									<span
+										key={item.key}
+										className="py-1.5 whitespace-nowrap before:inline-block before:w-3.5 before:text-center before:content-['·']"
+									>
+										{item.text}
+									</span>
+								))}
+								<span className="-my-[11px] ml-auto flex gap-[18px] pl-3.5">
+									<a
+										href={s.cow}
+										target="_blank"
+										rel="noopener"
+										className="flex min-h-11 items-center whitespace-nowrap quiet"
+									>
+										{tc.rich("explorer", { arrow })}
+									</a>
+									<a
+										href={s.scan}
+										target="_blank"
+										rel="noopener"
+										className="flex min-h-11 items-center whitespace-nowrap quiet"
+									>
+										{tc.rich("basescan", { arrow })}
+									</a>
+								</span>
+							</div>
 						</div>
 					</div>
 				))}

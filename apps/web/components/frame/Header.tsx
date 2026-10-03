@@ -42,7 +42,7 @@ export function Header({
 				<a
 					href={away ? "/" : "#"}
 					aria-label={t("home")}
-					className="flex flex-none items-baseline text-[20px] leading-none font-semibold tracking-[-0.045em] text-fg hover:no-underline"
+					className="flex flex-none items-baseline text-[20px] leading-none font-semibold tracking-[-0.035em] text-fg hover:no-underline"
 				>
 					<Logo />
 				</a>

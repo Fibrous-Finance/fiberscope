@@ -9,7 +9,7 @@ export interface Selection {
 	solver: string | null;
 }
 
-export const DEFAULT_SELECTION: Selection = { period: "24h", measure: "batches", solver: null };
+const DEFAULT_SELECTION: Selection = { period: "24h", measure: "batches", solver: null };
 
 type SearchParams = Record<string, string | string[] | undefined>;
 

@@ -68,7 +68,6 @@ export interface BatchRow {
 
 export interface TradeValueRow {
 	tx: string;
-	logIndex: number;
 	settlementLogIndex: number;
 	block: number;
 	sellToken: string;
@@ -86,9 +85,7 @@ export interface SolutionRow {
 	auctionId: number;
 	startBlock: number;
 	solver: string;
-	ranking: number;
 	winner: number;
-	filteredOut: number;
 	tx: string | null;
 }
 
@@ -757,12 +754,11 @@ export class Store {
 	}
 }
 
-const TRADE_ROWS = `SELECT tr.tx, tr.log_index AS logIndex, tr.settlement_log_index AS settlementLogIndex,
-	tr.block, tr.sell_token AS sellToken, tr.buy_token AS buyToken, tr.sell_amount AS sellAmount,
+const TRADE_ROWS = `SELECT tr.tx, tr.settlement_log_index AS settlementLogIndex, tr.block,
+	tr.sell_token AS sellToken, tr.buy_token AS buyToken, tr.sell_amount AS sellAmount,
 	tr.buy_amount AS buyAmount, tr.limit_sell_amount AS limitSellAmount,
 	tr.limit_buy_amount AS limitBuyAmount, tr.fee_amount AS feeAmount, a.auction_id AS auctionId
 	FROM trades tr LEFT JOIN auction_txs a ON a.tx = tr.tx`;
 
-const SOLUTION_ROWS = `SELECT a.id AS auctionId, a.start_block AS startBlock, s.solver, s.ranking,
-	s.winner, s.filtered_out AS filteredOut, s.tx
+const SOLUTION_ROWS = `SELECT a.id AS auctionId, a.start_block AS startBlock, s.solver, s.winner, s.tx
 	FROM auctions a JOIN solutions s ON s.auction_id = a.id`;

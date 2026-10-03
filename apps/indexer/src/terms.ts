@@ -43,7 +43,7 @@ export interface SettleCall {
 }
 
 /** The amounts settle() moves for one trade, as its Trade event reports them. */
-export interface Execution {
+interface Execution {
 	sellToken: string;
 	buyToken: string;
 	/** Sold, fee included. */
@@ -189,7 +189,7 @@ function readTrades(data: Calldata, at: number, tokenCount: number): CalldataTra
  * that at the clearing prices, rounded down. A partial fill pays its share of the signed fee,
  * rounded down. Null where the contract would divide by zero.
  */
-export function execution(call: SettleCall, trade: CalldataTrade): Execution | null {
+function execution(call: SettleCall, trade: CalldataTrade): Execution | null {
 	const sellPrice = call.clearingPrices[trade.sellTokenIndex];
 	const buyPrice = call.clearingPrices[trade.buyTokenIndex];
 	if (sellPrice === 0n || buyPrice === 0n) return null;

@@ -105,7 +105,7 @@ export class TradeValuer {
 }
 
 /** A solver that submitted at least one solution to an auction (filtered-out ones included). */
-export interface Entrant {
+interface Entrant {
 	identity: SolverIdentity;
 	addresses: Set<string>;
 }

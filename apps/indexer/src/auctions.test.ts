@@ -97,7 +97,7 @@ function fakeApi(competitions: Competition[]): CompetitionSource & { asked: stri
 }
 
 function stats(): AuctionStats {
-	return { txs: 0, lookups: 0, missing: 0, seconds: 0 };
+	return { lookups: 0, missing: 0, seconds: 0 };
 }
 
 describe("competition lookups", () => {

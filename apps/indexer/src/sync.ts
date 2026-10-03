@@ -65,8 +65,8 @@ export async function sync(
 		throw new Error("The database is empty: pass --chain-days to backfill");
 	}
 	const stats: SyncStats = {
-		chain: { ranges: 0, receipts: 0, seconds: 0 },
-		auctions: { txs: 0, lookups: 0, missing: 0, seconds: 0 },
+		chain: { receipts: 0, seconds: 0 },
+		auctions: { lookups: 0, missing: 0, seconds: 0 },
 		terms: { txs: 0, trades: 0, read: 0, seconds: 0 },
 	};
 	await repairRouterRecipients(store, rpc);

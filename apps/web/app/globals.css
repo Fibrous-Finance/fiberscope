@@ -15,7 +15,6 @@
 	--ln2: light-dark(#d2d7db, #363d51);
 	--hov: light-dark(#eef1f3, #232839);
 	--act: light-dark(#0a7a81, #3cc9cf);
-	--acg: light-dark(#0e9aa1, #11b2ba);
 	--warn: light-dark(#8a5a00, #f2b544);
 	--err: light-dark(#b42318, #ff8a7a);
 }
@@ -42,7 +41,6 @@
 	--color-ln2: var(--ln2);
 	--color-hov: var(--hov);
 	--color-act: var(--act);
-	--color-acg: var(--acg);
 	--color-warn: var(--warn);
 	--color-err: var(--err);
 	/* Brand teal: thumbs, buttons, hover highlight, logo, live dot. Text on teal is navy. */
@@ -50,7 +48,6 @@
 	--color-navy: #1b1f2c;
 	--color-base: #0052ff;
 	--color-transparent: transparent;
-	--color-current: currentColor;
 
 	--font-sans: var(--font-geist-sans), system-ui, sans-serif;
 	--font-mono: var(--font-geist-mono), monospace;

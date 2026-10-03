@@ -24,7 +24,6 @@ const PIPELINE = 2;
 
 /** Running totals of chain ingestion, for throughput reports. */
 export interface IngestStats {
-	ranges: number;
 	/** Batch transactions, one receipt each. */
 	receipts: number;
 	/** Time spent ingesting. */
@@ -37,7 +36,7 @@ export interface IngestStats {
  * kept: `eth_call` is the scarcest RPC allowance (see ETH_CALL_SHARE in rpc.ts), and an address
  * does not switch between being a solver and being an operator account.
  */
-export class AllowList {
+class AllowList {
 	readonly #store: Store;
 	readonly #rpc: Rpc;
 	readonly #checks = new Map<string, Promise<boolean>>();
@@ -77,7 +76,7 @@ export class AllowList {
  * gives its trades, and the ETH/USD answers of the aggregators that `feed` says the Chainlink
  * proxy used. Flash-loan router senders and recipients get an AllowList verdict on the way.
  */
-export async function fetchChunk(
+async function fetchChunk(
 	rpc: Rpc,
 	range: BlockRange,
 	feed: FeedSegment[],
@@ -364,7 +363,6 @@ async function ingest(
 		refill();
 		done++;
 		receipts += chunk.txs.length;
-		stats.ranges++;
 		stats.receipts += chunk.txs.length;
 		report(() => {
 			const seconds = (performance.now() - started) / 1000;

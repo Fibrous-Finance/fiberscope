@@ -29,7 +29,7 @@ export function systemTheme(): Theme {
 	return window.matchMedia(DARK_QUERY).matches ? "dark" : "light";
 }
 
-export function applyAppearance(appearance: Appearance): void {
+function applyAppearance(appearance: Appearance): void {
 	const root = document.documentElement;
 	if (appearance === "auto") delete root.dataset.theme;
 	else root.dataset.theme = appearance;

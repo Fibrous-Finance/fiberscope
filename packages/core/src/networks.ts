@@ -3,7 +3,6 @@ export type NetworkId = "base";
 
 export interface Network {
 	id: NetworkId;
-	name: string;
 	chainId: number;
 	/** CoW Protocol API root for this network. */
 	cowApi: string;
@@ -27,7 +26,6 @@ export interface Network {
 
 export const BASE: Network = {
 	id: "base",
-	name: "Base",
 	chainId: 8453,
 	cowApi: "https://api.cow.fi/base",
 	explorerSlug: "base",

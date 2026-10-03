@@ -2,7 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { backoff, describeError, Pacer, retryAfterMs } from "./pacer.ts";
 
-export interface Solution {
+interface Solution {
 	/** Submission address, lowercase. */
 	solver: string;
 	score: string;
@@ -30,7 +30,7 @@ const TIMEOUT_MS = 60_000;
 /** A polite client for CoW's solver-competition API: paced, and backing off when told to. */
 export class CowApi {
 	readonly root: string;
-	readonly stats = { requests: 0, found: 0, notFound: 0, retries: 0, bytes: 0 };
+	readonly stats = { retries: 0, bytes: 0 };
 	#pacer: Pacer;
 
 	/** `root` is the network's API root, such as https://api.cow.fi/base. */
@@ -53,7 +53,6 @@ export class CowApi {
 				await sleep(backoff(attempt, 60_000));
 			}
 			await this.#pacer.take();
-			this.stats.requests++;
 			let status: number;
 			try {
 				const response = await fetch(this.root + path, {
@@ -62,7 +61,6 @@ export class CowApi {
 				status = response.status;
 				if (response.ok) {
 					const text = await response.text();
-					this.stats.found++;
 					this.stats.bytes += text.length;
 					return JSON.parse(text);
 				}
@@ -76,10 +74,7 @@ export class CowApi {
 				problem = describeError(error);
 				continue;
 			}
-			if (status === 404) {
-				this.stats.notFound++;
-				return null;
-			}
+			if (status === 404) return null;
 			if (status !== 429 && status < 500) throw new Error(`GET ${path}: HTTP ${status}`);
 			problem = `HTTP ${status}`;
 		}
@@ -104,7 +99,7 @@ interface RawCompetition {
 }
 
 /** Keeps what the indexer uses from a competition; `auction.orders` (most of the bytes) is dropped. */
-export function parseCompetition(json: unknown): Competition {
+function parseCompetition(json: unknown): Competition {
 	const raw = json as RawCompetition;
 	if (!Number.isInteger(raw.auctionId) || !Number.isInteger(raw.auctionStartBlock)) {
 		throw new Error(`unexpected competition: ${JSON.stringify(json).slice(0, 200)}`);

@@ -3,9 +3,9 @@ import { FEW_TRADES } from "./view.ts";
 import type { Row } from "./view.ts";
 
 /** The ends the swaps axis can take; it stops at the last one even if a solver goes beyond. */
-export const SWAPS_AXIS_ENDS: readonly number[] = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
+const SWAPS_AXIS_ENDS: readonly number[] = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
 /** The ends the cost axis can take, in cents per trade; it stops at the last one too. */
-export const COST_AXIS_ENDS: readonly number[] = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30, 50];
+const COST_AXIS_ENDS: readonly number[] = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30, 50];
 
 /** A track's axis, in the track's unit. */
 export interface TrackAxis {

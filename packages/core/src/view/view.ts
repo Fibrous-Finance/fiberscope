@@ -19,7 +19,7 @@ export const PERIODS: readonly Period[] = ["24h", "7d", "30d", "90d", "180d"];
 export const MEASURES: readonly Measure[] = ["batches", "trades", "volume"];
 
 /** Days in each window. */
-export const PERIOD_DAYS: Record<Period, number> = {
+const PERIOD_DAYS: Record<Period, number> = {
 	"24h": 1,
 	"7d": 7,
 	"30d": 30,
@@ -78,7 +78,6 @@ export interface Row extends SolverRef {
 	/** Volume ÷ trades over the same auction-covered days. */
 	averageTrade: number | null;
 	entered: number | null;
-	won: number | null;
 	/**
 	 * Share of the window's auctions the solver entered. This and the two rates below are null when
 	 * it entered none: every batch comes from a won auction, so a solver with batches but no entries
@@ -120,7 +119,7 @@ export type Fraction =
 	  }
 	| { key: "oneIn"; n: number };
 
-export interface LeaderRun {
+interface LeaderRun {
 	solver: SolverRef;
 	/** Consecutive rolling days, ending with the latest, on which the solver alone led the daily measure. */
 	days: number;
@@ -140,7 +139,6 @@ export interface LeaderRun {
 
 export interface Entrant extends SolverRef {
 	entered: number;
-	won: number;
 	participation: number;
 	winRate: number;
 	wonShare: number;
@@ -152,7 +150,7 @@ export interface TapeCell {
 	tx: string | null;
 }
 
-export interface TapeAuction {
+interface TapeAuction {
 	id: number;
 	time: number;
 	entered: number;
@@ -186,8 +184,6 @@ export interface View {
 		trades: number;
 		volume: number | null;
 		solvers: number;
-		auctions: number | null;
-		solutions: number | null;
 	};
 	/**
 	 * Total of the active measure; 0 means nothing in the window counts toward it (no batches, or for
@@ -216,7 +212,6 @@ export interface View {
 		average: number | null;
 	};
 	competition: {
-		auctions: number;
 		solutionsPerAuction: number;
 		/** Average number of solvers entering each auction. */
 		entrantsPerAuction: number;
@@ -387,7 +382,6 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 			volume: s.volume,
 			averageTrade: s.averageTrade,
 			entered: s.entered,
-			won: s.won,
 			participation: s.entered && auctions ? s.entered / auctions : null,
 			winRate: s.entered && s.won !== null ? s.won / s.entered : null,
 			wonShare: s.entered && s.won !== null && auctions ? s.won / auctions : null,
@@ -488,14 +482,12 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 			.map((s) => ({
 				...s.ref,
 				entered: s.entered ?? 0,
-				won: s.won ?? 0,
 				participation: (s.entered ?? 0) / auctions,
 				winRate: (s.won ?? 0) / (s.entered ?? 1),
 				wonShare: (s.won ?? 0) / auctions,
 			}))
 			.sort((a, b) => b.wonShare - a.wonShare || b.participation - a.participation);
 		competition = {
-			auctions,
 			solutionsPerAuction: (solutions ?? 0) / auctions,
 			entrantsPerAuction: entrants.reduce((a, e) => a + e.entered, 0) / auctions,
 			entrants,
@@ -542,8 +534,6 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 			trades: totalTrades,
 			volume: totalVolume,
 			solvers: rows.length,
-			auctions,
-			solutions,
 		},
 		total,
 		rows,

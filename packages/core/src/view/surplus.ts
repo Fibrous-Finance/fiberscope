@@ -142,7 +142,7 @@ const BPS = 10_000;
  * The ends the trader surplus axis can take, in basis points of volume; it stops at the last one
  * even if a solver goes beyond.
  */
-export const SURPLUS_AXIS_ENDS: readonly number[] = [100, 150, 200, 300, 400, 500, 600, 800, 1_000];
+const SURPLUS_AXIS_ENDS: readonly number[] = [100, 150, 200, 300, 400, 500, 600, 800, 1_000];
 
 export interface SurplusAxis {
 	/** The axis end as a 0–1 ratio of volume, like `surplusRate`: 0.04 is 400 bps. */

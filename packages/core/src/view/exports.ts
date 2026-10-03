@@ -11,7 +11,7 @@ import type { Row, View } from "./view.ts";
  */
 
 /** A coverage footnote of the Markdown: which one, over how many of the window's days. */
-export interface ExportFootnote {
+interface ExportFootnote {
 	/** "auctionAndSurplus" when surplus covers the same days as auction data: one footnote. */
 	key: "auction" | "auctionAndSurplus" | "surplus";
 	covered: number;

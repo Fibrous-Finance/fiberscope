@@ -21,9 +21,7 @@ export interface ChainWatch {
 
 /** Running totals of auction ingestion, for throughput reports. */
 export interface AuctionStats {
-	/** Batch transactions examined. */
-	txs: number;
-	/** Of those, transactions looked up in the API. */
+	/** Batch transactions looked up in the API. */
 	lookups: number;
 	/** Lookups the API had no competition for. */
 	missing: number;
@@ -45,7 +43,7 @@ const SAME_AUCTION_BLOCKS = 10;
 const MISS_IS_FINAL_AFTER = 600;
 
 /** Whether a batch transaction still needs a competition lookup. */
-export function needsLookup(link: CompetitionLink | null, block: number): boolean {
+function needsLookup(link: CompetitionLink | null, block: number): boolean {
 	if (link === null) return true;
 	if (link.auctionId !== null) return !link.priced;
 	return link.checkedAt - timeOf(block) < MISS_IS_FINAL_AFTER;
@@ -56,7 +54,7 @@ export function needsLookup(link: CompetitionLink | null, block: number): boolea
  * prices of the tokens traded by those of its transactions that are already ingested. Its other
  * transactions are linked unpriced and looked up again once their blocks are ingested.
  */
-export async function lookUpCompetition(
+async function lookUpCompetition(
 	store: Store,
 	source: CompetitionSource,
 	tx: string
@@ -107,7 +105,6 @@ export async function processAuctionRange(
 		while (inFlight.size >= LANES)
 			await Promise.race([...inFlight.values()].map((job) => job.done));
 		if (errors.length > 0 || signal?.aborted) break;
-		stats.txs++;
 		if (!needsLookup(store.competitionLink(tx), block)) continue;
 		stats.lookups++;
 		const done = lookUpCompetition(store, source, tx)

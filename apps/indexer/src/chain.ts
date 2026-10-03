@@ -154,12 +154,10 @@ export async function getLogs(
 }
 
 export interface Receipt {
-	transactionHash: string;
 	blockNumber: string;
 	from: string;
 	/** Null only for contract creations, which never settle. */
 	to: string | null;
-	status: string;
 	gasUsed: string;
 	effectiveGasPrice: string;
 	/** OP-stack L1 data fee in wei; absent on some deposit transactions. */

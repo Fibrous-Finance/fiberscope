@@ -10,7 +10,7 @@ import type { Measure, Period, Snapshot, Sort, View } from "@fiberscope/core";
  */
 
 /** How fresh the data is. "empty" is not a data state: it depends on the period (`View.total`). */
-export type DataState = "live" | "delayed" | "loading" | "error";
+type DataState = "live" | "delayed" | "loading" | "error";
 
 export interface Status {
 	/**
@@ -40,7 +40,7 @@ export interface Status {
 	retry: () => void;
 }
 
-export interface Layout {
+interface Layout {
 	/** Page narrower than 760px: the compact layout. */
 	compact: boolean;
 	/** Width of the content column in px (the mosaic fills it). */

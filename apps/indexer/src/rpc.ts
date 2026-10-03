@@ -44,7 +44,7 @@ const ETH_CALL_SHARE = 1 / 30;
  */
 export class Rpc {
 	readonly url: string;
-	readonly stats = { calls: 0, requests: 0, retries: 0 };
+	readonly stats = { calls: 0, retries: 0 };
 	#pacer: Pacer;
 	#ethCallPacer: Pacer;
 	#id = 0;
@@ -137,7 +137,6 @@ export class Rpc {
 		const ethCalls = body.filter((call) => call.method === "eth_call").length;
 		if (ethCalls > 0) await this.#ethCallPacer.take(ethCalls);
 		await this.#pacer.take(body.length);
-		this.stats.requests++;
 		this.stats.calls += body.length;
 		const response = await fetch(this.url, {
 			method: "POST",

@@ -8,6 +8,7 @@ import hero from "./hero.json";
 import meta from "./meta.json";
 import methodology from "./methodology.json";
 import notFound from "./notFound.json";
+import surplus from "./surplus.json";
 import winning from "./winning.json";
 
 /** One file per namespace, so each part of the page owns its copy. */
@@ -20,6 +21,7 @@ const messages = {
 	Change: change,
 	Enter: enter,
 	Efficiency: efficiency,
+	Surplus: surplus,
 	Methodology: methodology,
 	Footer: footer,
 	NotFound: notFound,

@@ -17,7 +17,8 @@ import {
 	systemTheme,
 } from "@/lib/theme";
 
-export type HeaderStatus = Omit<Status, "retry">;
+/** The data status the header shows on every page; the overview adds what its sections need. */
+export type HeaderStatus = Omit<Status, "delayed" | "asOf" | "retry">;
 
 /** Sections the nav follows, in page order. */
 const SECTIONS = [
@@ -47,9 +48,9 @@ export function Header({
 					<Logo />
 				</a>
 				<Nav away={away} />
-				<div className="ml-auto flex items-center gap-[clamp(12px,2vw,24px)]">
+				<div className="ml-auto flex items-center gap-2 wide:gap-[clamp(12px,2vw,24px)]">
 					<NetworkMenu />
-					<StatusPill status={status} />
+					<StatusPill status={status} away={away} />
 					<ThemeButton />
 				</div>
 			</div>
@@ -138,14 +139,14 @@ function NetworkMenu() {
 				aria-expanded={open}
 				aria-label={t("label", { name: tc("network") })}
 				onClick={() => setOpen(!open)}
-				className="flex items-center gap-[7px] border-0 bg-transparent py-2.5 text-[14px] font-medium text-fg"
+				className="-mx-1.5 flex h-11 items-center gap-[7px] border-0 bg-transparent px-1.5 text-[14px] font-medium text-fg wide:mx-0 wide:h-auto wide:px-0 wide:py-2.5"
 			>
 				<span className="size-2 rounded-[2px] bg-base" />
 				{tc("network")}
 				<Caret open={open} className="text-mu" />
 			</button>
 			{open ? (
-				<div className="absolute top-11 -right-3 z-30 w-[220px] rounded-[12px] border border-ln2 bg-bg p-1.5 text-[14px]">
+				<div className="absolute top-[50px] -right-3 z-30 w-[220px] rounded-[12px] border border-ln2 bg-bg p-1.5 text-[14px] wide:top-11">
 					<button
 						type="button"
 						onClick={() => setOpen(false)}
@@ -171,58 +172,80 @@ function NetworkMenu() {
 	);
 }
 
-function StatusPill({ status }: { status: HeaderStatus }) {
+interface Pill {
+	title: string;
+	dot: string;
+	label: string;
+	tone?: string;
+	/** The compact label, when it differs. */
+	short?: string;
+	/** The compact layout shows only the dot; the label stays for screen readers. */
+	quiet?: boolean;
+}
+
+/** The data status: a dot and a label, one word in the compact layout so the header fits at 360. */
+function StatusPill({ status, away }: { status: HeaderStatus; away?: boolean }) {
 	const t = useTranslations("Header.status");
 	const f = useFormat();
-	const time = status.lastRunAt === null ? "" : f.time(status.lastRunAt);
-	const minutes = status.delayMinutes;
-	const content = {
-		live: {
-			title: t("liveTitle", {
-				block: f.int(status.endBlock ?? 0),
-				minutes: status.refreshMinutes,
-			}),
-			dot: "bg-teal animate-pulse-dot",
-			wide: t("live", { time }),
-			compact: null,
-			tone: "",
-		},
-		stale: {
-			title: t("staleTitle", { time, minutes }),
-			dot: "bg-warn",
-			wide:
-				minutes >= 120
-					? t("staleHours", { hours: Math.floor(minutes / 60) })
-					: t("stale", { minutes }),
-			compact: t("staleShort"),
-			tone: "text-warn",
-		},
-		loading: {
-			title: t("loadingTitle"),
-			dot: "bg-fa",
-			wide: t("loading"),
-			compact: t("loading"),
-			tone: "",
-		},
-		error: {
-			title: t("errorTitle", { time: f.time(status.attemptedAt ?? 0) }),
-			dot: "bg-err",
-			wide: t("error"),
-			compact: t("errorShort"),
-			tone: "text-err",
-		},
-	}[status.state];
+	const { dataTime, now } = status;
+	let pill: Pill;
+	switch (status.state) {
+		case "live":
+			pill = {
+				title: t("liveTitle", {
+					block: f.int(status.endBlock ?? 0),
+					minutes: status.refreshMinutes,
+				}),
+				dot: "bg-teal animate-pulse-dot",
+				label: t("live", { time: dataTime === null ? "" : f.time(dataTime) }),
+				quiet: true,
+			};
+			break;
+		case "delayed":
+			pill = {
+				title:
+					dataTime === null
+						? ""
+						: t("delayedTitle", {
+								age: f.ago(now - dataTime),
+								asOf: f.asOf(dataTime, now),
+								// Only the overview fetches on its own.
+								polling: away ? "no" : "yes",
+							}),
+				dot: "bg-warn",
+				label: t("delayed"),
+				tone: "text-warn",
+			};
+			break;
+		case "loading":
+			pill = {
+				title: t("loadingTitle"),
+				dot: "bg-fa",
+				label: t("loading"),
+				short: t("loadingShort"),
+			};
+			break;
+		case "error":
+			pill = {
+				title: t("errorTitle", { time: f.time(status.failedAt ?? now) }),
+				dot: "bg-err",
+				label: t("error"),
+				tone: "text-err",
+				short: t("errorShort"),
+			};
+	}
+	const compact = pill.short ? "max-wide:hidden" : pill.quiet ? "max-wide:sr-only" : "";
 
 	return (
 		<span
 			role="status"
-			title={content.title}
-			className="flex items-center gap-[9px] font-mono text-[12px] font-medium whitespace-nowrap text-mu"
+			title={pill.title}
+			className="flex items-center gap-[9px] font-mono text-[12px] leading-[normal] font-medium whitespace-nowrap text-mu"
 		>
-			<span className={`size-[7px] flex-none rounded-full ${content.dot}`} />
-			<span className={`hidden wide:inline ${content.tone}`}>{content.wide}</span>
-			{content.compact ? (
-				<span className={`wide:hidden ${content.tone}`}>{content.compact}</span>
+			<span className={`size-[7px] flex-none rounded-full ${pill.dot}`} />
+			<span className={`${pill.tone ?? ""} ${compact}`}>{pill.label}</span>
+			{pill.short ? (
+				<span className={`wide:hidden ${pill.tone ?? ""}`}>{pill.short}</span>
 			) : null}
 		</span>
 	);
@@ -245,7 +268,7 @@ function ThemeButton() {
 			title={title}
 			aria-label={title}
 			onClick={() => saveAppearance(next)}
-			className="grid size-10 place-items-center rounded-full border-0 bg-transparent text-fg transition-colors duration-200 hover:bg-hov wide:size-[34px]"
+			className="-mr-3 grid size-11 place-items-center rounded-full border-0 bg-transparent text-fg transition-colors duration-200 hover:bg-hov wide:mr-0 wide:size-[34px]"
 		>
 			<svg viewBox="0 0 18 18" aria-hidden="true" className="block size-[18px]">
 				{appearance === "light" ? (

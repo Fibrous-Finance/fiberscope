@@ -119,10 +119,11 @@ export function createFormat(locale: string): Format {
 		}
 		return f.format(value);
 	};
+	// "13 Sep" never splits across lines: a no-break space joins the day and the month.
 	const day = (ms: number) => {
-		if (!english) return dayMonth.format(ms);
+		if (!english) return dayMonth.format(ms).replaceAll(" ", NBSP);
 		const d = new Date(ms);
-		return `${d.getUTCDate()} ${EN_MONTHS[d.getUTCMonth()]}`;
+		return `${d.getUTCDate()}${NBSP}${EN_MONTHS[d.getUTCMonth()]}`;
 	};
 	const usd = (value: number | null): string => {
 		if (value === null) return DASH;
@@ -197,20 +198,25 @@ export function createFormat(locale: string): Format {
 		day,
 		dayTime: (ms) => `${day(ms)} ${hm.format(ms)}`,
 		date(ms) {
-			if (!english) return dayMonthYear.format(ms);
-			return `${day(ms)} ${new Date(ms).getUTCFullYear()}`;
+			if (!english) return dayMonthYear.format(ms).replaceAll(" ", NBSP);
+			return `${day(ms)}${NBSP}${new Date(ms).getUTCFullYear()}`;
 		},
 		ago(ms) {
 			// Minutes under an hour, rounded hours under 36 hours, then rounded days.
 			const minutes = Math.max(1, Math.round(ms / MINUTE_MS));
-			if (minutes < 60) return relative.format(-minutes, "minute");
-			if (minutes < 36 * 60) return relative.format(-Math.round(minutes / 60), "hour");
-			return relative.format(-Math.round(minutes / (24 * 60)), "day");
+			const [value, unit]: [number, Intl.RelativeTimeFormatUnit] =
+				minutes < 60
+					? [minutes, "minute"]
+					: minutes < 36 * 60
+						? [Math.round(minutes / 60), "hour"]
+						: [Math.round(minutes / (24 * 60)), "day"];
+			// "8 hours ago": the number and its unit stay on one line.
+			return relative.format(-value, unit).replace(/(\d) /u, `$1${NBSP}`);
 		},
 		asOf(ms, now) {
 			const time = `${hm.format(ms)}${NBSP}UTC`;
 			if (Math.floor(ms / DAY_MS) === Math.floor(now / DAY_MS)) return time;
-			return `${day(ms).replaceAll(" ", NBSP)}, ${time}`;
+			return `${day(ms)}, ${time}`;
 		},
 	};
 }

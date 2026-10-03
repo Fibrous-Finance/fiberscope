@@ -89,25 +89,25 @@ describe("format", () => {
 		assert.equal(f.percent(1), "100%");
 	});
 
-	it("writes English dates day first with three-letter months, in UTC", () => {
+	it("writes English dates day first with three-letter months, in UTC, never split", () => {
 		const t = Date.UTC(2026, 8, 13, 22, 10, 5);
-		assert.equal(f.day(t), "13 Sep");
-		assert.equal(f.dayTime(t), "13 Sep 22:10");
+		assert.equal(f.day(t), "13\u00a0Sep");
+		assert.equal(f.dayTime(t), "13\u00a0Sep 22:10");
 		assert.equal(f.clock(t), "22:10:05");
-		assert.equal(f.date(t), "13 Sep 2026");
+		assert.equal(f.date(t), "13\u00a0Sep\u00a02026");
 	});
 
-	it("says how old the data is in minutes, then rounded hours, then days", () => {
+	it("says how old the data is in minutes, then rounded hours, then days, unsplit", () => {
 		const minute = 60_000;
-		assert.equal(f.ago(20_000), "1 minute ago");
-		assert.equal(f.ago(47 * minute), "47 minutes ago");
-		assert.equal(f.ago(59 * minute + 29_000), "59 minutes ago");
-		assert.equal(f.ago(59 * minute + 31_000), "1 hour ago");
-		assert.equal(f.ago(472 * minute), "8 hours ago");
-		assert.equal(f.ago(35 * 60 * minute), "35 hours ago");
+		assert.equal(f.ago(20_000), "1\u00a0minute ago");
+		assert.equal(f.ago(47 * minute), "47\u00a0minutes ago");
+		assert.equal(f.ago(59 * minute + 29_000), "59\u00a0minutes ago");
+		assert.equal(f.ago(59 * minute + 31_000), "1\u00a0hour ago");
+		assert.equal(f.ago(472 * minute), "8\u00a0hours ago");
+		assert.equal(f.ago(35 * 60 * minute), "35\u00a0hours ago");
 		// From 36 hours on, days: 36 hours rounds to 2 days.
-		assert.equal(f.ago(36 * 60 * minute), "2 days ago");
-		assert.equal(f.ago(3_060 * minute), "2 days ago");
+		assert.equal(f.ago(36 * 60 * minute), "2\u00a0days ago");
+		assert.equal(f.ago(3_060 * minute), "2\u00a0days ago");
 	});
 
 	it("dates the as-of time only when it is another UTC day, with no-break spaces", () => {

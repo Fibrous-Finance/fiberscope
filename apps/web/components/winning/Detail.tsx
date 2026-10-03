@@ -9,6 +9,7 @@ import {
 	linePath,
 	mediumAddress,
 	registrationOf,
+	shortAddress,
 	surplusAndCost,
 	tapeCell,
 } from "@fiberscope/core";
@@ -25,6 +26,8 @@ import { useFormat } from "@/lib/format";
 
 /** Below this visible table width, the first block moves its third column underneath. */
 const NARROW_TABLE = 1120;
+/** Below this visible table width, a medium address (0x012345…234567) no longer fits its column. */
+const SHORT_ADDRESS_TABLE = 720;
 /** The share chart's y-range spans at least 4 percentage points. */
 const MIN_SPAN = 0.04;
 /** The strip shows this many of the latest auctions, oldest first. */
@@ -285,6 +288,7 @@ function useDetail(row: Row) {
 			label: t(`detail.env.${a.env}`),
 			address: a.address,
 			medium: mediumAddress(a.address),
+			short: shortAddress(a.address),
 			retired: !a.active,
 			href: `${BASE.scan}/address/${a.address}`,
 		})),
@@ -325,6 +329,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 	const tc = useTranslations("Common");
 	const [copied, copy] = useCopy(COPIED_MS);
 	const narrow = width > 0 && width < NARROW_TABLE;
+	const tight = width > 0 && width < SHORT_ADDRESS_TABLE;
 	const pinned = { width: width > 0 ? width : "100%" };
 
 	return (
@@ -368,7 +373,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 										title={a.address}
 										className={`truncate font-mono text-[12.5px] leading-[normal] font-medium ${a.retired ? "text-fa" : ""}`}
 									>
-										{a.address}
+										{tight ? a.short : a.medium}
 									</span>
 									{/* Copy and Basescan: 24px targets that do not space the row out. */}
 									<span className="flex gap-3.5 font-mono text-[12px] leading-[normal] font-medium">

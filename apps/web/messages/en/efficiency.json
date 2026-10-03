@@ -1,21 +1,25 @@
 {
 	"title": "How efficiently",
-	"sentence": "{solver} uses the least gas per trade among solvers with {minBatches}+ batches: {gas}, against a network average of {average}.",
+	"sentence": "{solver} uses the least gas per trade among solvers with {minBatches}+\u00a0batches: {gas}, against a network average of {average}.",
 	"sentenceAll": "{solver} uses the least gas per trade: {gas}, against a network average of {average}.",
-	"sentenceSwaps": "Across the network, a trade takes {swaps} DEX swaps on average.",
+	"sentenceSwaps": "Across the network, a trade takes {swaps}\u00a0DEX swaps on average.",
 	"legend": {
 		"average": "Network average",
-		"few": "Fewer than {count} trades",
+		"few": "Fewer than {count}\u00a0trades",
 		"size": "Dot size: trades"
 	},
 	"header": {
-		"gas": "Gas per trade · avg {average}",
-		"swaps": "DEX swaps/trade · avg {average}",
-		"swapsShort": "Swaps"
+		"gas": "Gas per trade · average {average}",
+		"swaps": "DEX swaps/trade · average {average}",
+		"swapsShort": "Swaps",
+		"cost": "Cost per trade · average {average}",
+		"costShort": "Cost"
 	},
-	"dot": "{gas} gas per trade over {trades, plural, one {# trade} other {# trades}}",
-	"swapsDot": "{swaps} DEX swaps per trade over {trades, plural, one {# trade} other {# trades}}",
-	"note": "Swaps beyond the axis sit at its end, marked ›.",
-	"noteCompact": "Swaps: DEX swaps per trade.",
-	"source": "Source: Base settlement transactions"
+	"dot": "{gas}\u00a0gas per trade over {trades, plural, one {#\u00a0trade} other {#\u00a0trades}}",
+	"swapsDot": "{swaps}\u00a0DEX swaps per trade over {trades, plural, one {#\u00a0trade} other {#\u00a0trades}}",
+	"note": "Values beyond an axis sit at its end, marked ›.",
+	"noteCompact": "Cost: transaction cost per trade. Swaps: DEX swaps per trade.",
+	"source": "Source: Base settlement transactions · Chainlink ETH/USD",
+	"sentenceCost": "Settling one costs {cost}, L1 data fee included.",
+	"costDot": "{cost} per trade over {trades, plural, one {#\u00a0trade} other {#\u00a0trades}}"
 }

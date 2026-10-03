@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { swapsAxis } from "./efficiency.ts";
+import { costAxis, swapsAxis } from "./efficiency.ts";
 
 const row = (trades: number, swapsPerTrade: number | null) => ({ trades, swapsPerTrade });
 
@@ -33,5 +33,43 @@ describe("swapsAxis", () => {
 
 	it("ignores solvers without trades", () => {
 		assert.equal(swapsAxis([row(0, null), row(50, 1.1)], 1.1).max, 2);
+	});
+});
+
+describe("costAxis", () => {
+	const cost = (trades: number, costPerTrade: number | null) => ({ trades, costPerTrade });
+
+	it("runs in cents to the smallest end that holds the solvers and the network", () => {
+		// 7D on 3 Oct: the network at 1.83¢, the dearest large solver at 5.96¢, and one trade
+		// at 11¢ from a solver that settled a single batch.
+		const axis = costAxis([cost(11_335, 0.0069), cost(1_676, 0.0596), cost(1, 0.11)], 0.0183);
+		assert.equal(axis.max, 6);
+		assert.deepEqual(axis.ticks, [0, 1, 2, 3, 4, 5, 6]);
+	});
+
+	it("counts a solver with exactly 30 trades, and an end equal to the value holds it", () => {
+		assert.equal(costAxis([cost(30, 0.04)], 0.018).max, 4);
+		assert.equal(costAxis([cost(29, 0.04)], 0.018).max, 2);
+		assert.equal(costAxis([cost(30, 0.0401)], 0.018).max, 5);
+		assert.equal(costAxis([cost(30, 0.12)], 0.018).max, 12);
+	});
+
+	it("holds the network average even when no solver reaches it", () => {
+		assert.equal(costAxis([cost(100, 0.004)], 0.025).max, 3);
+		assert.equal(costAxis([cost(100, 0.004)], 0.004).max, 1);
+		assert.deepEqual(costAxis([], null), { max: 1, ticks: [0, 1] });
+	});
+
+	it("ticks every 2¢ up to 12¢, every 5¢ up to 20¢, then every 10¢, and stops at 50¢", () => {
+		assert.deepEqual(costAxis([cost(100, 0.075)], 0.018).ticks, [0, 2, 4, 6, 8]);
+		assert.deepEqual(costAxis([cost(100, 0.14)], 0.018).ticks, [0, 5, 10, 15]);
+		assert.deepEqual(costAxis([cost(100, 0.25)], 0.018).ticks, [0, 10, 20, 30]);
+		const capped = costAxis([cost(100, 1.24)], 0.018);
+		assert.equal(capped.max, 50);
+		assert.deepEqual(capped.ticks, [0, 10, 20, 30, 40, 50]);
+	});
+
+	it("ignores solvers without trades", () => {
+		assert.equal(costAxis([cost(0, null), cost(50, 0.009)], 0.009).max, 1);
 	});
 });

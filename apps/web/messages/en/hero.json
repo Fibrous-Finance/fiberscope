@@ -50,12 +50,14 @@
 		"runBy": "{name} · {run}",
 		"noRun": "No leader today",
 		"gas": "Lowest gas / trade",
-		"noGas": "No gas data"
+		"noGas": "No gas data",
+		"gasBy": "{name} · {minBatches}+ batches"
 	},
 	"empty": {
 		"headline": "No batches settled on {network} in {span}.",
 		"noVolume": "No {network} volume data for {span} yet.",
-		"action": "Show the last {period}"
+		"action": "Show the last {period}",
+		"actionMeasure": "Show {measure}"
 	},
 	"error": {
 		"headline": "We couldn’t load the latest data.",

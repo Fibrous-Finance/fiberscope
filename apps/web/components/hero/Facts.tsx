@@ -15,9 +15,12 @@ const GRID =
 export function Facts({ view, leader }: { view: View; leader: Row }) {
 	const t = useTranslations("Hero.facts");
 	const f = useFormat();
-	const second = view.rows[1];
+	// The runner-up in the measure. A #2 without a share of it (volume without priced trades) is
+	// none, as when there is no #2: there is no one to compare the leader with.
+	const [, next] = view.rows;
+	const second = next?.share ? next : null;
 	const run = view.leaderRun;
-	const lowest = view.gas.lowest;
+	const { lowest, minBatches } = view.gas;
 	// The daily leader can differ from the window's leader (it took over inside the window), so
 	// the run names its solver then: "Leading since" belongs to it, not to the leader above.
 	const days = run ? t(run.atLeast ? "runAtLeast" : "run", { days: run.days }) : t("noRun");
@@ -35,7 +38,7 @@ export function Facts({ view, leader }: { view: View; leader: Row }) {
 			href: "#who",
 			label: t("lead"),
 			// Shares of one total, so their ratio is the ratio of the measure's values.
-			value: second && second.share > 0 ? f.times(leader.share / second.share) : DASH,
+			value: second ? f.times(leader.share / second.share) : DASH,
 			caption: second ? t("versus", { name: second.label }) : t("alone"),
 			mono: second?.unnamed,
 		},
@@ -50,7 +53,13 @@ export function Facts({ view, leader }: { view: View; leader: Row }) {
 			href: "#eff",
 			label: t("gas"),
 			value: f.gas(lowest?.gasPerTrade ?? null),
-			caption: lowest ? lowest.label : t("noGas"),
+			// The caption names the rule the fact applies, as the chart below shows smaller solvers
+			// using less; when no solver reaches it, every solver counts and the name stands alone.
+			caption: !lowest
+				? t("noGas")
+				: lowest.batches >= minBatches
+					? t("gasBy", { name: lowest.label, minBatches: f.int(minBatches) })
+					: lowest.label,
 			mono: lowest?.unnamed,
 		},
 	];
@@ -67,8 +76,9 @@ export function Facts({ view, leader }: { view: View; leader: Row }) {
 					<span className="font-mono text-[clamp(32px,3.6vw,46px)] leading-[1.05] font-medium tracking-[-0.05em] whitespace-nowrap">
 						{fact.value}
 					</span>
+					{/* Captions wrap, balanced, rather than lose the end of a name or a rule. */}
 					<span
-						className={`truncate text-[13px] text-mu ${fact.mono ? "font-mono" : ""}`}
+						className={`text-[13px] text-balance text-mu ${fact.mono ? "font-mono" : ""}`}
 					>
 						{fact.caption}
 					</span>

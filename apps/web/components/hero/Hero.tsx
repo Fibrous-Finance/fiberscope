@@ -70,14 +70,21 @@ export function Hero() {
 	const days = empty ? view.days : view.measure === "volume" ? auction : chain;
 	// "the last 24 hours", or while delayed "the 24 hours to 09:49 UTC".
 	const span = status.delayed ? t("span.to", { days, asOf }) : t("span.last", { days });
+	const { batches, trades, volume, solvers } = view.totals;
 	const totals = [
-		t("totals.batches", { count: view.totals.batches }),
-		t("totals.trades", { count: view.totals.trades }),
-		auction > 0 && auction < view.days
-			? t("totals.volumeCovered", { value: f.usd(view.totals.volume), days: auction })
-			: t("totals.volume", { value: f.usd(view.totals.volume) }),
-		t("totals.solvers", { count: view.totals.solvers }),
-		t(empty ? "totals.checked" : "totals.to", { asOf }),
+		t("totals.batches", { count: batches }),
+		t("totals.trades", { count: trades }),
+		// Volume needs auction data: without any in the window, the item is left out.
+		...(volume === null
+			? []
+			: [
+					auction < view.days
+						? t("totals.volumeCovered", { value: f.usd(volume), days: auction })
+						: t("totals.volume", { value: f.usd(volume) }),
+				]),
+		t("totals.solvers", { count: solvers }),
+		// "checked" when nothing settled; batches without volume data still run "to" that time.
+		t(batches > 0 ? "totals.to" : "totals.checked", { asOf }),
 	];
 
 	return (
@@ -85,7 +92,7 @@ export function Hero() {
 			<h1 className="mt-[18px] max-w-[19ch] headline">
 				{empty
 					? // Batches can settle without volume data (no auction data yet): say which.
-						t(view.totals.batches > 0 ? "empty.noVolume" : "empty.headline", {
+						t(batches > 0 ? "empty.noVolume" : "empty.headline", {
 							network,
 							span,
 						})

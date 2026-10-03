@@ -14,20 +14,34 @@ import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
 	const t = await getTranslations("Meta");
+	// public/og-image.png; metadataBase makes the URL absolute.
+	const image = {
+		url: "/og-image.png",
+		type: "image/png",
+		width: 1200,
+		height: 630,
+		alt: t("ogImageAlt"),
+	};
 	return {
 		metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
 		title: t("title"),
 		description: t("description"),
+		icons: {
+			icon: { url: "/favicon.svg", type: "image/svg+xml" },
+			apple: "/apple-touch-icon.png",
+		},
 		openGraph: {
 			title: t("title"),
 			description: t("ogDescription"),
 			type: "website",
 			siteName: "Fiberscope",
+			images: [image],
 		},
 		twitter: {
 			card: "summary_large_image",
 			title: t("title"),
 			description: t("ogDescription"),
+			images: [image],
 		},
 		// Search engines stay out until launch, when the deployment sets ALLOW_INDEXING=true.
 		robots: process.env.ALLOW_INDEXING === "true" ? undefined : { index: false },

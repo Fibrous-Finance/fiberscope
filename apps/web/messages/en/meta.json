@@ -2,5 +2,6 @@
 	"title": "Fiberscope · CoW Protocol solver analytics",
 	"description": "Open, independent analytics for CoW Protocol solvers on Base: who wins the batch auctions, by how much, whether that is changing, and how efficiently each solver settles.",
 	"ogDescription": "Who wins CoW Protocol batch auctions on Base, by how much, and how efficiently. Updated every 10 minutes.",
+	"ogImageAlt": "Fiberscope: solver competition on CoW Protocol, Base",
 	"notFoundTitle": "Page not found · Fiberscope"
 }

@@ -9,7 +9,7 @@ export function Footer({ away }: { /** On pages other than the overview. */ away
 		<footer
 			className={`${away ? "mt-auto" : "mt-[clamp(84px,10vw,128px)]"} flex flex-wrap items-center gap-x-7 gap-y-3 border-t border-ln pt-7 pb-10 text-[13px] text-mu`}
 		>
-			<span className="flex items-baseline text-[15px] leading-none font-semibold tracking-[-0.04em] text-fg">
+			<span className="flex items-baseline text-[15px] leading-none font-semibold tracking-[-0.035em] text-fg">
 				<Logo />
 			</span>
 			<span>{t("tagline")}</span>

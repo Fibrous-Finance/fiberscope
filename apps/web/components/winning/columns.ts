@@ -20,7 +20,7 @@ const AUCTION_COLUMNS: Partial<Record<SortKey, true>> = {
 	winRate: true,
 };
 
-/** Header labels of the sortable columns; the detail's stats use them too. */
+/** Header labels of the sortable columns; the detail's stats and Copy as Markdown use them too. */
 export function useColumnLabels(): Record<SortKey, string> {
 	const t = useTranslations("Winning.columns");
 	const tc = useTranslations("Common.measureLabel");
@@ -36,8 +36,8 @@ export function useColumnLabels(): Record<SortKey, string> {
 }
 
 /**
- * The table's header labels: the auction columns end in "†" when auction data covers only part
- * of the window. Copy as Markdown uses them too, so a pasted table keeps its footnote mark.
+ * The table's header labels: the auction columns end in "†" when auction data does not cover
+ * the whole window.
  */
 export function useHeaderLabels(partial: boolean): Record<SortKey, string> {
 	const t = useTranslations("Winning.columns");

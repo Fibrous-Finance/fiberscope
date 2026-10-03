@@ -14,7 +14,7 @@ import { useFormat } from "@/lib/format";
 
 /** Solver, status, prod and barn addresses, last settlement: the header and every row share it. */
 const GRID =
-	"grid grid-cols-[minmax(150px,1.1fr)_90px_minmax(0,1.3fr)_minmax(0,1.3fr)_140px] gap-x-4";
+	"grid grid-cols-[minmax(150px,1.1fr)_90px_minmax(0,1.3fr)_minmax(0,1.3fr)_150px] gap-x-4";
 /** "Retired" after an address. */
 const RETIRED = "text-[10.5px] tracking-[.06em] text-fa uppercase";
 

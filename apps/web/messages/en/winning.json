@@ -13,38 +13,46 @@
 		"winRate": "Win rate",
 		"partial": "{label}†",
 		"sorted": "{label} <arrow>{direction, select, ascending {↑} other {↓}}</arrow>",
-		"spark": "{days}d share"
+		"spark": "{days}d share",
+		"surplusPerTrade": "Surplus/trade",
+		"typicalBps": "Typical bps"
 	},
 	"rankChange": {
 		"short": "{direction, select, up {▲{places}} down {▼{places}} other {NEW}}",
 		"spoken": "{direction, select, up {up {places, plural, one {# place} other {# places}}} down {down {places, plural, one {# place} other {# places}}} other {new}}"
 	},
 	"metaValue": "{measure, select, volume {{volume}} trades {{count, plural, one {#\u00a0trade} other {#\u00a0trades}}} other {{count, plural, one {#\u00a0batch} other {#\u00a0batches}}}}",
-	"meta": "{value} · {entered} in · {winRate} win · {gas} gas",
-	"metaNoAuctions": "{value} · {gas} gas · no auction data",
+	"meta": "{value} · {entered} in · {winRate} win · {gas}\u00a0gas",
+	"metaNoAuctions": "{value} · {gas}\u00a0gas · no auction data",
 	"retired": "Retired",
-	"note": "Click a row for details. {earlier, select, yes {<arrow>▲▼</arrow> rank change against {previous}.} other {No earlier window to compare yet.}} {window}.",
-	"auctionCoverage": "{covered, plural, =0 {† Volume, Entered and Win rate need auction data, and this window has none yet.} other {† Volume, Entered and Win rate cover the last {covered} of {days, plural, one {# day} other {# days}}.}}",
+	"note": "Open a row for details. {earlier, select, yes {<arrow>▲▼</arrow> rank change against {previous}.} other {No earlier window to compare yet.}} {window}.",
+	"auctionCoverage": "{covered, plural, =0 {† Volume, Entered and Win rate need auction data, and this window has none yet.} other {† Volume, Entered and Win rate cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
 	"source": "Source: CoW Protocol API · {network} settlement events",
 	"detail": {
-		"shareOf": "Share of {measure} · last {days, plural, =1 {24 hours} other {# days}}",
+		"shareOf": "Share of {measure} · last {days, plural, =1 {24\u00a0hours} other {#\u00a0days}}",
 		"trend": "{points} since {date}",
 		"chart": "Daily share of {measure}, {start} to {end}: from {first} to {last}",
 		"labels": {
 			"batchValue": "Batch value",
-			"swaps": "DEX swaps/trade"
+			"swaps": "DEX swaps/trade",
+			"cost": "Cost/trade",
+			"surplus": "Typical surplus"
 		},
 		"stats": {
 			"batches": "{share} of all batches",
 			"trades": "{count} per batch",
 			"volume": "{value} average trade",
 			"average": "Network average {value}",
-			"gas": "{direction, select, below {{percent} below network avg} above {{percent} above network avg} other {Same as network avg}}",
+			"gas": "{direction, select, below {{percent} below network average} above {{percent} above network average} other {Same as network average}}",
 			"participation": "Average solver {percent}",
 			"winRate": "Won {percent} of all auctions",
-			"noAuctionData": "No auction data"
+			"noAuctionData": "No auction data",
+			"cost": "Network average {value}",
+			"surplusValue": "{bps}\u00a0bps",
+			"surplus": "{share, select, none {None of its surplus is unusual} other {{share} of its surplus is unusual}}",
+			"noSurplusData": "No surplus data"
 		},
-		"auctions": "{count, plural, =0 {Latest auctions} one {Latest auction} other {Latest # auctions}}",
+		"auctions": "{count, plural, =0 {Latest auctions} one {Latest auction} other {Latest #\u00a0auctions}}",
 		"auctionsNote": "Entered {entered}, won {won} of the latest {count}",
 		"auctionsAndRanks": "{auctions} · {ranks}",
 		"auction": "Auction #{id} · {time} · {state, select, won {won} entered {entered, not won} other {not entered}}{link, select, yes { · open the settlement in CoW Explorer} other {}}",
@@ -54,7 +62,7 @@
 		"gasVsNetwork": "Gas per trade vs network",
 		"gasScale": "{gas} gas per trade against a network average of {average}",
 		"lower": "Lower",
-		"networkAverage": "Dashed: network avg",
+		"networkAverage": "Dashed: network average",
 		"higher": "Higher",
 		"addresses": "Submission addresses",
 		"env": {
@@ -63,27 +71,36 @@
 		},
 		"settlements": "Latest settlements",
 		"settlementColumns": {
-			"time": "Time UTC",
+			"time": "Time\u00a0UTC",
 			"trades": "Trades",
 			"swaps": "Swaps",
 			"pair": "Pair",
 			"volume": "Volume",
+			"surplus": "Surplus",
+			"cost": "Cost",
 			"gas": "Gas",
 			"links": "Links"
 		},
 		"pair": "{sell} → {buy}{more, plural, =0 {} other { +#}}",
-		"settlementLine": "{trades, plural, one {# trade} other {# trades}} · {swaps, plural, one {# swap} other {# swaps}} · {volume} · {gas} gas"
+		"settlementItems": {
+			"trades": "{trades, plural, one {#\u00a0trade} other {#\u00a0trades}}",
+			"swaps": "{swaps, plural, one {#\u00a0swap} other {#\u00a0swaps}}",
+			"volume": "{volume}",
+			"surplus": "{surplus}\u00a0surplus",
+			"cost": "{cost}\u00a0cost",
+			"gas": "{gas}\u00a0gas"
+		}
 	},
 	"registry": {
 		"title": "Solver registry",
-		"summary": "{total, plural, one {The # solver} other {All # solvers}} in CoW’s registry for {network}, with {total, plural, one {its} other {their}} addresses and last settlement.",
+		"summary": "{total, plural, one {The #\u00a0solver} other {All #\u00a0solvers}} in CoW’s registry for {network}, with {total, plural, one {its} other {their}} addresses and last settlement.",
 		"intro": "{settled, plural, one {# has} other {# have}} settled since {since}; {unsettled, plural, one {# has} other {# have}} not. Newest settlement first.",
 		"columns": {
 			"solver": "Solver",
 			"status": "Status",
 			"prod": "Prod address",
 			"barn": "Barn address",
-			"last": "Last settlement UTC"
+			"last": "Last settlement\u00a0UTC"
 		},
 		"status": "{status, select, active {Active} other {Inactive}}",
 		"retiredNote": "· retired",
@@ -93,5 +110,10 @@
 		"unsettled": "{open, select, yes {Hide} other {Show}} the {count} that {count, plural, one {has} other {have}} not settled since {since}",
 		"note": "A retired address is one CoW’s registry marks inactive.",
 		"source": "Source: CoW’s solver registry · {network} settlement events · on-chain solver allow-list"
+	},
+	"markdownFootnotes": {
+		"auction": "{covered, plural, =0 {† Volume, Entered and Win rate need auction data, and this window has none yet.} other {† Volume, Entered and Win rate cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
+		"auctionAndSurplus": "{covered, plural, =0 {† Volume, Entered, Win rate and surplus need auction data, and this window has none yet.} other {† Volume, Entered, Win rate and surplus cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
+		"surplus": "{covered, plural, =0 {‡ Surplus needs auction data, and this window has none yet.} other {‡ Surplus covers the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}"
 	}
 }

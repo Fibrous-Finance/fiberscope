@@ -145,6 +145,7 @@
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: var(--mu);
+	text-wrap: balance;
 }
 
 @utility label {
@@ -190,21 +191,26 @@
 	}
 }
 
+/* Teal buttons: Retry now, the empty state's longer window, the 404 page's way back. */
 @utility btn-teal {
 	display: inline-flex;
 	align-items: center;
-	height: 32px;
-	padding: 0 16px;
+	height: 40px;
+	padding: 0 18px;
 	border: 0;
 	border-radius: 9px;
 	background: #11b2ba;
 	color: #1b1f2c;
-	font: 500 12px var(--font-mono);
+	font: 500 12.5px var(--font-mono);
 	letter-spacing: 0.04em;
 	text-decoration: none;
 
 	&:hover {
 		text-decoration: none;
+	}
+
+	@variant max-wide {
+		height: 44px;
 	}
 }
 

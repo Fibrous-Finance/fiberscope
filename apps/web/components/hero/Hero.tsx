@@ -11,12 +11,10 @@ import { EmptyMosaic, Mosaic, MosaicSkeleton } from "@/components/hero/Mosaic";
 
 import { useFormat } from "@/lib/format";
 
-/** The totals and the error line. */
-const NOTE = "font-mono text-[13px] leading-[1.6] font-medium text-mu";
-
 /**
  * Who won the window, in one sentence, then the totals, the period and measure controls, the
- * batch mosaic and four key facts. The hero also carries the loading, empty and error states.
+ * batch mosaic and four key facts. The hero also carries the loading, empty, error and delayed
+ * states.
  */
 export function Hero() {
 	const t = useTranslations("Hero");
@@ -26,132 +24,147 @@ export function Hero() {
 
 	if (status.state === "loading") {
 		return (
-			<Frame
-				headline={null}
-				summary={<span className="skeleton h-[13px] w-[min(440px,80%)] rounded-[6px]" />}
-			>
+			<Frame busy>
+				<div className="mt-[18px] flex max-w-[19ch] flex-col gap-[.2em] text-[clamp(38px,5.4vw,70px)]">
+					<span className="skeleton h-[.8em] w-full rounded-[10px]" />
+					<span className="skeleton h-[.8em] w-[84%] rounded-[10px]" />
+					<span className="skeleton h-[.8em] w-[56%] rounded-[10px]" />
+				</div>
+				<Summary>
+					<span className="skeleton h-[13px] w-[min(440px,80%)] rounded-[6px]" />
+				</Summary>
 				<MosaicSkeleton />
 				<FactsSkeleton />
 			</Frame>
 		);
 	}
 
+	// Nothing to show and nothing to control: the message, Retry now and the next automatic try.
 	if (status.state === "error" || !view) {
 		return (
-			<Frame
-				headline={t("error.headline")}
-				summary={
-					<div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
-						<p className={NOTE}>
-							{status.attemptedAt === null
-								? t("error.noAttempt")
-								: t("error.attempt", { time: f.time(status.attemptedAt) })}
-						</p>
-						<button type="button" onClick={status.retry} className="btn-teal">
-							{t("error.retry")}
-						</button>
-					</div>
-				}
-			/>
-		);
-	}
-
-	const network = tc("network");
-	const period = tc(`period.${view.period}`);
-	const totals = {
-		batches: view.totals.batches,
-		trades: view.totals.trades,
-		volume: f.usd(view.totals.volume),
-		solvers: view.totals.solvers,
-	};
-	const leader = view.rows[0];
-	const fraction = view.headline;
-	// A young index covers only part of the window: the headline claims just the days its measure
-	// has data for (volume needs auction data), and a note under the totals says what is partial.
-	const covered = view.measure === "volume" ? view.coverage.auction : view.coverage.chain;
-	const partial = (["chain", "auction"] as const).filter(
-		(kind) => view.coverage[kind] < view.days
-	);
-	const note =
-		partial.length > 0 ? (
-			<div className="mt-2.5 flex flex-col gap-1.5 text-pretty foot-line">
-				{partial.map((kind) => (
-					<p key={kind}>
-						{tc(`coverage.${kind}`, { covered: view.coverage[kind], days: view.days })}
-					</p>
-				))}
-			</div>
-		) : null;
-
-	if (view.total === 0 || !leader || !fraction) {
-		return (
-			<Frame
-				headline={t("empty.headline", { network, period })}
-				summary={
-					<p className={NOTE}>
-						{t("empty.totals", {
-							...totals,
-							time: f.time(status.lastRunAt ?? view.end.time),
-						})}
-					</p>
-				}
-			>
-				{note}
-				<EmptyMosaic />
+			<Frame>
+				<h1 className="mt-[18px] max-w-[19ch] headline">{t("error.headline")}</h1>
+				<p className="mt-6 max-w-[560px] answer">
+					{t("error.text", { time: f.time(status.failedAt ?? status.now) })}
+				</p>
+				<div className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-3">
+					<button type="button" onClick={status.retry} className="btn-teal">
+						{t("error.retry")}
+					</button>
+					<span className="font-mono text-[12px] leading-[normal] font-medium whitespace-nowrap text-fa">
+						{t("error.next", { time: f.time(status.nextTryAt) })}
+					</span>
+				</div>
 			</Frame>
 		);
 	}
 
+	const network = tc("network");
+	const leader = view.rows[0];
+	const fraction = view.headline;
+	const empty = view.total === 0 || !leader || !fraction;
+	const { chain, auction } = view.coverage;
+	const asOf = status.asOf ?? "";
+	// The headline claims only the days its measure has data for (volume needs auction data); the
+	// empty headline names the whole window.
+	const days = empty ? view.days : view.measure === "volume" ? auction : chain;
+	// "the last 24 hours", or while delayed "the 24 hours to 09:49 UTC".
+	const span = status.delayed ? t("span.to", { days, asOf }) : t("span.last", { days });
+	const totals = [
+		t("totals.batches", { count: view.totals.batches }),
+		t("totals.trades", { count: view.totals.trades }),
+		auction > 0 && auction < view.days
+			? t("totals.volumeCovered", { value: f.usd(view.totals.volume), days: auction })
+			: t("totals.volume", { value: f.usd(view.totals.volume) }),
+		t("totals.solvers", { count: view.totals.solvers }),
+		t(empty ? "totals.checked" : "totals.to", { asOf }),
+	];
+
 	return (
-		<Frame
-			headline={t("headline", {
-				fraction: fraction.key,
-				n: fraction.key === "oneIn" ? fraction.n : 0,
-				network,
-				measure: tc(`measure.${view.measure}`),
-				days: covered,
-			})}
-			summary={
-				<p className={NOTE}>{t("totals", { ...totals, time: f.time(view.end.time) })}</p>
-			}
-		>
-			{note}
-			<Mosaic view={view} leader={leader} />
-			<Facts view={view} leader={leader} />
+		<Frame>
+			<h1 className="mt-[18px] max-w-[19ch] headline">
+				{empty
+					? t("empty.headline", { network, span })
+					: t("headline", {
+							fraction: fraction.key,
+							n: fraction.key === "oneIn" ? fraction.n : 0,
+							network,
+							measure: tc(`measure.${view.measure}`),
+							span,
+						})}
+			</h1>
+			{status.delayed && status.dataTime !== null ? (
+				// One line, not a banner: the data's age, the as-of time and the automatic check.
+				<p className="mt-[22px] flex max-w-[640px] gap-3 text-[15px] leading-[1.55] text-pretty text-mu">
+					<span
+						aria-hidden="true"
+						className="mt-2 size-[7px] flex-none rounded-full bg-warn"
+					/>
+					<span>
+						{t.rich("delayed", {
+							age: f.ago(status.now - status.dataTime),
+							asOf,
+							strong: (chunks) => (
+								<strong className="font-medium text-fg">{chunks}</strong>
+							),
+						})}
+					</span>
+				</p>
+			) : null}
+			<Summary delayed={status.delayed}>
+				{/* Each item carries its "·" in front; the list is pulled 22px left inside a
+				clipping box, so the dot that would start a line is cut off. */}
+				<div className="min-w-0 overflow-hidden">
+					<p className="-ml-[22px] flex flex-wrap font-mono text-[13px] leading-[1.6] font-medium text-mu">
+						{totals.map((item) => (
+							<span
+								key={item}
+								className="whitespace-nowrap before:inline-block before:w-[22px] before:text-center before:content-['·']"
+							>
+								{item}
+							</span>
+						))}
+					</p>
+				</div>
+			</Summary>
+			{/* A young index covers only part of the window for batches, trades and gas too. */}
+			{chain < view.days ? (
+				<p className="mt-2.5 text-pretty foot-line">
+					{tc("coverage.chain", { covered: chain, days: view.days })}
+				</p>
+			) : null}
+			{empty ? (
+				<EmptyMosaic />
+			) : (
+				<>
+					<Mosaic view={view} leader={leader} />
+					<Facts view={view} leader={leader} />
+				</>
+			)}
 		</Frame>
 	);
 }
 
-/** What every state shares: eyebrow, headline (placeholder bars while loading), totals row. */
-function Frame({
-	headline,
-	summary,
-	children,
-}: {
-	/** null while loading. */
-	headline: string | null;
-	summary: ReactNode;
-	children?: ReactNode;
-}) {
+/** Every state starts with the eyebrow. */
+function Frame({ busy, children }: { busy?: boolean; children: ReactNode }) {
 	const t = useTranslations("Hero");
 	const tc = useTranslations("Common");
 	return (
-		<section aria-busy={headline === null || undefined} className="pt-[clamp(48px,8vw,108px)]">
+		<section aria-busy={busy || undefined} className="pt-[clamp(48px,8vw,108px)]">
 			<p className="eyebrow">{t("eyebrow", { network: tc("network") })}</p>
-			{headline === null ? (
-				<div className="mt-[18px] flex max-w-[19ch] flex-col gap-[.2em] text-[clamp(38px,5.4vw,70px)]">
-					<span className="skeleton h-[.8em] w-full rounded-[10px]" />
-					<span className="skeleton h-[.8em] w-[84%] rounded-[10px]" />
-					<span className="skeleton h-[.8em] w-[56%] rounded-[10px]" />
-				</div>
-			) : (
-				<h1 className="mt-[18px] max-w-[19ch] headline">{headline}</h1>
-			)}
-			<div className="mt-[30px] flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-				{summary}
-				<Controls />
-			</div>
 			{children}
 		</section>
+	);
+}
+
+/** The totals (or their placeholder) and the period and measure controls. */
+function Summary({ delayed, children }: { delayed?: boolean; children: ReactNode }) {
+	return (
+		<div
+			className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-4 ${delayed ? "mt-[26px]" : "mt-[30px]"}`}
+		>
+			{children}
+			<Controls />
+		</div>
 	);
 }

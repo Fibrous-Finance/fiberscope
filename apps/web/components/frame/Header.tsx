@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 
 import { useTranslations } from "next-intl";
 
@@ -109,11 +109,17 @@ function Nav({ away }: { away?: boolean }) {
 	);
 }
 
+/**
+ * The network picker, a disclosure: Escape or a click outside closes it. Closing from inside the
+ * popup puts focus back on the button, which would otherwise be lost with the popup.
+ */
 function NetworkMenu() {
 	const t = useTranslations("Header.network");
 	const tc = useTranslations("Common");
 	const [open, setOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
+	const button = useRef<HTMLButtonElement>(null);
+	const popup = useId();
 
 	useEffect(() => {
 		if (!open) return;
@@ -121,7 +127,9 @@ function NetworkMenu() {
 			if (!ref.current?.contains(event.target as Node)) setOpen(false);
 		};
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape") setOpen(false);
+			if (event.key !== "Escape") return;
+			if (ref.current?.contains(document.activeElement)) button.current?.focus();
+			setOpen(false);
 		};
 		document.addEventListener("pointerdown", onPointer);
 		document.addEventListener("keydown", onKey);
@@ -134,9 +142,10 @@ function NetworkMenu() {
 	return (
 		<div ref={ref} className="relative">
 			<button
+				ref={button}
 				type="button"
-				aria-haspopup="true"
 				aria-expanded={open}
+				aria-controls={open ? popup : undefined}
 				aria-label={t("label", { name: tc("network") })}
 				onClick={() => setOpen(!open)}
 				className="-mx-1.5 flex h-11 items-center gap-[7px] border-0 bg-transparent px-1.5 text-[14px] font-medium text-fg wide:mx-0 wide:h-auto wide:px-0 wide:py-2.5"
@@ -146,10 +155,16 @@ function NetworkMenu() {
 				<Caret open={open} className="text-mu" />
 			</button>
 			{open ? (
-				<div className="absolute top-[50px] -right-3 z-30 w-[220px] rounded-[12px] border border-ln2 bg-bg p-1.5 text-[14px] wide:top-11">
+				<div
+					id={popup}
+					className="absolute top-[50px] -right-3 z-30 w-[220px] rounded-[12px] border border-ln2 bg-bg p-1.5 text-[14px] wide:top-11"
+				>
 					<button
 						type="button"
-						onClick={() => setOpen(false)}
+						onClick={() => {
+							button.current?.focus();
+							setOpen(false);
+						}}
 						className="flex w-full items-baseline justify-between rounded-[8px] border-0 bg-hov px-2.5 py-[9px] text-left text-fg"
 					>
 						<span>{tc("network")}</span>

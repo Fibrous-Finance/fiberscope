@@ -7,3 +7,4 @@ export * from "./view/efficiency.ts";
 export * from "./view/network.ts";
 export * from "./view/settlements.ts";
 export * from "./view/registry.ts";
+export * from "./view/surplus.ts";

@@ -1,5 +1,6 @@
 import {
 	ethCall,
+	getInputs,
 	getLogs,
 	getReceipts,
 	parseSettlementLogs,
@@ -8,13 +9,15 @@ import {
 	SETTLEMENT,
 	TOPIC,
 } from "./chain.ts";
+import type { TradeRow } from "./chain.ts";
 import { LOG_RANGE, NETWORK } from "./config.ts";
 import { duration, fmt, log, throttledLog } from "./log.ts";
-import { feedSegments, pricePoints } from "./prices.ts";
+import { answerAt, feedSegments, pricePoints } from "./prices.ts";
 import type { FeedSegment } from "./prices.ts";
 import type { Rpc } from "./rpc.ts";
 import type { BlockRange } from "./rules.ts";
 import type { ChainChunk, Store, TxRow } from "./store.ts";
+import { readOrderTerms } from "./terms.ts";
 
 /** Block ranges in flight at once, the next one to commit included. */
 const PIPELINE = 2;
@@ -70,9 +73,9 @@ export class AllowList {
 
 /**
  * Fetches everything a block range adds: settlements and trades from the settlement contract's
- * logs, a receipt per batch transaction, and the ETH/USD answers of the aggregators that `feed`
- * says the Chainlink proxy used. Flash-loan router senders and recipients get an AllowList
- * verdict on the way.
+ * logs, a receipt and the calldata of each batch transaction, with the order terms the calldata
+ * gives its trades, and the ETH/USD answers of the aggregators that `feed` says the Chainlink
+ * proxy used. Flash-loan router senders and recipients get an AllowList verdict on the way.
  */
 export async function fetchChunk(
 	rpc: Rpc,
@@ -100,7 +103,11 @@ export async function fetchChunk(
 		blockOf.set(settlement.tx, settlement.block);
 		if (settlement.solver === ROUTER) routed.add(settlement.tx);
 	}
-	const receipts = await getReceipts(rpc, [...blockOf.keys()]);
+	const hashes = [...blockOf.keys()];
+	const [receipts, inputs] = await Promise.all([
+		getReceipts(rpc, hashes),
+		getInputs(rpc, hashes),
+	]);
 	const txs: TxRow[] = [...receipts].map(([tx, receipt]) => {
 		const block = Number(receipt.blockNumber);
 		if (block !== blockOf.get(tx)) {
@@ -118,10 +125,33 @@ export async function fetchChunk(
 			l1Fee: BigInt(receipt.l1Fee ?? 0).toString(),
 		};
 	});
+	addTerms(trades, inputs);
 	for (const { tx, block, sender, recipient } of txs) {
 		if (routed.has(tx)) await checkRouterParties(allowList, sender, recipient, block);
 	}
 	return { range, settlements, trades, txs, prices: pricePoints(feed, logs, range) };
+}
+
+/** Gives trades the order terms their transaction's calldata holds, and logs the ones it lacks. */
+function addTerms(trades: TradeRow[], inputs: Map<string, string>): void {
+	const byTx = new Map<string, TradeRow[]>();
+	for (const trade of trades) {
+		const list = byTx.get(trade.tx);
+		if (list) list.push(trade);
+		else byTx.set(trade.tx, [trade]);
+	}
+	const unread: string[] = [];
+	for (const [tx, list] of byTx) {
+		const terms = readOrderTerms(inputs.get(tx)!, list);
+		for (const trade of list) trade.terms = terms.get(trade.logIndex);
+		if (terms.size < list.length) unread.push(tx);
+	}
+	if (unread.length > 0) {
+		log(
+			`order terms: no settle() call in the calldata reproduces trades of ${unread.length} ` +
+				`txs, e.g. ${unread[0]}`
+		);
+	}
 }
 
 /** AllowList verdicts on what attribution may credit a router settlement to. */
@@ -170,6 +200,88 @@ export async function repairRouterRecipients(store: Store, rpc: Rpc): Promise<vo
 	}
 	const seconds = (performance.now() - started) / 1000;
 	log(`router recipients: ${fmt(pending.length)} txs repaired in ${duration(seconds)}`);
+}
+
+/** Batch transactions whose calldata one round of the terms backfill reads and commits. */
+const TERMS_ROUND = 500;
+
+/** Running totals of the terms backfill. */
+export interface TermsStats {
+	/** Batch transactions whose calldata was read. */
+	txs: number;
+	/** Their trades. */
+	trades: number;
+	/** Of those, trades a settle() call in the calldata reproduced: they have order terms. */
+	read: number;
+	seconds: number;
+}
+
+/**
+ * Reads the order terms of trades stored before terms were kept, from their transactions'
+ * calldata, newest first so that recent days, the auction window among them, complete first.
+ * Each round is committed, so a stopped or interrupted backfill resumes where it left off.
+ * Once `stop` aborts, no further round starts.
+ */
+export async function backfillTerms(
+	store: Store,
+	rpc: Rpc,
+	stats: TermsStats,
+	stop?: AbortSignal
+): Promise<void> {
+	let pending = store.txsWithoutTerms(TERMS_ROUND);
+	if (pending.length === 0 || stop?.aborted) return;
+	const total = store.countTxsWithoutTerms();
+	const started = performance.now();
+	log(`terms backfill: ${fmt(total)} txs, from block ${pending[0].block} down`);
+	const report = throttledLog();
+	let done = 0;
+	while (pending.length > 0 && !stop?.aborted) {
+		const inputs = await getInputs(
+			rpc,
+			pending.map(({ tx }) => tx)
+		);
+		const rows = pending.map(({ tx }) => {
+			const trades = store.txTrades(tx);
+			const terms = readOrderTerms(inputs.get(tx)!, trades);
+			stats.trades += trades.length;
+			stats.read += terms.size;
+			return { tx, terms };
+		});
+		store.saveTerms(rows);
+		done += rows.length;
+		stats.txs += rows.length;
+		const at = pending[pending.length - 1].block;
+		report(() => {
+			const seconds = (performance.now() - started) / 1000;
+			const eta = (seconds / done) * (total - done);
+			return (
+				`terms backfill: ${fmt(done)}/${fmt(total)} txs · at block ${at} · ` +
+				`${(done / seconds).toFixed(1)} txs/s · eta ${duration(eta)}`
+			);
+		});
+		pending = store.txsWithoutTerms(TERMS_ROUND);
+	}
+	const seconds = (performance.now() - started) / 1000;
+	stats.seconds += seconds;
+	const outcome = pending.length > 0 ? `stopped above block ${pending[0].block}` : "done";
+	log(
+		`terms backfill: ${outcome}, ${fmt(done)} txs in ${duration(seconds)}; ` +
+			`${fmt(stats.read)} of ${fmt(stats.trades)} trades have order terms`
+	);
+}
+
+/**
+ * Gives the first block of the chain data an ETH/USD price when it has none. Each backfill pass
+ * stores the proxy's answer at the bottom of its range only when it gets there, so a pass the
+ * budget stopped leaves the blocks below its lowest AnswerUpdated without a rate.
+ */
+export async function seedEthUsd(store: Store, rpc: Rpc): Promise<void> {
+	const chain = store.chainRange();
+	if (chain === null) return;
+	const first = store.firstEthUsdBlock();
+	if (first !== null && first <= chain.from) return;
+	store.saveEthUsdPoint({ block: chain.from, answer: await answerAt(rpc, chain.from) });
+	log(`ETH/USD: stored the answer at block ${chain.from}, the first of the chain data`);
 }
 
 /**

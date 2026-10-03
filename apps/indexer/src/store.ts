@@ -8,6 +8,7 @@ import type { Competition } from "./cow.ts";
 import type { PricePoint } from "./prices.ts";
 import type { RegistryEntry } from "./registry.ts";
 import type { BlockRange } from "./rules.ts";
+import type { OrderTerms, TradeFacts } from "./terms.ts";
 
 /** Receipt facts of a transaction that holds at least one batch. */
 export interface TxRow {
@@ -53,11 +54,15 @@ export interface BatchRow {
 	sender: string;
 	recipient: string | null;
 	gasUsed: number;
+	/** `effectiveGasPrice` in wei. */
+	gasPrice: string;
+	/** OP-stack L1 data fee in wei. */
+	l1Fee: string;
 	/** The AllowList verdict on the sender, if it was ever checked (flash-loan router senders). */
 	senderIsSolver: number | null;
 	/** The AllowList verdict on the recipient, if it was ever checked (router recipients). */
 	recipientIsSolver: number | null;
-	/** Batches in the same transaction; they share its gas. */
+	/** Batches in the same transaction; they share its gas and its fee. */
 	txBatches: number;
 }
 
@@ -70,6 +75,10 @@ export interface TradeValueRow {
 	buyToken: string;
 	sellAmount: string;
 	buyAmount: string;
+	/** The order terms (see OrderTerms); null when they are not known. */
+	limitSellAmount: string | null;
+	limitBuyAmount: string | null;
+	feeAmount: string | null;
 	auctionId: number | null;
 }
 
@@ -101,6 +110,8 @@ CREATE TABLE IF NOT EXISTS settlements (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS settlements_block ON settlements (block);
 
+-- terms_read: 1 once the calldata was read for the order terms of the transaction's trades; null
+-- in rows stored before terms were kept, until the terms backfill reads them.
 CREATE TABLE IF NOT EXISTS txs (
 	tx TEXT PRIMARY KEY,
 	block INTEGER NOT NULL,
@@ -108,7 +119,8 @@ CREATE TABLE IF NOT EXISTS txs (
 	to_address TEXT,
 	gas_used INTEGER NOT NULL,
 	gas_price TEXT NOT NULL,
-	l1_fee TEXT NOT NULL
+	l1_fee TEXT NOT NULL,
+	terms_read INTEGER
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS txs_block ON txs (block);
 
@@ -119,6 +131,9 @@ CREATE TABLE IF NOT EXISTS allow_list (
 	checked_block INTEGER NOT NULL
 ) WITHOUT ROWID;
 
+-- limit_sell_amount, limit_buy_amount and fee_amount are the order terms read from the settle()
+-- calldata (see OrderTerms); null when no settle() call in the calldata reproduces the trade, or
+-- until its transaction's calldata is read.
 CREATE TABLE IF NOT EXISTS trades (
 	tx TEXT NOT NULL,
 	log_index INTEGER NOT NULL,
@@ -128,6 +143,9 @@ CREATE TABLE IF NOT EXISTS trades (
 	buy_token TEXT NOT NULL,
 	sell_amount TEXT NOT NULL,
 	buy_amount TEXT NOT NULL,
+	limit_sell_amount TEXT,
+	limit_buy_amount TEXT,
+	fee_amount TEXT,
 	PRIMARY KEY (tx, log_index)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS trades_block ON trades (block);
@@ -203,10 +221,25 @@ export class Store {
 
 	/** Brings a database created by an older version up to the current schema. */
 	#migrate(): void {
-		const columns = this.#all<{ name: string }>("SELECT name FROM pragma_table_info('txs')");
-		if (!columns.some((column) => column.name === "to_address")) {
-			this.db.exec("ALTER TABLE txs ADD COLUMN to_address TEXT");
+		const added: [table: string, column: string, type: string][] = [
+			["txs", "to_address", "TEXT"],
+			["txs", "terms_read", "INTEGER"],
+			["trades", "limit_sell_amount", "TEXT"],
+			["trades", "limit_buy_amount", "TEXT"],
+			["trades", "fee_amount", "TEXT"],
+		];
+		for (const [table, column, type] of added) {
+			const columns = this.#all<{ name: string }>(
+				`SELECT name FROM pragma_table_info('${table}')`
+			);
+			if (!columns.some((existing) => existing.name === column)) {
+				this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+			}
 		}
+		// The terms backfill's queue, newest first; it empties as the backfill reads calldata.
+		this.db.exec(
+			"CREATE INDEX IF NOT EXISTS txs_terms_unread ON txs (block) WHERE terms_read IS NULL"
+		);
 	}
 
 	close(): void {
@@ -243,7 +276,11 @@ export class Store {
 
 	// Chain data
 
-	/** Replaces everything in the chunk's block range and records the new chain range. */
+	/**
+	 * Replaces everything in the chunk's block range and records the new chain range. The chunk's
+	 * transactions count as read for order terms: a chunk carries the terms of every trade its
+	 * calldata reproduces.
+	 */
 	commitChunk(chunk: ChainChunk, chainRange: BlockRange): void {
 		const { from, to } = chunk.range;
 		this.#transaction(() => {
@@ -264,7 +301,8 @@ export class Store {
 			for (const t of chunk.trades) {
 				this.#run(
 					`INSERT INTO trades (tx, log_index, block, settlement_log_index, sell_token, buy_token,
-						sell_amount, buy_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+						sell_amount, buy_amount, limit_sell_amount, limit_buy_amount, fee_amount)
+						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 					t.tx,
 					t.logIndex,
 					t.block,
@@ -272,13 +310,16 @@ export class Store {
 					t.sellToken,
 					t.buyToken,
 					t.sellAmount,
-					t.buyAmount
+					t.buyAmount,
+					t.terms?.limitSellAmount ?? null,
+					t.terms?.limitBuyAmount ?? null,
+					t.terms?.feeAmount ?? null
 				);
 			}
 			for (const t of chunk.txs) {
 				this.#run(
-					`INSERT INTO txs (tx, block, sender, to_address, gas_used, gas_price, l1_fee)
-						VALUES (?, ?, ?, ?, ?, ?, ?)`,
+					`INSERT INTO txs (tx, block, sender, to_address, gas_used, gas_price, l1_fee,
+						terms_read) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
 					t.tx,
 					t.block,
 					t.sender,
@@ -340,6 +381,75 @@ export class Store {
 		return this.#all<PricePoint>("SELECT block, answer FROM eth_usd ORDER BY block");
 	}
 
+	/** The block of the earliest ETH/USD price point, or null when there is none. */
+	firstEthUsdBlock(): number | null {
+		return this.#get<{ block: number | null }>("SELECT MIN(block) AS block FROM eth_usd")!
+			.block;
+	}
+
+	saveEthUsdPoint(point: PricePoint): void {
+		this.#run(
+			"INSERT OR REPLACE INTO eth_usd (block, answer) VALUES (?, ?)",
+			point.block,
+			point.answer
+		);
+	}
+
+	/** Batch transactions whose calldata was never read for order terms, newest first. */
+	txsWithoutTerms(limit: number): { tx: string; block: number }[] {
+		return this.#all(
+			"SELECT tx, block FROM txs WHERE terms_read IS NULL ORDER BY block DESC LIMIT ?",
+			limit
+		);
+	}
+
+	/** Batch transactions whose calldata was never read, in a block range (default: all). */
+	countTxsWithoutTerms(range: BlockRange = { from: 0, to: Number.MAX_SAFE_INTEGER }): number {
+		return this.#get<{ n: number }>(
+			"SELECT COUNT(*) AS n FROM txs WHERE terms_read IS NULL AND block BETWEEN ? AND ?",
+			range.from,
+			range.to
+		)!.n;
+	}
+
+	/** The block of the newest batch transaction whose calldata was never read, or null. */
+	newestTxWithoutTerms(): number | null {
+		return this.#get<{ block: number | null }>(
+			"SELECT MAX(block) AS block FROM txs WHERE terms_read IS NULL"
+		)!.block;
+	}
+
+	/** A transaction's trades, as matching them to their settle() calls needs them. */
+	txTrades(tx: string): TradeFacts[] {
+		return this.#all(
+			`SELECT log_index AS logIndex, settlement_log_index AS settlementLogIndex,
+				sell_token AS sellToken, buy_token AS buyToken, sell_amount AS sellAmount,
+				buy_amount AS buyAmount
+			FROM trades WHERE tx = ? ORDER BY log_index`,
+			tx
+		);
+	}
+
+	/** Stores the order terms read from transactions' calldata, by trade log index. */
+	saveTerms(rows: { tx: string; terms: Map<number, OrderTerms> }[]): void {
+		this.#transaction(() => {
+			for (const { tx, terms } of rows) {
+				for (const [logIndex, t] of terms) {
+					this.#run(
+						`UPDATE trades SET limit_sell_amount = ?, limit_buy_amount = ?,
+							fee_amount = ? WHERE tx = ? AND log_index = ?`,
+						t.limitSellAmount,
+						t.limitBuyAmount,
+						t.feeAmount,
+						tx,
+						logIndex
+					);
+				}
+				this.#run("UPDATE txs SET terms_read = 1 WHERE tx = ?", tx);
+			}
+		});
+	}
+
 	/** Batch transactions in a block range, in block order. */
 	batchTxs(range: BlockRange): { tx: string; block: number }[] {
 		return this.#all(
@@ -353,8 +463,8 @@ export class Store {
 	batchRows(range: BlockRange): BatchRow[] {
 		return this.#all(
 			`SELECT s.tx, s.log_index AS logIndex, s.block, s.solver, s.trades, s.swaps, t.sender,
-				t.to_address AS recipient, t.gas_used AS gasUsed, l.is_solver AS senderIsSolver,
-				r.is_solver AS recipientIsSolver,
+				t.to_address AS recipient, t.gas_used AS gasUsed, t.gas_price AS gasPrice,
+				t.l1_fee AS l1Fee, l.is_solver AS senderIsSolver, r.is_solver AS recipientIsSolver,
 				(SELECT COUNT(*) FROM settlements x WHERE x.tx = s.tx AND x.trades > 0) AS txBatches
 			FROM settlements s JOIN txs t ON t.tx = s.tx LEFT JOIN allow_list l ON l.address = t.sender
 				LEFT JOIN allow_list r ON r.address = t.to_address
@@ -649,7 +759,8 @@ export class Store {
 
 const TRADE_ROWS = `SELECT tr.tx, tr.log_index AS logIndex, tr.settlement_log_index AS settlementLogIndex,
 	tr.block, tr.sell_token AS sellToken, tr.buy_token AS buyToken, tr.sell_amount AS sellAmount,
-	tr.buy_amount AS buyAmount, a.auction_id AS auctionId
+	tr.buy_amount AS buyAmount, tr.limit_sell_amount AS limitSellAmount,
+	tr.limit_buy_amount AS limitBuyAmount, tr.fee_amount AS feeAmount, a.auction_id AS auctionId
 	FROM trades tr LEFT JOIN auction_txs a ON a.tx = tr.tx`;
 
 const SOLUTION_ROWS = `SELECT a.id AS auctionId, a.start_block AS startBlock, s.solver, s.ranking,

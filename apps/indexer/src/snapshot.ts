@@ -35,6 +35,14 @@ export interface SnapshotStats {
 	unpriced: number;
 	/** Of those, trades valued from one side only. */
 	oneSided: number;
+	/** Priced trades in the surplus coverage. */
+	surplusPriced: number;
+	/** Of those, trades without a surplus: their order terms are unknown. */
+	noSurplus: number;
+	/** Of the trades with a surplus, the unusual ones (more than a tenth of their value). */
+	unusual: number;
+	/** Batches in the chain coverage without an ETH/USD rate, so without a cost. */
+	uncosted: number;
 }
 
 interface Tally {
@@ -45,7 +53,14 @@ interface Tally {
 	trades: number[];
 	swaps: number[];
 	gas: number[];
+	cost: number[];
 	volume: number[];
+	surplus: number[];
+	surplusTrades: number[];
+	surplusVolume: number[];
+	unusualSurplus: number[];
+	unusualTrades: number[];
+	unusualVolume: number[];
 	entered: number[];
 	won: number[];
 	/** The latest batches, oldest first. */
@@ -63,6 +78,11 @@ export async function buildSnapshot(
 	const chainDays = completeBuckets(end, chain);
 	const auctionRange = store.auctionRange();
 	const auctionDays = Math.min(chainDays, completeBuckets(end, auctionRange));
+	// Surplus also needs order terms, which the terms backfill reads newest first: it covers the
+	// days after the newest transaction still unread.
+	const unread = store.newestTxWithoutTerms();
+	const surplusDays =
+		unread === null ? auctionDays : Math.min(auctionDays, bucketOf(end, unread));
 	const lastRunAt = store.lastRunAt();
 	if (lastRunAt === null) throw new Error("No sync has completed yet");
 
@@ -77,7 +97,14 @@ export async function buildSnapshot(
 				trades: zeros(chainDays),
 				swaps: zeros(chainDays),
 				gas: zeros(chainDays),
+				cost: zeros(chainDays),
 				volume: zeros(auctionDays),
+				surplus: zeros(surplusDays),
+				surplusTrades: zeros(surplusDays),
+				surplusVolume: zeros(surplusDays),
+				unusualSurplus: zeros(surplusDays),
+				unusualTrades: zeros(surplusDays),
+				unusualVolume: zeros(surplusDays),
 				entered: zeros(auctionDays),
 				won: zeros(auctionDays),
 				latest: [],
@@ -85,6 +112,16 @@ export async function buildSnapshot(
 			tallies.set(identity.id, entry);
 		}
 		return entry;
+	};
+
+	const stats: SnapshotStats = {
+		trades: 0,
+		unpriced: 0,
+		oneSided: 0,
+		surplusPriced: 0,
+		noSurplus: 0,
+		unusual: 0,
+		uncosted: 0,
 	};
 
 	const creditedTo = new Map<string, Tally>();
@@ -102,6 +139,8 @@ export async function buildSnapshot(
 			entry.trades[d] += batch.trades;
 			entry.swaps[d] += batch.swaps;
 			entry.gas[d] += batch.gas;
+			if (batch.cost === null) stats.uncosted++;
+			else entry.cost[d] += batch.cost;
 			entry.latest.push(batch);
 			if (entry.latest.length > LATEST_SETTLEMENTS) entry.latest.shift();
 			networkLatest.push(batch);
@@ -111,18 +150,34 @@ export async function buildSnapshot(
 	}
 
 	const valuer = new TradeValuer(store);
-	const stats: SnapshotStats = { trades: 0, unpriced: 0, oneSided: 0 };
 	const count = zeros(auctionDays);
 	const solutions = zeros(auctionDays);
 	if (auctionDays > 0) {
 		const range = { from: windowStart(end, auctionDays), to: end };
 		for (const trade of store.tradeRows(range)) {
-			const { usd, pricedSides } = valuer.value(trade);
+			const { usd, pricedSides, surplus } = valuer.value(trade);
 			stats.trades++;
 			if (usd === null) stats.unpriced++;
 			else if (pricedSides === 1) stats.oneSided++;
+			const d = bucketOf(end, trade.block);
 			const entry = creditedTo.get(`${trade.tx}:${trade.settlementLogIndex}`);
-			if (usd !== null && entry) entry.volume[bucketOf(end, trade.block)] += usd;
+			if (usd === null || !entry) continue;
+			entry.volume[d] += usd;
+			if (d >= surplusDays) continue;
+			stats.surplusPriced++;
+			if (surplus === null) {
+				stats.noSurplus++;
+				continue;
+			}
+			entry.surplus[d] += surplus.usd;
+			entry.surplusTrades[d]++;
+			entry.surplusVolume[d] += usd;
+			if (surplus.unusual) {
+				stats.unusual++;
+				entry.unusualSurplus[d] += surplus.usd;
+				entry.unusualTrades[d]++;
+				entry.unusualVolume[d] += usd;
+			}
 		}
 		for (const auction of auctionOutcomes(store.solutionsByStart(range), registry)) {
 			const d = bucketOf(end, auction.startBlock);
@@ -152,7 +207,9 @@ export async function buildSnapshot(
 	const symbol = (token: string) => symbols.get(token) ?? shortAddress(token);
 	const summary = (batch: Batch): SettlementSummary => {
 		const trades = tradesOf.get(batch)!;
-		const priced = trades.map((trade) => valuer.value(trade).usd).filter((usd) => usd !== null);
+		const values = trades.map((trade) => valuer.value(trade));
+		const priced = values.flatMap(({ usd }) => (usd === null ? [] : [usd]));
+		const surpluses = values.flatMap(({ surplus }) => (surplus === null ? [] : [surplus.usd]));
 		return {
 			tx: batch.tx,
 			block: batch.block,
@@ -160,8 +217,10 @@ export async function buildSnapshot(
 			trades: batch.trades,
 			swaps: batch.swaps,
 			pair: { sell: symbol(trades[0].sellToken), buy: symbol(trades[0].buyToken) },
-			volume: priced.length === 0 ? null : cents(priced.reduce((a, b) => a + b, 0)),
+			volume: priced.length === 0 ? null : cents(sum(priced)),
+			surplus: surpluses.length === 0 ? null : subCents(sum(surpluses)),
 			gas: Math.round(batch.gas),
+			cost: batch.cost === null ? null : subCents(batch.cost),
 		};
 	};
 
@@ -181,6 +240,13 @@ export async function buildSnapshot(
 			swaps: entry.swaps,
 			gas: entry.gas.map(Math.round),
 			volume: entry.volume.map(cents),
+			surplus: entry.surplus.map(subCents),
+			surplusTrades: entry.surplusTrades,
+			surplusVolume: entry.surplusVolume.map(cents),
+			unusualSurplus: entry.unusualSurplus.map(subCents),
+			unusualTrades: entry.unusualTrades,
+			unusualVolume: entry.unusualVolume.map(cents),
+			cost: entry.cost.map(subCents),
 			entered: entry.entered,
 			won: entry.won,
 			latestSettlements: entry.latest.toReversed().map(summary),
@@ -233,7 +299,7 @@ export async function buildSnapshot(
 		end: { block: end, time: timeOf(end) * 1000 },
 		lastRunAt,
 		refreshMinutes: options.refreshMinutes,
-		coverage: { chainDays, auctionDays },
+		coverage: { chainDays, auctionDays, surplusDays },
 		auctions: { count, solutions },
 		solvers,
 		latestAuctions,
@@ -276,4 +342,9 @@ function sum(values: number[]): number {
 
 function cents(usd: number): number {
 	return Math.round(usd * 100) / 100;
+}
+
+/** USD to a hundredth of a cent: a batch often costs less than a cent. */
+function subCents(usd: number): number {
+	return Math.round(usd * 10_000) / 10_000;
 }

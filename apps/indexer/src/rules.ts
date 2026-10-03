@@ -1,7 +1,7 @@
 import { ROUTER } from "./chain.ts";
 import { BLOCKS_PER_DAY, NATIVE_ETH, WETH } from "./config.ts";
 
-/** The published methodology as pure functions: buckets, attribution and volume. */
+/** The published methodology as pure functions: buckets, attribution, volume, surplus and cost. */
 
 export interface BlockRange {
 	from: number;
@@ -90,4 +90,66 @@ export function tradeVolumeUsd(
 	const buy = buyNative > 0n ? BigInt(buyAmount) * buyNative : null;
 	const lower = sell !== null && buy !== null ? (sell < buy ? sell : buy) : (sell ?? buy);
 	return lower === null ? null : (Number(lower) / 1e36) * ethUsd;
+}
+
+/** What surplus needs from a trade: its executed amounts and its order terms (see OrderTerms). */
+export interface SurplusFacts {
+	/** Sold, fee included. */
+	sellAmount: string;
+	buyAmount: string;
+	limitSellAmount: string | null;
+	limitBuyAmount: string | null;
+	feeAmount: string | null;
+}
+
+/** A trade's surplus and how CoW classes it. */
+export interface TradeSurplus {
+	/** USD. */
+	usd: number;
+	/**
+	 * More than a tenth of the trade's value: CoW's own split of trader surplus into "unusual"
+	 * and "reasonable" (Dune query 1368423, "V3: Total User Surplus": surplus_usd > 0.1 ×
+	 * usd_value). Unusual surplus comes from limits far from the market price, which say more
+	 * about the order than about how well it was settled.
+	 */
+	unusual: boolean;
+}
+
+/**
+ * A trade's surplus, the way Dune's CoW Protocol trades model computes `surplus_usd`: the
+ * trade's USD value times how far its executed price beat its limit price,
+ *
+ *     (bought × limitSell − sold × limitBuy) ÷ (bought × limitSell)
+ *
+ * where bought and sold are the executed amounts, sold without the fee, and limitSell and
+ * limitBuy are the signed order's amounts. The expression is the same for sell and buy orders,
+ * and for whole and partial fills: it compares prices, not amounts. Since surplus is the value
+ * times that ratio, it is unusual exactly when the ratio exceeds a tenth, whatever the prices,
+ * so the class is decided on the amounts alone. Null when the trade has no USD value or its
+ * order terms are unknown.
+ */
+export function tradeSurplus(usd: number | null, trade: SurplusFacts): TradeSurplus | null {
+	const { limitSellAmount, limitBuyAmount, feeAmount } = trade;
+	if (usd === null || limitSellAmount === null || limitBuyAmount === null || feeAmount === null) {
+		return null;
+	}
+	const bought = BigInt(trade.buyAmount);
+	const sold = BigInt(trade.sellAmount) - BigInt(feeAmount);
+	const limit = bought * BigInt(limitSellAmount);
+	if (limit === 0n) return null;
+	const beat = limit - sold * BigInt(limitBuyAmount);
+	return { usd: (usd * Number(beat)) / Number(limit), unusual: beat * 10n > limit };
+}
+
+/**
+ * A batch's transaction cost in USD: its transaction's fee, gas used × effective gas price plus
+ * the L1 data fee (wei), in ETH at the ETH/USD rate of its block, split evenly between the
+ * batches the transaction holds, as its gas is.
+ */
+export function batchCostUsd(
+	tx: { gasUsed: number; gasPrice: string; l1Fee: string; txBatches: number },
+	ethUsd: number
+): number {
+	const wei = BigInt(tx.gasUsed) * BigInt(tx.gasPrice) + BigInt(tx.l1Fee);
+	return (Number(wei) / 1e18 / tx.txBatches) * ethUsd;
 }

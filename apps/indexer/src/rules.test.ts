@@ -4,10 +4,12 @@ import { describe, test } from "node:test";
 import { ROUTER } from "./chain.ts";
 import { BLOCKS_PER_DAY, NATIVE_ETH, WETH } from "./config.ts";
 import {
+	batchCostUsd,
 	bucketOf,
 	completeBuckets,
 	creditedAddress,
 	priceToken,
+	tradeSurplus,
 	tradeVolumeUsd,
 	windowStart,
 } from "./rules.ts";
@@ -78,6 +80,89 @@ describe("trade volume", () => {
 			priceToken("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
 			"0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
 		);
+	});
+});
+
+describe("trade surplus", () => {
+	// A sell order: 1,000 USDC for at least 0.4 WETH, filled for 0.45 WETH.
+	const sell = {
+		sellAmount: "1000000000",
+		buyAmount: "450000000000000000",
+		limitSellAmount: "1000000000",
+		limitBuyAmount: "400000000000000000",
+		feeAmount: "0",
+	};
+
+	test("is the trade's value times how far the executed price beat the limit", () => {
+		// 0.05 WETH more than the limit asked, of the 0.45 bought: a ninth.
+		assert.ok(Math.abs(tradeSurplus(900, sell)!.usd - 100) < 1e-9);
+		// Filled exactly at the limit: no surplus.
+		assert.equal(tradeSurplus(900, { ...sell, buyAmount: "400000000000000000" })?.usd, 0);
+	});
+
+	test("uses the same expression for buy orders: what the trader saved of the limit", () => {
+		// 1,000 DAI for at most 0.5 WETH, bought for 0.45 WETH: a tenth saved.
+		const buy = {
+			sellAmount: "450000000000000000",
+			buyAmount: "1000000000000000000000",
+			limitSellAmount: "500000000000000000",
+			limitBuyAmount: "1000000000000000000000",
+			feeAmount: "0",
+		};
+		assert.ok(Math.abs(tradeSurplus(1_000, buy)!.usd - 100) < 1e-9);
+	});
+
+	test("compares prices, so a partial fill at the same price has the same ratio", () => {
+		// Half of a 2,000 USDC order for at least 0.8 WETH.
+		const half = {
+			...sell,
+			limitSellAmount: "2000000000",
+			limitBuyAmount: "800000000000000000",
+		};
+		assert.ok(Math.abs(tradeSurplus(900, half)!.usd - 100) < 1e-9);
+	});
+
+	test("leaves the fee out of the amount sold", () => {
+		// The same trade with 1 USDC of signed fee on top: the surplus does not change.
+		const withFee = { ...sell, sellAmount: "1001000000", feeAmount: "1000000" };
+		assert.ok(Math.abs(tradeSurplus(900, withFee)!.usd - 100) < 1e-9);
+	});
+
+	test("is unusual only when it is more than a tenth of the trade's value", () => {
+		// A ninth of the value: unusual.
+		assert.equal(tradeSurplus(900, sell)?.unusual, true);
+		// Exactly a tenth (0.45 WETH bought where 0.405 was asked) is still reasonable; one atom
+		// less asked tips it over. The value does not matter: the ratio decides.
+		const tenth = { ...sell, limitBuyAmount: "405000000000000000" };
+		assert.ok(Math.abs(tradeSurplus(900, tenth)!.usd - 90) < 1e-9);
+		assert.equal(tradeSurplus(900, tenth)?.unusual, false);
+		assert.equal(tradeSurplus(1, tenth)?.unusual, false);
+		const over = { ...sell, limitBuyAmount: "404999999999999999" };
+		assert.equal(tradeSurplus(900, over)?.unusual, true);
+		assert.equal(
+			tradeSurplus(900, { ...sell, buyAmount: "400000000000000000" })?.unusual,
+			false
+		);
+	});
+
+	test("has none without a value or without order terms", () => {
+		assert.equal(tradeSurplus(null, sell), null);
+		assert.equal(tradeSurplus(900, { ...sell, limitSellAmount: null }), null);
+		assert.equal(tradeSurplus(900, { ...sell, feeAmount: null }), null);
+		assert.equal(tradeSurplus(900, { ...sell, limitSellAmount: "0" }), null);
+	});
+});
+
+describe("batch cost", () => {
+	// 400K gas at 0.01 gwei plus 0.0000001 ETH of L1 data fee: 0.0000041 ETH.
+	const tx = { gasUsed: 400_000, gasPrice: "10000000", l1Fee: "100000000000", txBatches: 1 };
+
+	test("is the transaction's fee in ETH at the ETH/USD rate", () => {
+		assert.ok(Math.abs(batchCostUsd(tx, 2_500) - 0.01025) < 1e-12);
+	});
+
+	test("splits the fee evenly between the batches of a transaction", () => {
+		assert.ok(Math.abs(batchCostUsd({ ...tx, txBatches: 2 }, 2_500) - 0.005125) < 1e-12);
 	});
 });
 

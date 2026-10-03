@@ -8,6 +8,7 @@ import { duration, fmt, log } from "./log.ts";
 import { OVERRIDES } from "./overrides.ts";
 import { Registry } from "./registry.ts";
 import { Rpc } from "./rpc.ts";
+import { seedDatabase } from "./seed.ts";
 import { buildSnapshot } from "./snapshot.ts";
 import { Store } from "./store.ts";
 import { resolveSymbols } from "./symbols.ts";
@@ -26,8 +27,11 @@ const USAGE = `Usage:
       Write the snapshot JSON (default ${relative(process.cwd(), DEFAULT_SNAPSHOT_PATH)}).
   node src/cli.ts window --from <block> --to <block>
       Print totals and the per-solver table for a block range, from the database.
+  node src/cli.ts seed --url <url>
+      Download a database from <url> when there is none yet, e.g. to move the indexer to a new
+      host without indexing again. It is integrity-checked before it is used.
 
-Every command takes --db <path> (default ${relative(process.cwd(), DEFAULT_DB_PATH)}).
+Every command takes --db <path> (default DB_PATH, else ${relative(process.cwd(), DEFAULT_DB_PATH)}).
 Environment: BASE_RPC_URL, BASE_RPC_RPS, COW_API_RPS, REFRESH_MINUTES. With SNAPSHOT_R2_BUCKET
 (plus CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN and optionally SNAPSHOT_R2_KEY, default
 ${NETWORK.id}/snapshot.json) every snapshot written is also uploaded to that R2 bucket.
@@ -45,6 +49,7 @@ async function main(): Promise<void> {
 			from: { type: "string" },
 			to: { type: "string" },
 			db: { type: "string" },
+			url: { type: "string" },
 			help: { type: "boolean", short: "h" },
 		},
 	});
@@ -55,7 +60,16 @@ async function main(): Promise<void> {
 		return;
 	}
 	const env = readEnv();
-	const dbPath = values.db ?? DEFAULT_DB_PATH;
+	const dbPath = values.db ?? env.dbPath;
+	if (command === "seed") {
+		if (values.url === undefined) throw new Error("seed needs --url <url>");
+		const started = performance.now();
+		const bytes = await seedDatabase(values.url, dbPath);
+		log(
+			`seed: ${dbPath} (${fmt(bytes / 1e6, 1)} MB) in ${duration((performance.now() - started) / 1000)}`
+		);
+		return;
+	}
 	const store = new Store(dbPath);
 	try {
 		if (command === "sync") {
@@ -149,8 +163,8 @@ async function writeSnapshot(store: Store, rpc: Rpc, env: Env, out: string): Pro
 			);
 		} catch (error) {
 			process.exitCode = 1;
-			log(
-				`  upload to R2 ${bucket}/${key} failed: ${error instanceof Error ? error.message : error}`
+			process.stderr.write(
+				`  upload to R2 ${bucket}/${key} failed: ${error instanceof Error ? error.message : error}\n`
 			);
 		}
 	}
@@ -170,6 +184,8 @@ function rate(count: number, seconds: number): string {
 }
 
 main().catch((error: unknown) => {
-	log(`error: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
+	process.stderr.write(
+		`error: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
+	);
 	process.exit(1);
 });

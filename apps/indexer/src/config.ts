@@ -38,6 +38,8 @@ export interface R2Target {
 }
 
 export interface Env {
+	/** The SQLite database (DB_PATH, default `apps/indexer/.data/base.db`). */
+	dbPath: string;
 	rpcUrl: string;
 	/** Most RPC calls per second; every call in a batch counts. */
 	rpcRps: number;
@@ -50,6 +52,7 @@ export interface Env {
 
 export function readEnv(env: NodeJS.ProcessEnv = process.env): Env {
 	return {
+		dbPath: env.DB_PATH || DEFAULT_DB_PATH,
 		rpcUrl: env.BASE_RPC_URL || "https://mainnet.base.org",
 		rpcRps: positive(env, "BASE_RPC_RPS", 15),
 		cowApiRps: positive(env, "COW_API_RPS", 3),

@@ -211,8 +211,3 @@ decoded trade reproduced its `Trade` event exactly, and the limits, order kinds 
 To check a block range yourself, `node src/cli.ts window --from <block> --to <block>` in
 `apps/indexer` prints its totals and per-solver table from the database (see
 [Development](development.md#the-indexer)).
-
-## Disclosure
-
-Fiberscope is built by Fibrous, which also runs a solver on CoW Protocol. Every solver, Fibrous
-included, is measured by the same open-source code.

@@ -50,8 +50,8 @@ pnpm format && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && 
 ## Neutrality
 
 - Every solver is measured, ranked and shown the same way, in code, copy and design.
-- Fibrous, which builds Fiberscope and also runs a solver, appears on the site only as "Built by
-  Fibrous" in the footer and in one disclosure in Methodology.
+- Fibrous builds Fiberscope and also runs a solver. On the site it appears as the builder only in
+  the footer's credit, which says so: "Built by Fibrous, which also runs a solver".
 - Copy and docs never use a real solver as a generic example.
 - The site states "Independent project, not affiliated with CoW DAO."
 

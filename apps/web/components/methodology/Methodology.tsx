@@ -92,13 +92,7 @@ export function Methodology() {
 			<h2 className="section-title">{t("title")}</h2>
 			<div className="mt-8 grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] gap-x-16 gap-y-9 border-t border-ln pt-7">
 				{list(MEASURES)}
-				<div className="flex flex-col gap-6">
-					{list(SOURCES)}
-					<p className="border-t border-ln pt-5 text-[14px] leading-[1.6] text-mu">
-						<span className="font-medium text-fg">{t("disclosureLabel")}</span>{" "}
-						{t("disclosure")}
-					</p>
-				</div>
+				{list(SOURCES)}
 			</div>
 		</Section>
 	);

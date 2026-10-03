@@ -121,5 +121,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately, as
 ---
 
 Fiberscope is an independent project, not affiliated with CoW DAO. It is built by
-[Fibrous](https://fibrous.finance), which also runs a solver on CoW Protocol and is measured by the
-same code as every other solver.
+[Fibrous](https://fibrous.finance), which also runs a solver on CoW Protocol.

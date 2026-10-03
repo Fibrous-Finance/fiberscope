@@ -92,7 +92,5 @@
 			"term": "Names",
 			"text": "From CoW’s public solver registry. Solvers without a public name are shown by address."
 		}
-	},
-	"disclosureLabel": "Disclosure.",
-	"disclosure": "Fiberscope is built by Fibrous, which also runs a solver on CoW Protocol. Every solver, Fibrous included, is measured by the same open-source code."
+	}
 }

@@ -21,7 +21,10 @@ import { useFormat } from "@/lib/format";
 
 /** The detail under an open row: two blocks on desktop, one stack in the compact list. */
 
-/** Below this visible table width, Block A moves its third column underneath and Block B stacks. */
+/**
+ * Below this visible table width, the first block moves its third column underneath and the
+ * second stacks.
+ */
 const NARROW_TABLE = 1120;
 /** The share chart's y-range spans at least 4 percentage points. */
 const MIN_SPAN = 0.04;
@@ -42,7 +45,7 @@ const RETIRED = "text-[10.5px] tracking-[.06em] text-fa uppercase";
 const SETTLEMENT_GRID =
 	"grid grid-cols-[96px_46px_46px_minmax(0,1fr)_76px_56px_200px] items-center gap-3";
 
-/** A won auction is a square, an entered one a dot, a missed one a faint speck. */
+/** A won auction is a square, an entered one a dot, one it did not enter a faint speck. */
 const DOT: Record<TapeCell["state"], string> = {
 	won: "size-2 rounded-[2px] bg-fg",
 	entered: "size-1 rounded-full bg-[color-mix(in_oklab,var(--fg)_45%,transparent)]",

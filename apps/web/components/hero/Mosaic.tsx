@@ -18,17 +18,17 @@ const LEGEND_SIZE = 6;
 const INTRO_STAGGER_S = 0.06;
 const INTRO_STEPS = 8;
 
-/** The placeholder field: the mosaic's squares and gaps at its usual size. */
+/** The placeholder field: the wide mosaic's 9px squares and 2px gaps. */
 const GRID =
 	"aspect-[1184/380] w-full bg-[linear-gradient(90deg,transparent_9px,var(--bg)_9px),linear-gradient(transparent_9px,var(--bg)_9px)] bg-size-[11px_11px] max-wide:aspect-[358/170]";
 
-/** The mosaic only differs between the server and the client; nothing to subscribe to. */
+/** For useSyncExternalStore: tells the server render from the client one; nothing to subscribe. */
 function subscribeNothing() {
 	return () => {};
 }
 
 /**
- * The batch mosaic: one square per unit of the measure, each solver a vertical block in rank
+ * The mosaic: one square per unit of the selected measure, each solver a vertical block in rank
  * order, so the field reads like a share bar. Hovering a solver here or anywhere else on the page
  * turns its squares teal and shows its numbers above the field.
  */

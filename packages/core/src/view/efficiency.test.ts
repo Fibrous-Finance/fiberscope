@@ -7,7 +7,7 @@ const row = (trades: number, swapsPerTrade: number | null) => ({ trades, swapsPe
 
 describe("swapsAxis", () => {
 	it("leaves a low-sample outlier beyond the axis", () => {
-		// 7D: Elfomo's 11.28 comes from fewer than 30 trades; the rest stay under 3.
+		// A low-sample solver: 11.28 swaps per trade from fewer than 30 trades; the rest stay under 3.
 		const axis = swapsAxis([row(9_000, 1.6), row(400, 2.94), row(12, 11.28)], 1.8);
 		assert.equal(axis.max, 3);
 		assert.deepEqual(axis.ticks, [0, 1, 2, 3]);

@@ -24,7 +24,7 @@ export default async function NotFound() {
 	return (
 		<>
 			<Header status={dataStatus(result, result.at)} away />
-			{/* A block, not a flex item: auto margins would shrink it, and `page` is content-box. */}
+			{/* A block-level child, not a flex item: auto margins would shrink it; `page` is content-box. */}
 			<div className="page flex min-h-[calc(100dvh-61px)] flex-col">
 				<main className="pt-[clamp(72px,12vw,168px)] pb-[clamp(72px,10vw,128px)]">
 					<p className="eyebrow">{t("eyebrow")}</p>

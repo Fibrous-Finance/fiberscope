@@ -243,7 +243,10 @@ export async function buildSnapshot(
 	return { snapshot, stats };
 }
 
-/** Registered addresses that are active or seen in the data, prod before barn; else the address. */
+/**
+ * Registered addresses that are active or seen in the data, prod before barn. For a solver the
+ * registry lacks, the addresses seen in the data, listed as prod.
+ */
 function addressesOf(entry: Tally, registry: Registry): SolverAddress[] {
 	const registered = registry.addresses(entry.identity.id);
 	if (registered.length === 0)

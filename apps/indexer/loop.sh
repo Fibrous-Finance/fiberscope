@@ -3,6 +3,8 @@
 # counted from the start of each run. A failed run is logged and the next one runs on schedule.
 # With SEED_DB_URL set and no database at DB_PATH yet, the database is first downloaded from that
 # URL (`cli.ts seed`), which moves the indexer to a new host without indexing again.
+# REFRESH_MINUTES, SEED_DB_URL and DB_PATH are read from this script's environment; ./.env is
+# read only by each `sync`.
 set -eu
 cd "$(dirname "$0")"
 

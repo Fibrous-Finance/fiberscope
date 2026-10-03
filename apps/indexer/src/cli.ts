@@ -22,7 +22,7 @@ const USAGE = `Usage:
       auction data. Resumable and idempotent: a re-run fetches only what is missing. With
       --budget-minutes the backfill stops B minutes after the start and the next run resumes it.
       With --snapshot the snapshot is written once the head is caught up, and again if the
-      backfill added history.
+      backfill added history (on an empty database, only after the backfill).
   node src/cli.ts snapshot [--out <path>]
       Write the snapshot JSON (default ${relative(process.cwd(), DEFAULT_SNAPSHOT_PATH)}).
   node src/cli.ts window --from <block> --to <block>

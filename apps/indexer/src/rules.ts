@@ -36,11 +36,11 @@ export interface SettlementParties {
 	solver: string;
 	/** The transaction's sender (`tx.from`). */
 	sender: string;
-	/** Whether the AllowList called the sender a solver at the settlement block. */
+	/** Whether the AllowList called the sender a solver; checked once per address (see ingest.ts). */
 	senderIsSolver: boolean;
 	/** The transaction's recipient (`tx.to`), or null when it is not known. */
 	recipient: string | null;
-	/** Whether the AllowList called the recipient a solver at the settlement block. */
+	/** Whether the AllowList called the recipient a solver; checked once per address. */
 	recipientIsSolver: boolean;
 }
 
@@ -74,8 +74,8 @@ export function priceToken(token: string): string {
 /**
  * A trade's USD value: the lower of its sell side and buy side, each valued as amount × native
  * price / 1e36 ETH (CoW native prices are in wei per token atom, scaled by 1e18), times ETH/USD.
- * With one side priced that side is used; with neither, or a zero price, the side is unpriced
- * and a trade with no priced side has no value.
+ * A side with no price or a zero price is unpriced. With one priced side, that side is used; with
+ * none, the trade has no value.
  */
 export function tradeVolumeUsd(
 	sellAmount: string,

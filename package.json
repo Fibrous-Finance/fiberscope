@@ -1,7 +1,9 @@
 {
 	"name": "fiberscope",
+	"description": "Open-source analytics for CoW Protocol solvers, starting with Base",
 	"private": true,
 	"license": "MIT",
+	"repository": "github:Fibrous-Finance/fiberscope",
 	"packageManager": "pnpm@10.33.0",
 	"engines": {
 		"node": ">=24"

@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /*
- * Design tokens (handoff → Design tokens). Each token holds its light and dark value; the root's
- * color-scheme picks one. Auto follows the system; the appearance button pins light or dark by
- * setting data-theme before first paint (see lib/theme.ts).
+ * Color tokens. Each token holds its light and dark value; the root's color-scheme picks one.
+ * Auto follows the system; the appearance button pins light or dark by setting data-theme before
+ * first paint (see lib/theme.ts).
  */
 :root {
 	color-scheme: light dark;
@@ -30,7 +30,7 @@
 
 @theme inline {
 	--breakpoint-*: initial;
-	/* The design's single breakpoint: below it the page uses the compact layout. */
+	/* The single breakpoint: below it the page uses the compact layout. */
 	--breakpoint-wide: 760px;
 
 	--color-*: initial;
@@ -130,7 +130,7 @@
 	}
 }
 
-/* Shared type roles (handoff → Typography). */
+/* Shared type roles. */
 
 /* Page width: 1200px of content plus the side padding. */
 @utility page {
@@ -179,7 +179,7 @@
 	color: var(--fa);
 }
 
-/* Quiet links and text buttons: muted, full colour on hover, never underlined. */
+/* Quiet links and text buttons: muted, full color on hover, never underlined. */
 @utility quiet {
 	color: var(--mu);
 	text-decoration: none;

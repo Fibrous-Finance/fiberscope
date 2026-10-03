@@ -1,6 +1,6 @@
 import { OTHERS } from "./context";
 
-/** Brand teal: marks the hovered solver everywhere it appears. No solver is ever drawn in it. */
+/** Brand teal: marks the hovered solver everywhere it appears. It is never a solver's own color. */
 export const TEAL = "#11B2BA";
 
 /** Mosaic tones by rank: % of --fg over --bg, ranks 1–6, then 14% for everyone else. */

@@ -16,9 +16,12 @@ export interface Snapshot {
 	builtAt: number;
 	/** The last indexed block and its timestamp (Unix ms). Every window ends here. */
 	end: { block: number; time: number };
-	/** When the indexer last completed a run (Unix ms). The page measures freshness from `end.time`. */
+	/**
+	 * When the indexer last caught up with the chain head (Unix ms); a run then backfills history.
+	 * The page measures freshness from `end.time`.
+	 */
 	lastRunAt: number;
-	/** Minutes between scheduled indexer runs. */
+	/** Minutes between scheduled indexer runs; the page also refetches on this interval. */
 	refreshMinutes: number;
 	/**
 	 * How many buckets hold complete data.
@@ -123,8 +126,8 @@ export interface RegisteredSolver {
 	/** At least one of its addresses is active. */
 	active: boolean;
 	/**
-	 * Every registered address, prod before barn, active first. An address registered in both
-	 * environments is listed for each.
+	 * Every registered address: prod before barn, and within each, active before inactive. An
+	 * address registered in both environments is listed for each.
 	 */
 	addresses: RegisteredAddress[];
 	/** Its most recent settlement; null when it has none in `coverage.chainDays`. */

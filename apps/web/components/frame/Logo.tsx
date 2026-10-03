@@ -1,8 +1,8 @@
 /**
  * The mosaic mark, a 3 × 3 grid filled column by column like the hero mosaic, then the word. The
  * parent sets the type (Geist 600, line-height 1, letter-spacing −0.035em) and the size: 20px in
- * the header, 15px in the footer. The mark is 0.9em square and sits 0.095em low, centred on the
- * cap height; its greys follow the theme through `--fg` and `--bg`.
+ * the header, 15px in the footer. The mark is 0.9em square and sits 0.095em low, centered on the
+ * cap height; four squares are teal, and the grays follow the theme through `--fg` and `--bg`.
  */
 export function Logo() {
 	return (

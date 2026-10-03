@@ -1,6 +1,6 @@
 /**
- * Number and date formatting for the page. The rules follow the design (e.g. "$4.87M", "644K",
- * "46.9%", "2 Oct"); separators, compact suffixes and month names come from the locale.
+ * Number and date formatting for the page, e.g. "$4.87M", "644K", "46.9%", "2 Oct"; separators,
+ * compact suffixes and month names come from the locale.
  * Every date and time is in UTC.
  */
 
@@ -171,12 +171,12 @@ export function createFormat(locale: string): Format {
 	};
 }
 
-/** 0x588ef3de…5e30 → 0x588e…5e30 */
+/** 0x0123456789abcdef0123456789abcdef01234567 → 0x0123…4567 */
 export function shortAddress(address: string): string {
 	return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;
 }
 
-/** A longer form for narrow layouts that still shows the full address elsewhere: 0x588ef3…665e30 */
+/** A longer form for narrow layouts that still shows the full address elsewhere: 0x012345…234567 */
 export function mediumAddress(address: string): string {
 	return address.length > 16 ? `${address.slice(0, 8)}…${address.slice(-6)}` : address;
 }

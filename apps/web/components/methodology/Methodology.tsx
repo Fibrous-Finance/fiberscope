@@ -56,8 +56,7 @@ export function Methodology() {
 				{
 					minutes,
 					block: f.int(data.end.block),
-					// Never split the date across lines.
-					date: f.date(data.end.time).replaceAll(" ", "\u00a0"),
+					date: f.date(data.end.time),
 					time: f.time(data.end.time),
 				}
 			);

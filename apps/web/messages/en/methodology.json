@@ -19,7 +19,7 @@
 		},
 		"gas": {
 			"term": "Gas/trade",
-			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas / trade” considers only solvers with at least {minBatches} batches per day of the window, or every solver when none has that many."
+			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas / trade” considers only solvers with at least {minBatches}\u00a0batches per day of the window, or every solver when none has that many."
 		},
 		"cost": {
 			"term": "Transaction cost",
@@ -75,9 +75,9 @@
 		},
 		"freshness": {
 			"term": "Freshness",
-			"text": "Updated every {minutes, plural, one {minute} other {# minutes}}. The figures run to block {block}, produced {date} at {time}\u00a0UTC.",
-			"noData": "Updated every {minutes, plural, one {minute} other {# minutes}}.",
-			"delayed": "Normally updated every {minutes, plural, one {minute} other {# minutes}}. The figures run to block {block}, produced {date} at {time} UTC."
+			"text": "Updated every {minutes, plural, one {minute} other {#\u00a0minutes}}. The figures run to block {block}, produced {date} at {time}\u00a0UTC.",
+			"noData": "Updated every {minutes, plural, one {minute} other {#\u00a0minutes}}.",
+			"delayed": "Normally updated every {minutes, plural, one {minute} other {#\u00a0minutes}}. The figures run to block {block}, produced {date} at {time}\u00a0UTC."
 		},
 		"windows": {
 			"term": "Windows",
@@ -85,7 +85,7 @@
 		},
 		"coverage": {
 			"term": "Coverage",
-			"text": "Settlement history goes back {chain, plural, one {# day} other {# days}}, auction history {auction, plural, one {# day} other {# days}} and surplus {surplus, plural, one {# day} other {# days}}. Volume, Entered and Win rate need auction data, and surplus also needs the terms each order was signed with, so in a longer window they cover only the days that have them, and a note says so.",
+			"text": "Settlement history goes back {chain, plural, one {#\u00a0day} other {#\u00a0days}}, auction history {auction, plural, one {#\u00a0day} other {#\u00a0days}} and surplus {surplus, plural, one {#\u00a0day} other {#\u00a0days}}. Volume, Entered and Win rate need auction data, and surplus also needs the terms each order was signed with, so in a longer window they cover only the days that have them, and a note says so.",
 			"noData": "Volume, Entered and Win rate need auction data, and surplus also needs the terms each order was signed with, so in a longer window they cover only the days that have them, and a note says so."
 		},
 		"names": {

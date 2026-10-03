@@ -162,9 +162,10 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 						 * The figures wrap as whole items. Each item's "·" sits in its 14px
 						 * ::before, and the list starts 14px left of the clipped edge, so a line
 						 * never begins with one. The links end the list at 44px tall, their
-						 * negative margins keeping the line gap of the figures.
+						 * negative margins keeping the line gap of the figures. Clipping only
+						 * sideways keeps the links' overhang tappable.
 						 */}
-						<div className="overflow-hidden">
+						<div className="overflow-x-clip">
 							<div className="-ml-3.5 flex flex-wrap items-center font-mono text-[11.5px] leading-[normal] font-medium text-mu">
 								{row.items.map((item, index) => (
 									<span

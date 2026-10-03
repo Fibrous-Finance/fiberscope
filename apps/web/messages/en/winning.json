@@ -57,7 +57,7 @@
 		"auctionsAndRanks": "{auctions} · {ranks}",
 		"auction": "Auction #{id} · {time} · {state, select, won {won} entered {entered, not won} other {not entered}}{link, select, yes { · open the settlement in CoW Explorer} other {}}",
 		"ranks": "Rank by measure",
-		"rankLine": "{batches} batches · {trades} trades · {volume} volume",
+		"rankLine": "{batches}\u00a0batches · {trades}\u00a0trades · {volume}\u00a0volume",
 		"rank": "#{rank}",
 		"gasVsNetwork": "Gas per trade vs network",
 		"gasScale": "{gas} gas per trade against a network average of {average}",

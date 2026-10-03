@@ -1,6 +1,6 @@
 {
 	"title": "Who enters, who wins",
-	"new": "NEW",
+	"coverage": "Auction records cover the last {covered} of {days, plural, one {# day} other {# days}}.",
 	"sentence": "On average {entrants} solvers enter each auction, about {solutions, plural, one {# competing solution} other {# competing solutions}}.",
 	"top": "{solver} enters {participation} of auctions and wins {winRate} of those.",
 	"empty": "No auction data for the last {period}, so entries and wins can’t be shown yet.",
@@ -20,6 +20,28 @@
 		"readout": "#{id} · {time} UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
 	},
 	"note": "Click an auction to open its settlement in CoW Explorer.",
+	"noteCompact": "Tap an auction to select it; the CoW Explorer link above opens it.",
 	"noAuctions": "{names}: no auction data in this window.",
-	"source": "Source: CoW Protocol solver-competition API"
+	"source": "Source: CoW Protocol solver-competition API",
+	"footnote": "† Volume, Entered and Win rate cover the last {covered} of {days, plural, one {# day} other {# days}}.",
+	"settlements": {
+		"title": "Latest settlements",
+		"scope": "All solvers · newest first",
+		"columns": {
+			"time": "Time UTC",
+			"solver": "Solver",
+			"trades": "Trades",
+			"swaps": "Swaps",
+			"pair": "Pair",
+			"volume": "Volume",
+			"gas": "Gas",
+			"links": "Links"
+		},
+		"pair": "{sell} → {buy}{more, plural, =0 {} other { +#}}",
+		"line": "{trades, plural, one {# trade} other {# trades}} · {swaps, plural, one {# swap} other {# swaps}} · {volume} · {gas} gas",
+		"more": "Show {count} more",
+		"fewer": "Show fewer",
+		"note": "Swaps: DEX interactions in the settlement, not counting token approvals and WETH unwraps.",
+		"source": "Source: {network} settlement events"
+	}
 }

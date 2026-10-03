@@ -12,6 +12,9 @@ describe("format", () => {
 		assert.equal(f.usd(52_998), "$53.0K");
 		assert.equal(f.usd(3_559), "$3.56K");
 		assert.equal(f.usd(56.4), "$56");
+		assert.equal(f.usd(0.19), "<$1");
+		assert.equal(f.usd(0.6), "<$1");
+		assert.equal(f.usd(0), "$0");
 		assert.equal(f.usd(null), "—");
 	});
 

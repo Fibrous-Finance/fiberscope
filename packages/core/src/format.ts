@@ -13,7 +13,7 @@ export interface Format {
 	int(value: number): string;
 	/** A plain decimal with fixed digits: 1.05, 8.0 */
 	fixed(value: number, digits: number): string;
-	/** $4.87M · $286K · $53.0K · $3.56K · $56 */
+	/** $4.87M · $286K · $53.0K · $3.56K · $56 · <$1 */
 	usd(value: number | null): string;
 	/** Gas units: 644K · 1.37M */
 	gas(units: number | null): string;
@@ -110,6 +110,8 @@ export function createFormat(locale: string): Format {
 			if (value >= 1e5) return usd0.format(value);
 			if (value >= 1e4) return usd1.format(value);
 			if (value >= 1e3) return usd2.format(value);
+			// A positive amount under a dollar would otherwise round to "$0" or "$1".
+			if (value > 0 && value < 1) return `<${usdWhole.format(1)}`;
 			return usdWhole.format(Math.max(0, value));
 		},
 		gas(units) {

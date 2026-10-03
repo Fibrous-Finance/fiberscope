@@ -4,16 +4,17 @@ import type { SnapshotResult } from "@/lib/snapshot";
 
 const MINUTE = 60_000;
 /**
- * The data is delayed once its newest block is more than 30 minutes old: three missed 10-minute
- * updates. Measured from the block, since an update can succeed and still be behind.
+ * The data is delayed once its newest block is more than 30 minutes old (three missed updates at
+ * the default 10-minute interval), whatever the interval. Measured from the block, since an
+ * update can succeed and still be behind.
  */
 const DELAYED_AFTER = 30 * MINUTE;
 const DEFAULT_REFRESH_MINUTES = 10;
 
 /**
- * How fresh the loaded data is at `now`, and when the page fetches it again: on the data's own
- * schedule while live, every minute while delayed or in error. Loading is the caller's to set
- * while it fetches.
+ * How fresh the loaded data is at `now`, and when the page fetches it again: `refreshMinutes`
+ * (the indexer's interval, from the snapshot) after this load while live, one minute after it
+ * while delayed or in error. Loading is the caller's to set while it fetches.
  */
 export function dataStatus(result: SnapshotResult, now: number): HeaderStatus {
 	const snapshot = result.ok ? result.snapshot : null;

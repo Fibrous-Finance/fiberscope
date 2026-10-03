@@ -1,7 +1,7 @@
 import { MEASURES, PERIODS } from "@fiberscope/core";
 import type { Measure, Period } from "@fiberscope/core";
 
-/** What a shared link restores: `?period=7d&measure=volume&solver=helixbox`. Defaults are omitted. */
+/** What a shared link restores: `?period=7d&measure=volume&solver=<id>`. Defaults are omitted. */
 export interface Selection {
 	period: Period;
 	measure: Measure;

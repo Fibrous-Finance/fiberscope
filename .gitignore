@@ -7,7 +7,6 @@ coverage/
 .env
 .env.*
 !.env.example
-.vercel/
 .DS_Store
 next-env.d.ts
 
@@ -16,9 +15,13 @@ next-env.d.ts
 .wrangler/
 .dev.vars*
 
-# Generated data: the indexer database and the snapshot it writes for the web app
+# Generated data: the indexer database and the snapshot it writes for the web app, and any
+# SQLite database or copy kept elsewhere in the tree
 /apps/indexer/.data/
 /apps/web/data/
+*.db
+*.db-shm
+*.db-wal
 
-# Claude Design handoff package: local reference only, never committed
+# Local design reference files, never committed
 /design/

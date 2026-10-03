@@ -1,6 +1,8 @@
 {
 	"name": "@fiberscope/web",
+	"description": "The Fiberscope site: Next.js on Cloudflare Workers",
 	"private": true,
+	"license": "MIT",
 	"version": "0.1.0",
 	"type": "module",
 	"scripts": {

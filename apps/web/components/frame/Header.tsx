@@ -183,7 +183,7 @@ interface Pill {
 	quiet?: boolean;
 }
 
-/** The data status: a dot and a label, one word in the compact layout so the header fits at 360. */
+/** The data status: a dot and a label, one word in the compact layout so the header fits at 360px. */
 function StatusPill({ status, away }: { status: HeaderStatus; away?: boolean }) {
 	const t = useTranslations("Header.status");
 	const f = useFormat();

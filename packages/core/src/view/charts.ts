@@ -1,4 +1,4 @@
-/** Chart geometry: the batch mosaic and the line/area paths. Pure maths, in SVG user units. */
+/** Chart geometry: the hero's mosaic and the line/area paths. Pure math, in SVG user units. */
 
 export interface MosaicSize {
 	/** Square edge in CSS px. */
@@ -70,7 +70,7 @@ export function mosaic(values: readonly number[], contentWidth: number, size: Mo
 	};
 }
 
-/** A y-range that spans at least `minSpan`, centred on the data and never below 0. */
+/** A y-range that spans at least `minSpan`, centered on the data and never below 0. */
 export function autoRange(values: readonly number[], minSpan: number): [number, number] {
 	if (values.length === 0) return [0, minSpan];
 	let lo = Math.min(...values);

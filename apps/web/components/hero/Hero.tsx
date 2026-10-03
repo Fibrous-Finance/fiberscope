@@ -13,7 +13,7 @@ import { useFormat } from "@/lib/format";
 
 /**
  * Who won the window, in one sentence, then the totals, the period and measure controls, the
- * batch mosaic and four key facts. The hero also carries the loading, empty, error and delayed
+ * mosaic and four key facts. The hero also carries the loading, empty, error and delayed
  * states.
  */
 export function Hero() {

@@ -9,8 +9,8 @@ import { themeScript } from "@/lib/theme";
 
 import "./globals.css";
 
-// The full Geist fonts, self-hosted (`--font-geist-sans`, `--font-geist-mono`). Google's Geist
-// subsets lack →, ↗, ▲ and ▼, which then came from a metric-adjusted Arial, oversized.
+// The full Geist fonts, self-hosted (`--font-geist-sans`, `--font-geist-mono`). Google Fonts'
+// Geist subsets lack →, ↗, ▲ and ▼, which would fall back to an oversized, metric-adjusted Arial.
 
 export async function generateMetadata(): Promise<Metadata> {
 	const t = await getTranslations("Meta");
@@ -43,7 +43,7 @@ export async function generateMetadata(): Promise<Metadata> {
 			description: t("ogDescription"),
 			images: [image],
 		},
-		// Search engines stay out until launch, when the deployment sets ALLOW_INDEXING=true.
+		// Every page is noindex unless the deployment sets ALLOW_INDEXING=true.
 		robots: process.env.ALLOW_INDEXING === "true" ? undefined : { index: false },
 	};
 }

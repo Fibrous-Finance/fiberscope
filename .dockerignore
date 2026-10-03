@@ -3,9 +3,11 @@
 **/node_modules
 **/.data
 **/.env
+**/.env.*
+**/*.db
+**/*.log
 .git
 .github
 design
-docs
 apps/web/*
 !apps/web/package.json

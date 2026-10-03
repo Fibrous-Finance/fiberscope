@@ -6,7 +6,7 @@ import { createFormat } from "./format.ts";
 const f = createFormat("en");
 
 describe("format", () => {
-	it("abbreviates dollars by the design's thresholds", () => {
+	it("abbreviates dollars with fewer decimals as amounts grow", () => {
 		assert.equal(f.usd(4_870_000), "$4.87M");
 		assert.equal(f.usd(285_674), "$286K");
 		assert.equal(f.usd(52_998), "$53.0K");

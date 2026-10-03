@@ -202,13 +202,13 @@ describe("buildView", () => {
 
 	it("labels unnamed solvers by their shortened prod address", () => {
 		const s = snapshot(1, 0, [
-			solver("0x588ef3de14875ff9c4fc74c9e2c308767d665e30", null, {
-				addresses: [{ env: "prod", address: "0x588ef3de14875ff9c4fc74c9e2c308767d665e30" }],
+			solver("0x0123456789abcdef0123456789abcdef01234567", null, {
+				addresses: [{ env: "prod", address: "0x0123456789abcdef0123456789abcdef01234567" }],
 				batches: [1],
 			}),
 		]);
 		const [r] = buildView(s, "24h", "batches").rows;
-		assert.equal(r?.label, "0x588e…5e30");
+		assert.equal(r?.label, "0x0123…4567");
 		assert.equal(r?.unnamed, true);
 	});
 });
@@ -231,7 +231,7 @@ describe("tapeCell", () => {
 });
 
 describe("fractionOf", () => {
-	it("uses the design's thresholds", () => {
+	it("maps shares to the headline's fractions", () => {
 		assert.deepEqual(fractionOf(0.55), { key: "moreThanHalf" });
 		assert.deepEqual(fractionOf(0.469), { key: "nearlyHalf" });
 		assert.deepEqual(fractionOf(0.18), { key: "oneInFive" });

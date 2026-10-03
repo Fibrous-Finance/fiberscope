@@ -26,7 +26,10 @@ export const PERIOD_DAYS: Record<Period, number> = {
 	"90d": 90,
 	"180d": 180,
 };
-/** Days of daily history drawn for each window: small multiples and the solver detail chart. */
+/**
+ * Days of daily history drawn for each window: the network chart, the small multiples, the solver
+ * detail chart and (a slice of it) the table's sparkline.
+ */
 export const HISTORY_DAYS: Record<Period, number> = {
 	"24h": 30,
 	"7d": 30,
@@ -34,9 +37,12 @@ export const HISTORY_DAYS: Record<Period, number> = {
 	"90d": 90,
 	"180d": 180,
 };
-/** The table's sparkline covers at least this many days. */
+/** The table's sparkline covers at least this many days, where the data reaches that far. */
 const SPARK_MIN_DAYS = 14;
-/** "Lowest gas / trade" only considers solvers with this many batches per day of the window. */
+/**
+ * "Lowest gas / trade" prefers solvers with at least this many batches per covered day of the
+ * window; when none has that many, it takes the lowest of all.
+ */
 const MIN_BATCHES_PER_DAY = 100;
 /** A gain smaller than this (percentage points) is not worth a sentence. */
 const MIN_GAIN_POINTS = 0.1;
@@ -75,8 +81,9 @@ export interface Row extends SolverRef {
 	won: number | null;
 	/**
 	 * Share of the window's auctions the solver entered. This and the two rates below are null when
-	 * it entered none: every settlement comes from a won auction, so that only happens on days
-	 * without auction data, and "0%" would claim more than is known.
+	 * it entered none: every batch comes from a won auction, so a solver with batches but no entries
+	 * means its auction data is missing (days before the auction history, or settlements CoW's API
+	 * has no competition for), and "0%" would claim more than is known.
 	 */
 	participation: number | null;
 	/** Auctions won ÷ auctions entered. */
@@ -114,7 +121,7 @@ export type Fraction =
 
 export interface LeaderRun {
 	solver: SolverRef;
-	/** Consecutive days, ending today, on which the solver led the daily measure. */
+	/** Consecutive rolling days, ending with the latest, on which the solver led the daily measure. */
 	days: number;
 	/** The day the run started (end time of its first rolling day). */
 	since: number;
@@ -160,7 +167,7 @@ export interface View {
 	/** Start of the window (Unix ms). */
 	start: number;
 	coverage: {
-		/** Days of the window with chain data: batches, trades, gas. */
+		/** Days of the window with chain data: batches, trades, swaps, gas. */
 		chain: number;
 		/** Days of the window with auction data: volume, entered, won. */
 		auction: number;
@@ -175,7 +182,10 @@ export interface View {
 		auctions: number | null;
 		solutions: number | null;
 	};
-	/** Total of the active measure; 0 means nothing settled in the window. */
+	/**
+	 * Total of the active measure; 0 means nothing in the window counts toward it (no batches, or for
+	 * volume, no priced auction data).
+	 */
 	total: number;
 	/** Solvers with a batch in the window, ranked by the active measure. */
 	rows: Row[];
@@ -220,7 +230,7 @@ export function solverRef(solver: SnapshotSolver): SolverRef {
 	};
 }
 
-/** The headline's "{fraction} of all Base {measure} went to one solver". */
+/** The headline's "{fraction} of all {network} {measure} went to one solver". */
 export function fractionOf(share: number): Fraction {
 	if (share >= 0.55) return { key: "moreThanHalf" };
 	if (share >= 0.5) return { key: "half" };

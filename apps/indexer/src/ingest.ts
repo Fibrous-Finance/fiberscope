@@ -16,7 +16,7 @@ import type { Rpc } from "./rpc.ts";
 import type { BlockRange } from "./rules.ts";
 import type { ChainChunk, Store, TxRow } from "./store.ts";
 
-/** Block ranges fetched ahead of the one being committed. */
+/** Block ranges in flight at once, the next one to commit included. */
 const PIPELINE = 2;
 
 /** Running totals of chain ingestion, for throughput reports. */
@@ -31,8 +31,8 @@ export interface IngestStats {
 /**
  * AllowList `isSolver` verdicts on flash-loan router senders and recipients. Each address is
  * checked once, at the block of the first router settlement seen with it, and the verdict is
- * kept: the public RPC allows about one `eth_call` every two seconds, and an address does not
- * switch between being a solver and being an operator account.
+ * kept: `eth_call` is the scarcest RPC allowance (see ETH_CALL_SHARE in rpc.ts), and an address
+ * does not switch between being a solver and being an operator account.
  */
 export class AllowList {
 	readonly #store: Store;

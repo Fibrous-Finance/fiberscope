@@ -21,7 +21,10 @@ export interface SyncOptions {
 	auctionDays: number;
 	/** Minutes after the start of the sync at which the backfill stops; null for no limit. */
 	budgetMinutes: number | null;
-	/** Writes the snapshot, once the data is current and again when the backfill adds history. */
+	/**
+	 * Writes the snapshot, once the data is current and again when the backfill adds history (on an
+	 * empty database, only after the backfill).
+	 */
 	writeSnapshot: (() => Promise<void>) | null;
 }
 
@@ -30,7 +33,7 @@ export interface SyncStats {
 	auctions: AuctionStats;
 }
 
-/** How far the end may trail the head after catching up before another round runs. */
+/** Blocks the end may trail the head after a catch-up round before another round runs (5 min). */
 const CATCH_UP_SLACK = 150;
 
 /**
@@ -60,7 +63,8 @@ export async function sync(
 	await repairRouterRecipients(store, rpc);
 
 	// Catch up: chain data to the head, then the auctions of the new blocks. A long pause since
-	// the last run leaves the head far behind, so this repeats until the end is close to the head.
+	// the last run leaves the head far behind, so this repeats, at most three times, until the end
+	// is within CATCH_UP_SLACK blocks of the head.
 	// An empty database has nothing to catch up: its backfill starts at the head.
 	const empty = store.chainRange() === null;
 	if (!empty) {
@@ -100,8 +104,9 @@ export async function sync(
 			const low = windowStart(head, options.auctionDays);
 			await backfillAuctions(store, cow, low, chain, stats.auctions, stop);
 		}
-		// The API budget is idle while the chain backfill runs on: spend it on the router
-		// settlements whose attribution needs the API's winner, as their blocks arrive.
+		// Once the auction backfill is done, the CoW API's rate allowance is idle while the chain
+		// backfill runs on: spend it on the router settlements whose attribution needs the API's
+		// winner, as their blocks arrive.
 		while (!chain.done) {
 			await resolveRouterSenders(store, cow, registry, stats.auctions, stop);
 			for (let waited = 0; waited < 20 && !chain.done; waited++) await sleep(500);

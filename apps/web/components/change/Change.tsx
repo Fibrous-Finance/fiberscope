@@ -84,7 +84,7 @@ export function Change({
 		row,
 		daily: (activity.shares.get(row.id) ?? []).filter((share) => share !== null),
 	}));
-	// Every tile shares one scale: 0 to the next 10% above the highest daily share.
+	// Every tile shares one scale: 0 to the highest daily share rounded up to a multiple of 10%.
 	const max = Math.max(
 		0.1,
 		Math.ceil(Math.max(...tiles.flatMap((tile) => tile.daily)) * 10) / 10
@@ -115,7 +115,7 @@ export function Change({
 					/>
 				))}
 			</div>
-			{/* The design sets this note 14px under the tiles, 2px closer than under other charts. */}
+			{/* This note sits 14px under the tiles, 2px closer than under other charts. */}
 			<div className="-mt-0.5">
 				<FootLine source={t("range", { start: f.day(days[0]), end })}>
 					{t("note", { measure, count: tiles.length, max: f.percent(max), start })}

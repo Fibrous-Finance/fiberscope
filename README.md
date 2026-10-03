@@ -12,19 +12,22 @@ competition (who enters and who wins).
 ## Why
 
 CoW's [Solver Info](https://dune.com/cowprotocol/solver-info) dashboard lives on Dune. Since
-10 September 2026, Dune's legacy free accounts are view-only, so most viewers can no longer refresh
-it or change its parameters. Fiberscope rebuilds that view from public data, free to view and
-updated every few minutes, and adds what the Dune dashboard never showed: which solvers enter each
-auction and how often they win.
+September 10, 2026, Dune's free plan is view-only for accounts created before July 21, 2026
+([Dune's announcement](https://x.com/Dune/status/2092614403342352418)): they can browse dashboards
+but not run queries, so they can no longer refresh this one or change its parameters. Fiberscope
+rebuilds that view from public data, free to view and updated every 10 minutes, and adds the
+auction-level view: which solvers enter each auction and how often they win.
 
 ## What the page shows
 
-- **Who is winning:** share of batches, trades or volume per solver over 24 hours, 7, 30 or 90 days,
-  with rank changes, entry and win rates, and each solver's addresses and latest settlements.
-- **Is it changing:** the daily share of the leading solvers.
+- **Who is winning:** share of batches, trades or volume per solver over 24 hours, 7, 30, 90 or
+  180 days, with rank changes, entry and win rates, and each solver's addresses and latest
+  settlements.
+- **Is it changing:** the daily share of the leading solvers, and the daily total across all
+  solvers.
 - **Who enters, who wins:** participation and win rate from CoW's solver-competition data, and a
   tape of the latest auctions.
-- **How efficiently:** gas per trade against the network average.
+- **How efficiently:** gas per trade and DEX swaps per trade, against the network average.
 - **Methodology:** every definition, on the page itself.
 
 ## How it works
@@ -35,30 +38,34 @@ CoW API (solver competition, native prices)               ─┼─> apps/indexe
 CoW solver registry + on-chain allow-list                 ─┘      (SQLite)
 ```
 
-| Package         | What it is                                                                                                                                                                                          |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/indexer`  | Node 24, no dependencies (`node:sqlite`). Each run catches up with the chain head, writes the snapshot, then backfills history within a time budget, so the site stays fresh during long backfills. |
-| `packages/core` | The snapshot contract, the view model (windows, shares, ranks, competition), number and date formatting, and the chart geometry. Tested with `node:test`.                                           |
-| `apps/web`      | Next.js 16 (App Router, React Compiler), Tailwind CSS 4 and next-intl. English only for now; every string goes through next-intl. Runs on Cloudflare Workers through OpenNext.                      |
+| Package         | What it is                                                                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/indexer`  | Node 24 and no third-party dependencies (`node:sqlite`). Each run catches up with the chain head, writes the snapshot, then backfills history within a time budget, so the site stays fresh during long backfills. |
+| `packages/core` | The snapshot contract, the view model (windows, shares, ranks, competition), number and date formatting, and the chart geometry. Tested with `node:test`.                                                          |
+| `apps/web`      | Next.js 16 (App Router, React Compiler), Tailwind CSS 4 and next-intl. English only for now; the page's copy goes through next-intl. Runs on Cloudflare Workers through OpenNext.                                  |
 
 ### Data sources
 
-| Source                                                                                                                    | Provides                                                                    |
-| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `GPv2Settlement` (`0x9008D19f58AAbD9eD0D60971565AA8510560ab41`): `Settlement`, `Trade` and `Interaction` events, receipts | Batches, trades, DEX swaps, gas, and the transaction's sender and recipient |
-| CoW API `GET /api/v2/solver_competition/by_tx_hash/{tx}`                                                                  | Every solution in the auction (solver, ranking, winner), native prices      |
-| [CoW's solver registry](https://cms.cow.fi/api/solver-networks) and `GPv2AllowListAuthentication`                         | Solver names and their prod and barn addresses, active or retired           |
-| Chainlink ETH/USD on Base                                                                                                 | The dollar rate at each settlement                                          |
+| Source                                                                                                                    | Provides                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `GPv2Settlement` (`0x9008D19f58AAbD9eD0D60971565AA8510560ab41`): `Settlement`, `Trade` and `Interaction` events, receipts | Batches, trades, DEX swaps, gas, and the transaction's sender and recipient  |
+| CoW API `GET /api/v2/solver_competition/by_tx_hash/{tx}`                                                                  | Every solution in the auction (solver, ranking, winner), native prices       |
+| [CoW's solver registry](https://cms.cow.fi/api/solver-networks) and `GPv2AllowListAuthentication`                         | Solver names and their prod and barn addresses, active or retired            |
+| Chainlink ETH/USD on Base                                                                                                 | The dollar rate at each settlement: the latest answer at or before its block |
+| ERC-20 `symbol()`                                                                                                         | Token symbols for the latest settlements' pairs                              |
 
 ### Methodology in brief
 
 - **Batch:** a settlement transaction that filled at least one order. Zero-trade settlements
   (buffer movements) are not counted.
-- **Volume:** each trade counts at the lower of its sell and buy value, priced with the token
-  prices CoW used in that auction and Chainlink's ETH/USD rate at settlement.
-- **Attribution:** settlements sent through CoW's flash-loan router are credited to the solver
-  behind them: the transaction's recipient when it is a solver contract, otherwise its sender, and
-  as a last resort the auction's winner from CoW's API.
+- **Volume:** each trade counts at the lower of its sell and buy value (or the one side that is
+  priced), priced with the token prices CoW used in that auction and Chainlink's ETH/USD rate at
+  settlement.
+- **Attribution:** a settlement is credited to the solver that submitted it. Settlements sent
+  through CoW's flash-loan router are credited to the solver behind them: the transaction's
+  recipient when it is a registered or allow-listed solver, otherwise its sender when that is one,
+  otherwise the winner of that settlement in CoW's competition data, and as a last resort the
+  sender.
 - **Entered / win rate:** the share of auctions (that ended in a settlement) in which a solver
   submitted a solution, and the share of those it won, alone or with other winners.
 - **Windows:** rolling, ending at the last indexed block. When the history behind a window is
@@ -74,7 +81,8 @@ Requires Node 24 and pnpm 10.
 ```sh
 pnpm install
 
-# Index Base from the public RPC. The first run backfills; later runs catch up in seconds.
+# Index Base from the public RPC. The first run backfills, which can take hours at the default
+# request rates; later runs fetch only what is new.
 cd apps/indexer
 node src/cli.ts sync --chain-days 30 --auction-days 7 --snapshot ../web/data/snapshot.json
 cd ../..
@@ -89,30 +97,32 @@ between runs is idle. `apps/indexer/loop.sh` does this: it runs `sync` with its 
 `REFRESH_MINUTES` (whole minutes, default 10, counted from the start of each run).
 
 ```sh
-REFRESH_MINUTES=10 sh apps/indexer/loop.sh --budget-minutes 10 --snapshot ../web/data/snapshot.json
+REFRESH_MINUTES=10 sh apps/indexer/loop.sh --chain-days 30 --auction-days 7 --budget-minutes 10 \
+  --snapshot ../web/data/snapshot.json
 ```
 
 The indexer's `sync` and `snapshot` scripts, and each `sync` that `loop.sh` starts, read
-`apps/indexer/.env` when it exists.
+`apps/indexer/.env` when it exists. `loop.sh` itself reads `REFRESH_MINUTES`, `SEED_DB_URL` and
+`DB_PATH` from its environment, not from `.env`.
 
 `node src/cli.ts seed --url <url>` downloads the database from a URL, e.g. a presigned R2 link,
 when there is none yet, so a new host does not index again. It never overwrites a database and
 checks the download's integrity before using it. `loop.sh` runs it first when `SEED_DB_URL` is set
-and `DB_PATH` does not exist; both must be set in the environment, not in `.env`.
+and `DB_PATH` does not exist.
 
-| Variable                                                            | Used by | Purpose                                                                                                       |
-| ------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
-| `BASE_RPC_URL`                                                      | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                                                        |
-| `DB_PATH`                                                           | indexer | The SQLite database (default `apps/indexer/.data/base.db`); `--db` overrides it                               |
-| `BASE_RPC_RPS`, `COW_API_RPS`                                       | indexer | Request rates for the RPC and CoW's API                                                                       |
-| `REFRESH_MINUTES`                                                   | indexer | `loop.sh`'s interval and the live page's refetch interval; the page shows Delayed past 30 minutes of data age |
-| `SEED_DB_URL`                                                       | indexer | With `loop.sh`, download the database from this URL when `DB_PATH` does not exist                             |
-| `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                  |
-| `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | indexer | The account, and the S3 credentials of an R2 API token with Object Read & Write on that bucket only           |
-| `SNAPSHOT_R2_KEY`                                                   | both    | The snapshot's object key (default `base/snapshot.json`); the Worker reads it through its `SNAPSHOTS` binding |
-| `SNAPSHOT_PATH`                                                     | web     | The local snapshot file when `SNAPSHOT_R2_KEY` is unset (default `data/snapshot.json`)                        |
-| `SITE_URL`                                                          | web     | The site's origin, for absolute link-preview URLs                                                             |
-| `ALLOW_INDEXING`                                                    | web     | `true` lets search engines index the site; otherwise every page is `noindex`                                  |
+| Variable                                                            | Used by | Purpose                                                                                                                                                         |
+| ------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BASE_RPC_URL`                                                      | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                                                                                                          |
+| `DB_PATH`                                                           | indexer | The SQLite database (default `apps/indexer/.data/base.db`); `--db` overrides it                                                                                 |
+| `BASE_RPC_RPS`, `COW_API_RPS`                                       | indexer | Request rates per second for the RPC and CoW's API (defaults 15 and 3)                                                                                          |
+| `REFRESH_MINUTES`                                                   | indexer | `loop.sh`'s interval and, through the snapshot, the live page's refetch interval (default 10). The page shows Delayed once the data is more than 30 minutes old |
+| `SEED_DB_URL`                                                       | indexer | With `loop.sh`, download the database from this URL when `DB_PATH` does not exist                                                                               |
+| `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                                                                    |
+| `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | indexer | The account, and the S3 credentials of an R2 API token with Object Read & Write on that bucket only                                                             |
+| `SNAPSHOT_R2_KEY`                                                   | both    | The snapshot's object key (default `base/snapshot.json`); the Worker reads it through its `SNAPSHOTS` binding                                                   |
+| `SNAPSHOT_PATH`                                                     | web     | The local snapshot file when `SNAPSHOT_R2_KEY` is unset (default `apps/web/data/snapshot.json`)                                                                 |
+| `SITE_URL`                                                          | web     | The site's origin, for absolute link-preview URLs (default `http://localhost:3000`)                                                                             |
+| `ALLOW_INDEXING`                                                    | web     | `true` lets search engines index the site; otherwise every page is `noindex`                                                                                    |
 
 ## Checks
 
@@ -120,7 +130,7 @@ and `DB_PATH` does not exist; both must be set in the environment, not in `.env`
 pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build
 ```
 
-The same run on every pull request (`.github/workflows/ci.yml`).
+CI runs the same checks on every pull request and every push to `main` (`.github/workflows/ci.yml`).
 
 ## Deploying
 
@@ -145,16 +155,15 @@ docker build -f apps/indexer/Dockerfile -t fiberscope-indexer .
 docker run -v fiberscope-data:/data --env-file apps/indexer/.env fiberscope-indexer
 ```
 
-The database (`DB_PATH=/data/base.db`) and the local snapshot live on the volume at `/data`. Until
-its permanent server is decided, the indexer runs from this image on
-[Railway](https://railway.com), with a volume at `/data`. `SEED_DB_URL` moves it to a new host
-with the existing database.
+The database (`DB_PATH=/data/base.db`) and the local snapshot live on the volume at `/data`. The
+live indexer runs from this image on [Railway](https://railway.com), with a volume at `/data`.
+`SEED_DB_URL` moves it to a new host with the existing database.
 
 ## Status
 
 - [x] Data feasibility check against Base mainnet
-- [x] Design ([docs/design-brief.md](docs/design-brief.md))
-- [x] Indexer for Base, validated against an independent 24-hour measurement
+- [x] Design
+- [x] Indexer for Base
 - [x] Web app
 - [x] Site on Cloudflare Workers, data in R2
 - [ ] Always-on hosting for the indexer

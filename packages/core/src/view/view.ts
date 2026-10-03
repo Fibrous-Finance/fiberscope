@@ -197,7 +197,6 @@ export interface View {
 	swaps: {
 		/** Trade-weighted average across all solvers: Σswaps ÷ Σtrades. */
 		average: number | null;
-		max: number | null;
 	};
 	competition: {
 		auctions: number;
@@ -445,10 +444,6 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 	const gasTrades = withGas.reduce((a, r) => a + r.trades, 0);
 	const minBatches = MIN_BATCHES_PER_DAY * chain;
 	const byGas = [...withGas].sort((a, b) => (a.gasPerTrade ?? 0) - (b.gasPerTrade ?? 0));
-	const maxSwaps = withGas.reduce<number | null>(
-		(max, r) => Math.max(max ?? 0, r.swapsPerTrade ?? 0),
-		null
-	);
 
 	let competition: View["competition"] = null;
 	if (hasAuctions && auctions !== null) {
@@ -530,7 +525,6 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 		},
 		swaps: {
 			average: gasTrades > 0 ? withGas.reduce((a, r) => a + r.swaps, 0) / gasTrades : null,
-			max: maxSwaps,
 		},
 		competition,
 		tape: {

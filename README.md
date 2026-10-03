@@ -105,7 +105,7 @@ and `DB_PATH` does not exist; both must be set in the environment, not in `.env`
 | `BASE_RPC_URL`                                                      | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                                                        |
 | `DB_PATH`                                                           | indexer | The SQLite database (default `apps/indexer/.data/base.db`); `--db` overrides it                               |
 | `BASE_RPC_RPS`, `COW_API_RPS`                                       | indexer | Request rates for the RPC and CoW's API                                                                       |
-| `REFRESH_MINUTES`                                                   | indexer | The schedule the page expects, and `loop.sh`'s interval; data older than three runs shows as delayed          |
+| `REFRESH_MINUTES`                                                   | indexer | `loop.sh`'s interval and the live page's refetch interval; the page shows Delayed past 30 minutes of data age |
 | `SEED_DB_URL`                                                       | indexer | With `loop.sh`, download the database from this URL when `DB_PATH` does not exist                             |
 | `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                  |
 | `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | indexer | The account, and the S3 credentials of an R2 API token with Object Read & Write on that bucket only           |

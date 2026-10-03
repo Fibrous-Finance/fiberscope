@@ -47,7 +47,8 @@ export function Methodology() {
 				? t("terms.freshness.text", {
 						minutes,
 						block: f.int(data.end.block),
-						date: f.date(data.end.time),
+						// Never split the date across lines.
+						date: f.date(data.end.time).replaceAll(" ", "\u00a0"),
 						time: f.time(data.end.time),
 					})
 				: t("terms.freshness.noData", { minutes });

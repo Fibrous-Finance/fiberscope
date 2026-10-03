@@ -16,7 +16,7 @@ export interface Snapshot {
 	builtAt: number;
 	/** The last indexed block and its timestamp (Unix ms). Every window ends here. */
 	end: { block: number; time: number };
-	/** When the indexer last completed a run (Unix ms). Drives the stale state. */
+	/** When the indexer last completed a run (Unix ms). The page measures freshness from `end.time`. */
 	lastRunAt: number;
 	/** Minutes between scheduled indexer runs. */
 	refreshMinutes: number;

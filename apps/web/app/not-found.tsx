@@ -30,7 +30,7 @@ export default async function NotFound() {
 					<p className="eyebrow">{t("eyebrow")}</p>
 					<h1 className="mt-[18px] max-w-[19ch] headline">{t("headline")}</h1>
 					<p className="mt-6 max-w-[560px] answer">{t("text")}</p>
-					<Link href="/" className="mt-9 btn-teal h-10 px-[18px] text-[12.5px]">
+					<Link href="/" className="mt-9 btn-teal">
 						{t("back")}
 					</Link>
 				</main>

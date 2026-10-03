@@ -59,7 +59,7 @@
 		},
 		"freshness": {
 			"term": "Freshness",
-			"text": "Updated every {minutes, plural, one {minute} other {# minutes}}. The figures run to block {block}, mined {date} at {time} UTC.",
+			"text": "Updated every {minutes, plural, one {minute} other {# minutes}}. The figures run to block {block}, mined {date} at {time}\u00a0UTC.",
 			"noData": "Updated every {minutes, plural, one {minute} other {# minutes}}."
 		},
 		"windows": {

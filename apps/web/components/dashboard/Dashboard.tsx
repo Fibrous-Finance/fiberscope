@@ -164,7 +164,9 @@ export function Dashboard({ result, selection }: { result: SnapshotResult; selec
 						{showData ? (
 							<>
 								<Winning />
-								<Change />
+								<Change
+									asOf={status.delayed ? (status.asOf ?? undefined) : undefined}
+								/>
 								<Enter />
 								<Efficiency />
 							</>

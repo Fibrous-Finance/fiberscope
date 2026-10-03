@@ -29,11 +29,6 @@ export interface Status {
 	failedAt: number | null;
 	/** When the page fetches again on its own: every minute while delayed or in error. */
 	nextTryAt: number;
-	/**
-	 * The last completed data update (Unix ms); null when nothing loaded. Freshness is measured
-	 * from `dataTime` instead: an update can succeed and still be behind.
-	 */
-	lastRunAt: number | null;
 	/** `state` is "delayed": period wording reads "in the {period} to {asOf}". */
 	delayed: boolean;
 	/**

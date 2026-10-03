@@ -28,6 +28,5 @@ export function dataStatus(result: SnapshotResult, now: number): HeaderStatus {
 		refreshMinutes,
 		failedAt: result.ok ? null : result.at,
 		nextTryAt: result.at + (state === "live" ? refreshMinutes : 1) * MINUTE,
-		lastRunAt: snapshot?.lastRunAt ?? null,
 	};
 }

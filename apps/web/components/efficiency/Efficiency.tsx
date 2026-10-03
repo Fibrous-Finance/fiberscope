@@ -6,6 +6,7 @@ import { costAxis, DASH, FEW_TRADES, sortRows, surplusAndCost, swapsAxis } from 
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
+import { Surplus } from "@/components/surplus/Surplus";
 import { FootLine, Section } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
@@ -226,6 +227,7 @@ export function Efficiency() {
 				<span className="max-wide:hidden">{t("note")}</span>
 				<span className="wide:hidden">{t("noteCompact")}</span>
 			</FootLine>
+			<Surplus />
 		</Section>
 	);
 }

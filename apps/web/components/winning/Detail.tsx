@@ -705,32 +705,45 @@ function ShareChart({
 	);
 }
 
-/** The latest auctions, oldest first; each cell opens that auction's settlement. */
+/**
+ * The latest auctions, oldest first; a click on a cell opens that auction's settlement. As on the
+ * auction tape, the cells are a picture to keyboards and screen readers, and the line under the
+ * strip says what it shows. Only the latest auction with a settlement keeps its link in the tab
+ * order, named in full.
+ */
 function AuctionStrip({ cells, className }: { cells: AuctionCell[]; className: string }) {
+	const latest = cells.findLast((cell) => cell.href !== null);
 	return (
 		<div className={`flex h-4 ${className}`}>
-			{cells.map((cell) =>
-				cell.href === null ? (
-					<span
-						key={cell.id}
-						title={cell.title}
-						className="grid h-full flex-1 place-items-center"
-					>
-						<span className={DOT[cell.state]} />
-					</span>
-				) : (
+			{cells.map((cell) => {
+				if (cell.href === null)
+					return (
+						<span
+							key={cell.id}
+							aria-hidden="true"
+							title={cell.title}
+							className="grid h-full flex-1 place-items-center"
+						>
+							<span className={DOT[cell.state]} />
+						</span>
+					);
+				const kept = cell === latest;
+				return (
 					<a
 						key={cell.id}
 						href={cell.href}
 						target="_blank"
 						rel="noopener"
 						title={cell.title}
+						aria-label={kept ? cell.title : undefined}
+						aria-hidden={kept ? undefined : true}
+						tabIndex={kept ? undefined : -1}
 						className="grid h-full flex-1 place-items-center rounded-[3px] hover:bg-[color-mix(in_oklab,var(--fg)_14%,transparent)]"
 					>
 						<span className={DOT[cell.state]} />
 					</a>
-				)
-			)}
+				);
+			})}
 		</div>
 	);
 }

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { isIndexable, siteUrl } from "@/lib/site";
 import { themeScript } from "@/lib/theme";
 
 import "./globals.css";
@@ -13,7 +15,7 @@ import "./globals.css";
 // Geist subsets lack →, ↗, ▲ and ▼, which would fall back to an oversized, metric-adjusted Arial.
 
 export async function generateMetadata(): Promise<Metadata> {
-	const t = await getTranslations("Meta");
+	const [t, request] = await Promise.all([getTranslations("Meta"), headers()]);
 	// public/og-image.png; metadataBase makes the URL absolute.
 	const image = {
 		url: "/og-image.png",
@@ -23,7 +25,9 @@ export async function generateMetadata(): Promise<Metadata> {
 		alt: t("ogImageAlt"),
 	};
 	return {
-		metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
+		metadataBase: siteUrl(),
+		// Period, measure and solver live in the query string; the page itself is one.
+		alternates: { canonical: "/" },
 		title: t("title"),
 		description: t("description"),
 		icons: {
@@ -43,8 +47,8 @@ export async function generateMetadata(): Promise<Metadata> {
 			description: t("ogDescription"),
 			images: [image],
 		},
-		// Every page is noindex unless the deployment sets ALLOW_INDEXING=true.
-		robots: process.env.ALLOW_INDEXING === "true" ? undefined : { index: false },
+		// Indexable only on the site's own host, and only once the deployment sets ALLOW_INDEXING.
+		robots: isIndexable(request.get("host")) ? undefined : { index: false },
 	};
 }
 

@@ -49,7 +49,7 @@
 		"runAtLeast": "{days, plural, other {#+\u00a0days in a row}}",
 		"runBy": "{name} · {run}",
 		"noRun": "No leader today",
-		"gas": "Lowest gas / trade",
+		"gas": "Lowest gas/trade",
 		"noGas": "No gas data",
 		"gasBy": "{name} · {minBatches}+\u00a0batches"
 	},
@@ -61,7 +61,7 @@
 	},
 	"error": {
 		"headline": "We couldn’t load the latest data.",
-		"text": "Fiberscope’s data service didn’t respond at {time}\u00a0UTC. The page tries again every minute and fills in as soon as the data arrives.",
+		"text": "Fiberscope’s data service didn’t respond at {time}\u00a0UTC. The page tries again every minute and updates as soon as the data arrives.",
 		"retry": "Retry now",
 		"next": "Next automatic try {time}\u00a0UTC"
 	}

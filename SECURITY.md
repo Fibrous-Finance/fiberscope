@@ -2,8 +2,8 @@
 
 ## Reporting a vulnerability
 
-Report vulnerabilities privately through GitHub: on the repository, open the **Security and
-quality** tab and choose **Report a vulnerability**, or go straight to the
+Report vulnerabilities privately through GitHub: in the repository, open the **Security and
+quality** tab and choose **Report a vulnerability**, or use the
 [reporting form](https://github.com/Fibrous-Finance/fiberscope/security/advisories/new). The
 report stays between you and the maintainers until an advisory is published.
 
@@ -25,7 +25,7 @@ In scope:
 Out of scope:
 
 - Services Fiberscope reads or runs on: CoW Protocol's contracts, API and solver registry, Base,
-  Chainlink, Cloudflare, Railway and GitHub. Report to their owners.
+  Chainlink, Cloudflare, Railway and GitHub. Report vulnerabilities in these services to their owners.
 - A figure you believe is wrong. That is a bug, not a vulnerability: open an issue.
 
 The site has no user accounts and no forms; the appearance choice stays in the browser's local

@@ -19,7 +19,7 @@
 		"live": "Updated {time}\u00a0UTC",
 		"liveTitle": "Data to block {block} · updated every {minutes, plural, one {minute} other {#\u00a0minutes}}",
 		"delayed": "Delayed",
-		"delayedTitle": "Last updated {age}, at {asOf}{polling, select, yes { · the page checks for new data every minute} other {}}",
+		"delayedTitle": "Last updated {age} ({asOf}){polling, select, yes { · the page checks for new data every minute} other {}}",
 		"loading": "Loading…",
 		"loadingShort": "Loading",
 		"loadingTitle": "Loading the latest data",

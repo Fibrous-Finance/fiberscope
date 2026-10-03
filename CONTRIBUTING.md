@@ -11,8 +11,8 @@ Node 24 and pnpm 10:
 pnpm install
 ```
 
-The site needs data to show: [docs/development.md](docs/development.md#run-the-site) indexes a day
-of Base in one command and starts the site.
+The site needs data. Follow [docs/development.md](docs/development.md#run-the-site) to index a
+day of Base and start the site.
 
 ## Checks
 
@@ -31,27 +31,27 @@ pnpm format && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && 
   (`node:sqlite`, `fetch`, `node:test`).
 - Prettier formats everything: tabs (width 4), lines up to 100 characters, double quotes, trailing
   commas where ES5 allows them, and sorted imports. `pnpm format` applies it.
-- A rule that decides a figure is a pure function with tests next to it (`*.test.ts`). When a
-  definition changes, change its test, the site's Methodology text and
+- Each rule used to calculate a figure is a pure function with tests next to it (`*.test.ts`).
+  When a definition changes, update its test, the site's Methodology text and
   [docs/methodology.md](docs/methodology.md) in the same pull request.
 
 ## Copy
 
-- English, with US spelling. Dates are day-first: "3 Oct 2026".
+- English, with US spelling. Dates are day-first: "3 Oct 2026".
 - Every reader-facing string lives in `apps/web/messages/en/*.json` and goes through next-intl,
   with plurals ("1 batch", "2 batches").
-- A no-break space joins a number and its unit ("24 hours", "133 bps"), comes before "UTC", and
-  sits inside dates.
-- No internal terms in reader-facing text: the page never says "indexer", "snapshot" or
-  "backfill".
+- A no-break space joins a number and its unit ("24 hours", "133 bps"), comes before "UTC"
+  and "pp", and sits inside dates.
+- No internal terms in reader-facing text: the page never says "indexer", "snapshot",
+  "backfill", "last run" or "retrying".
 - Every sentence must stay true on real data and at the edges: ties, no data, a window longer than
   the history.
 
 ## Neutrality
 
 - Every solver is measured, ranked and shown the same way, in code, copy and design.
-- Fibrous builds Fiberscope and also runs a solver. On the site it appears as the builder only in
-  the footer's credit, which says so: "Built by Fibrous, which also runs a solver".
+- The builder appears only in the footer credit, which states that it also runs a solver.
+  Use the wording in `apps/web/messages/en/footer.json`.
 - Copy and docs never use a real solver as a generic example.
 - The site states "Independent project, not affiliated with CoW DAO."
 

@@ -19,11 +19,11 @@
 		},
 		"gas": {
 			"term": "Gas/trade",
-			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas / trade” considers only solvers with at least {minBatches}\u00a0batches per day of the window, or every solver when none has that many."
+			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas/trade” considers only solvers with at least {minBatches}\u00a0batches per day of the window, or every solver when none has that many."
 		},
 		"cost": {
 			"term": "Transaction cost",
-			"text": "What a settlement transaction paid on Base: gas used × gas price, plus the L1 data fee, in USD at Chainlink’s ETH/USD rate in its block. A transaction that holds several batches splits it evenly, as gas is split. Per trade: a solver’s cost divided by the trades it filled."
+			"text": "What a settlement transaction paid on Base: gas used × gas price, plus the L1 data fee, in USD at Chainlink’s ETH/USD rate in its block. A transaction that holds several batches splits its cost evenly between them, as it splits gas. Per trade: a solver’s cost divided by the trades it filled."
 		},
 		"swaps": {
 			"term": "DEX swaps",
@@ -35,11 +35,11 @@
 		},
 		"surplus": {
 			"term": "Surplus",
-			"text": "How much better a trade executed than the limit price its user signed, in USD, valued like Volume. Dune’s formula: value × (bought × limit sell − sold × limit buy) ÷ (bought × limit sell), with the limits read from the settlement’s calldata. Compared in basis points (hundredths of a percent) of volume."
+			"text": "The USD value of a trade’s improvement over its user’s signed limit price, valued like Volume. Dune’s formula: value × (bought × limit sell − sold × limit buy) ÷ (bought × limit sell), with the limits read from the settlement’s calldata. Compared in basis points (hundredths of a percent) of volume."
 		},
 		"unusual": {
 			"term": "Unusual surplus",
-			"text": "Surplus above a tenth of the trade’s value, CoW’s own cutoff (Dune query 1368423). It comes from limits set far from the market, such as very wide slippage or stale orders. “Typical” leaves these trades out; the unusual share is their part of a solver’s surplus."
+			"text": "Surplus above a tenth of the trade’s value, CoW’s own cutoff (Dune query 1368423). It comes from limits set far from the market, such as very wide slippage or stale orders. “Typical surplus” excludes these trades; the unusual share is their portion of a solver’s surplus."
 		},
 		"networkAverage": {
 			"term": "Network average",
@@ -47,7 +47,7 @@
 		},
 		"entered": {
 			"term": "Entered",
-			"text": "Share of the window’s auctions in which the solver submitted at least one solution. Only auctions that ended in a settlement count. “Average solver” is the mean over the table’s solvers that entered at least one auction."
+			"text": "Share of the window’s auctions in which the solver submitted at least one solution. Only auctions that ended in a settlement count. “Average solver” is the mean Entered share among the table’s solvers that entered at least one auction."
 		},
 		"winRate": {
 			"term": "Win rate",
@@ -55,7 +55,7 @@
 		},
 		"leadingSince": {
 			"term": "Leading since",
-			"text": "First day of the current unbroken run in which the same solver alone ranked #1 by daily share."
+			"text": "First day of the current unbroken run in which the same solver alone ranked #1 by daily share of the selected measure."
 		},
 		"sources": {
 			"term": "Sources",
@@ -71,7 +71,7 @@
 		},
 		"registry": {
 			"term": "Registry",
-			"text": "Status and submission addresses as CoW’s solver registry lists them for Base, plus addresses it does not list as active that settle on Base and are on the settlement contract’s on-chain solver allow-list; those are shown as active (today one: Rizzolver’s 0x8f58…5cb7). A retired address is one the registry marks inactive."
+			"text": "Status and submission addresses from CoW’s solver registry for Base, plus addresses that settle on Base and are on the settlement contract’s on-chain solver allow-list but are not listed as active. These additional addresses are shown as active. A retired address is one the registry marks inactive."
 		},
 		"freshness": {
 			"term": "Freshness",
@@ -85,8 +85,8 @@
 		},
 		"coverage": {
 			"term": "Coverage",
-			"text": "Settlement history goes back {chain, plural, one {#\u00a0day} other {#\u00a0days}}, auction history {auction, plural, one {#\u00a0day} other {#\u00a0days}} and surplus {surplus, plural, one {#\u00a0day} other {#\u00a0days}}. Volume, Entered and Win rate need auction data, and surplus also needs the terms each order was signed with, so in a longer window they cover only the days that have them, and a note says so.",
-			"noData": "Volume, Entered and Win rate need auction data, and surplus also needs the terms each order was signed with, so in a longer window they cover only the days that have them, and a note says so."
+			"text": "Settlement history goes back {chain, plural, one {#\u00a0day} other {#\u00a0days}}, auction history {auction, plural, one {#\u00a0day} other {#\u00a0days}} and surplus history {surplus, plural, one {#\u00a0day} other {#\u00a0days}}. Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page.",
+			"noData": "Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page."
 		},
 		"names": {
 			"term": "Names",

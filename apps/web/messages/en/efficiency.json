@@ -17,9 +17,9 @@
 	},
 	"dot": "{gas}\u00a0gas per trade over {trades, plural, one {#\u00a0trade} other {#\u00a0trades}}",
 	"swapsDot": "{swaps}\u00a0DEX swaps per trade over {trades, plural, one {#\u00a0trade} other {#\u00a0trades}}",
-	"note": "Values beyond an axis sit at its end, marked ›.",
+	"note": "Values beyond an axis range sit at its end, marked ›.",
 	"noteCompact": "Cost: transaction cost per trade. Swaps: DEX swaps per trade.",
 	"source": "Source: Base settlement transactions · Chainlink ETH/USD",
-	"sentenceCost": "Settling one costs {cost}, L1 data fee included.",
+	"sentenceCost": "Transaction cost averages {cost} per trade, including the L1 data fee.",
 	"costDot": "{cost} per trade over {trades, plural, one {#\u00a0trade} other {#\u00a0trades}}"
 }

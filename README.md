@@ -46,21 +46,23 @@ CoW solver registry + on-chain allow-list                 ─┘      (SQLite)
 
 ### Data sources
 
-| Source                                                                                                                    | Provides                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `GPv2Settlement` (`0x9008D19f58AAbD9eD0D60971565AA8510560ab41`): `Settlement`, `Trade` and `Interaction` events, receipts | Batches, trades, DEX swaps, gas, and the transaction's sender and recipient  |
-| CoW API `GET /api/v2/solver_competition/by_tx_hash/{tx}`                                                                  | Every solution in the auction (solver, ranking, winner), native prices       |
-| [CoW's solver registry](https://cms.cow.fi/api/solver-networks) and `GPv2AllowListAuthentication`                         | Solver names and their prod and barn addresses, active or retired            |
-| Chainlink ETH/USD on Base                                                                                                 | The dollar rate at each settlement: the latest answer at or before its block |
-| ERC-20 `symbol()`                                                                                                         | Token symbols for the latest settlements' pairs                              |
+| Source                                                                                                                    | Provides                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GPv2Settlement` (`0x9008D19f58AAbD9eD0D60971565AA8510560ab41`): `Settlement`, `Trade` and `Interaction` events, receipts | Batches, trades, DEX swaps, gas, and the transaction's sender and recipient                                                                                                                |
+| CoW API `GET /api/v2/solver_competition/by_tx_hash/{tx}`                                                                  | Every solution in the auction (solver, ranking, winner), native prices                                                                                                                     |
+| [CoW's solver registry](https://cms.cow.fi/api/solver-networks), plus overrides in `apps/indexer/src/overrides.ts`        | Solver names and their prod and barn addresses; an address the registry marks inactive is retired. An override adds an address that is allow-listed on-chain but missing from the registry |
+| `GPv2AllowListAuthentication` `isSolver`                                                                                  | Whether a flash-loan router settlement's sender or recipient is a solver, for attribution                                                                                                  |
+| Chainlink ETH/USD on Base                                                                                                 | The dollar rate at each settlement: the latest answer at or before its block                                                                                                               |
+| ERC-20 `symbol()`                                                                                                         | Token symbols for the latest settlements' pairs                                                                                                                                            |
 
 ### Methodology in brief
 
-- **Batch:** a settlement transaction that filled at least one order. Zero-trade settlements
-  (buffer movements) are not counted.
-- **Volume:** each trade counts at the lower of its sell and buy value (or the one side that is
-  priced), priced with the token prices CoW used in that auction and Chainlink's ETH/USD rate at
-  settlement.
+- **Batch:** one settlement (a `Settlement` event, one call to `settle`) that filled at least one
+  order; a transaction can carry more than one, and its gas is split evenly between them.
+  Zero-trade settlements (buffer movements) are not counted.
+- **Volume:** each trade counts at the lower of its sell and buy value, priced with the token
+  prices CoW used in that auction and Chainlink's ETH/USD rate at settlement. A trade priced on one
+  side only counts at that side; a trade priced on neither adds nothing.
 - **Attribution:** a settlement is credited to the solver that submitted it. Settlements sent
   through CoW's flash-loan router are credited to the solver behind them: the transaction's
   recipient when it is a registered or allow-listed solver, otherwise its sender when that is one,

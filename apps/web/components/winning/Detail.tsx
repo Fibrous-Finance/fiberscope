@@ -370,6 +370,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 									>
 										{a.address}
 									</span>
+									{/* Copy and Basescan: 24px targets that do not space the row out. */}
 									<span className="flex gap-3.5 font-mono text-[12px] leading-[normal] font-medium">
 										{a.retired ? (
 											<span className={RETIRED}>{t("retired")}</span>
@@ -378,7 +379,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 												<button
 													type="button"
 													onClick={() => copy(a.address)}
-													className="whitespace-nowrap quiet"
+													className="-my-1 py-1 whitespace-nowrap quiet"
 												>
 													{copied === a.address
 														? tc("copied")
@@ -388,7 +389,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 													href={a.href}
 													target="_blank"
 													rel="noopener"
-													className="whitespace-nowrap quiet"
+													className="-my-1 py-1 whitespace-nowrap quiet"
 												>
 													{tc.rich("basescan", { arrow })}
 												</a>

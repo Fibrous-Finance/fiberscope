@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties, Dispatch, HTMLAttributes, SetStateAction } from "react";
 
 import { useTranslations } from "next-intl";
@@ -181,16 +181,21 @@ function TableRow({
 	setHovered: (id: string | null) => void;
 }) {
 	const f = useFormat();
+	const detail = useId();
 	const spark = row.daily.slice(-sparkDays);
 	const [lo, hi] = autoRange(spark, SPARK_MIN_SPAN);
 	const pinned = `sticky z-1 flex items-center self-stretch transition-colors duration-150 ${hot || open ? "bg-hov" : "bg-bg"}`;
 
 	return (
 		<>
-			<RowButton
+			{/*
+			 * A click anywhere on the row toggles the detail. The solver's name is the disclosure
+			 * button for keyboards and assistive tech: its click (Enter and Space too) bubbles up to
+			 * the row, which draws the focus ring around itself.
+			 */}
+			<div
 				role="row"
-				open={open}
-				onToggle={() => setOpen(open ? null : row.id)}
+				onClick={() => setOpen(open ? null : row.id)}
 				onMouseEnter={() => setHovered(row.id)}
 				onMouseLeave={() => setHovered(null)}
 				className={`${GRID} focus-inset box-content h-[50px] cursor-pointer border-b border-ln font-mono text-[13px] leading-[normal] font-medium transition-colors duration-150 ${hot || open ? "bg-hov" : ""}`}
@@ -202,9 +207,16 @@ function TableRow({
 					role="cell"
 					className={`${pinned} left-9 -ml-4 min-w-0 gap-2.5 pr-2 pl-4 ${scrolled ? EDGE : ""}`}
 				>
-					<span className={`truncate text-[14px] ${row.unnamed ? "" : "font-sans"}`}>
-						{row.label}
-					</span>
+					<button
+						type="button"
+						aria-expanded={open}
+						aria-controls={open ? detail : undefined}
+						className="flex min-w-0 items-center self-stretch"
+					>
+						<span className={`truncate text-[14px] ${row.unnamed ? "" : "font-sans"}`}>
+							{row.label}
+						</span>
+					</button>
 					<RankChange row={row} />
 					<Caret open={open} className="ml-auto size-[13px] text-fa" />
 				</span>
@@ -237,10 +249,10 @@ function TableRow({
 						className="stroke-fg opacity-80"
 					/>
 				</svg>
-			</RowButton>
+			</div>
 			{open ? (
 				// The detail spans the row, so the table stays a table to assistive tech.
-				<div role="row">
+				<div role="row" id={detail}>
 					<div role="cell" aria-colspan={COLUMNS.length + 2}>
 						<DetailWide row={row} width={width} />
 					</div>
@@ -359,23 +371,19 @@ function RankChange({ row }: { row: Row }) {
 	);
 }
 
-/**
- * A row that opens its detail: a click, Enter or Space toggles it. A "row" in the desktop table,
- * a "button" in the compact list.
- */
+/** A compact row that opens its detail: a tap, Enter or Space toggles it. */
 function RowButton({
 	open,
 	onToggle,
-	role = "button",
 	...props
-}: { open: boolean; onToggle: () => void; role?: "button" | "row" } & Omit<
+}: { open: boolean; onToggle: () => void } & Omit<
 	HTMLAttributes<HTMLDivElement>,
 	"role" | "tabIndex" | "onClick" | "onKeyDown"
 >) {
 	return (
 		<div
 			{...props}
-			role={role}
+			role="button"
 			tabIndex={0}
 			aria-expanded={open}
 			onClick={onToggle}

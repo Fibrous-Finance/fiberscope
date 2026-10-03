@@ -67,7 +67,8 @@ jobs:
               with:
                   script: |
                       const marker = "<!-- fiberscope-preview -->";
-                      const body = `${marker}\nPreview: ${process.env.PREVIEW_URL}\n\nCommit ${context.sha.slice(0, 7)}.`;
+                      const head = context.payload.pull_request.head.sha.slice(0, 7);
+                      const body = `${marker}\nPreview: ${process.env.PREVIEW_URL}\n\nCommit ${head}.`;
                       const { owner, repo } = context.repo;
                       const issue_number = context.issue.number;
                       const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });

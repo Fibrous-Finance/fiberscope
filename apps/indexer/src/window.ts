@@ -15,6 +15,8 @@ interface Row {
 	surplus: number;
 	/** Trades with a surplus. */
 	surplusTrades: number;
+	/** Surplus of the unusual trades among them (see TradeSurplus). */
+	unusualSurplus: number;
 	entered: number;
 	won: number;
 }
@@ -56,6 +58,7 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 				volume: 0,
 				surplus: 0,
 				surplusTrades: 0,
+				unusualSurplus: 0,
 				entered: 0,
 				won: 0,
 			};
@@ -82,6 +85,8 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 	let surplus = 0;
 	let surplusTrades = 0;
 	let surplusVolume = 0;
+	let unusualSurplus = 0;
+	let unusualTrades = 0;
 	for (const trade of store.tradeRows(range)) {
 		const value = valuer.value(trade);
 		trades++;
@@ -94,11 +99,15 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		const entry = credited.get(`${trade.tx}:${trade.settlementLogIndex}`)!;
 		entry.volume += value.usd;
 		if (value.surplus === null) continue;
-		surplus += value.surplus;
+		surplus += value.surplus.usd;
 		surplusTrades++;
 		surplusVolume += value.usd;
-		entry.surplus += value.surplus;
+		entry.surplus += value.surplus.usd;
 		entry.surplusTrades++;
+		if (!value.surplus.unusual) continue;
+		unusualSurplus += value.surplus.usd;
+		unusualTrades++;
+		entry.unusualSurplus += value.surplus.usd;
 	}
 
 	const auctions = auctionOutcomes(store.solutionsByStart(range), registry);
@@ -127,7 +136,9 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 			`${fmt(oneSided)} on one side, ${fmt(unpriced)} unpriced)`,
 		`Volume     $${fmt(volume)}`,
 		`Surplus    $${fmt(surplus)} over ${fmt(surplusTrades)} priced trades with order terms ` +
-			`(${usdPer(surplus, surplusTrades)} per trade, ${bps} bps of their volume)`,
+			`(${usdPer(surplus, surplusTrades)} per trade, ${bps} bps of their volume); ` +
+			`${share(unusualSurplus, surplus)} from ${fmt(unusualTrades)} unusual trades ` +
+			`(surplus over a tenth of their value)`,
 		`Gas        ${fmt(gas)} (${perTrade(gas, trades)} per trade)`,
 		`Cost       $${fmt(cost)} (${usdPer(cost, trades, 4)} per trade` +
 			`${uncosted > 0 ? `; ${fmt(uncosted)} batches without an ETH/USD rate` : ""})`,
@@ -146,6 +157,7 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 			"Volume $",
 			"Surplus $",
 			"Surplus/trade",
+			"Unusual",
 			"Gas/trade",
 			"Cost/trade",
 			"Entered",
@@ -159,6 +171,7 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 			fmt(entry.volume),
 			fmt(entry.surplus),
 			usdPer(entry.surplus, entry.surplusTrades),
+			share(entry.unusualSurplus, entry.surplus),
 			perTrade(entry.gas, entry.trades),
 			usdPer(entry.cost, entry.trades, 4),
 			fmt(entry.entered),
@@ -186,4 +199,9 @@ function perTrade(gas: number, trades: number): string {
 /** A USD total per item. */
 function usdPer(usd: number, count: number, digits = 2): string {
 	return count === 0 ? "—" : `$${(usd / count).toFixed(digits)}`;
+}
+
+/** A part of a total as a whole percentage. */
+function share(part: number, total: number): string {
+	return total > 0 ? `${((part / total) * 100).toFixed(0)}%` : "—";
 }

@@ -102,18 +102,33 @@ export interface SurplusFacts {
 	feeAmount: string | null;
 }
 
+/** A trade's surplus and how CoW classes it. */
+export interface TradeSurplus {
+	/** USD. */
+	usd: number;
+	/**
+	 * More than a tenth of the trade's value: CoW's own split of trader surplus into "unusual"
+	 * and "reasonable" (Dune query 1368423, "V3: Total User Surplus": surplus_usd > 0.1 ×
+	 * usd_value). Unusual surplus comes from limits far from the market price, which say more
+	 * about the order than about how well it was settled.
+	 */
+	unusual: boolean;
+}
+
 /**
- * A trade's surplus in USD, the way Dune's CoW Protocol trades model computes `surplus_usd`: the
+ * A trade's surplus, the way Dune's CoW Protocol trades model computes `surplus_usd`: the
  * trade's USD value times how far its executed price beat its limit price,
  *
  *     (bought × limitSell − sold × limitBuy) ÷ (bought × limitSell)
  *
  * where bought and sold are the executed amounts, sold without the fee, and limitSell and
  * limitBuy are the signed order's amounts. The expression is the same for sell and buy orders,
- * and for whole and partial fills: it compares prices, not amounts. Null when the trade has no
- * USD value or its order terms are unknown.
+ * and for whole and partial fills: it compares prices, not amounts. Since surplus is the value
+ * times that ratio, it is unusual exactly when the ratio exceeds a tenth, whatever the prices,
+ * so the class is decided on the amounts alone. Null when the trade has no USD value or its
+ * order terms are unknown.
  */
-export function tradeSurplusUsd(usd: number | null, trade: SurplusFacts): number | null {
+export function tradeSurplus(usd: number | null, trade: SurplusFacts): TradeSurplus | null {
 	const { limitSellAmount, limitBuyAmount, feeAmount } = trade;
 	if (usd === null || limitSellAmount === null || limitBuyAmount === null || feeAmount === null) {
 		return null;
@@ -122,7 +137,8 @@ export function tradeSurplusUsd(usd: number | null, trade: SurplusFacts): number
 	const sold = BigInt(trade.sellAmount) - BigInt(feeAmount);
 	const limit = bought * BigInt(limitSellAmount);
 	if (limit === 0n) return null;
-	return (usd * Number(limit - sold * BigInt(limitBuyAmount))) / Number(limit);
+	const beat = limit - sold * BigInt(limitBuyAmount);
+	return { usd: (usd * Number(beat)) / Number(limit), unusual: beat * 10n > limit };
 }
 
 /**

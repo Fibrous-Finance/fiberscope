@@ -39,6 +39,8 @@ export interface SnapshotStats {
 	surplusPriced: number;
 	/** Of those, trades without a surplus: their order terms are unknown. */
 	noSurplus: number;
+	/** Of the trades with a surplus, the unusual ones (more than a tenth of their value). */
+	unusual: number;
 	/** Batches in the chain coverage without an ETH/USD rate, so without a cost. */
 	uncosted: number;
 }
@@ -56,6 +58,9 @@ interface Tally {
 	surplus: number[];
 	surplusTrades: number[];
 	surplusVolume: number[];
+	unusualSurplus: number[];
+	unusualTrades: number[];
+	unusualVolume: number[];
 	entered: number[];
 	won: number[];
 	/** The latest batches, oldest first. */
@@ -97,6 +102,9 @@ export async function buildSnapshot(
 				surplus: zeros(surplusDays),
 				surplusTrades: zeros(surplusDays),
 				surplusVolume: zeros(surplusDays),
+				unusualSurplus: zeros(surplusDays),
+				unusualTrades: zeros(surplusDays),
+				unusualVolume: zeros(surplusDays),
 				entered: zeros(auctionDays),
 				won: zeros(auctionDays),
 				latest: [],
@@ -112,6 +120,7 @@ export async function buildSnapshot(
 		oneSided: 0,
 		surplusPriced: 0,
 		noSurplus: 0,
+		unusual: 0,
 		uncosted: 0,
 	};
 
@@ -158,10 +167,16 @@ export async function buildSnapshot(
 			stats.surplusPriced++;
 			if (surplus === null) {
 				stats.noSurplus++;
-			} else {
-				entry.surplus[d] += surplus;
-				entry.surplusTrades[d]++;
-				entry.surplusVolume[d] += usd;
+				continue;
+			}
+			entry.surplus[d] += surplus.usd;
+			entry.surplusTrades[d]++;
+			entry.surplusVolume[d] += usd;
+			if (surplus.unusual) {
+				stats.unusual++;
+				entry.unusualSurplus[d] += surplus.usd;
+				entry.unusualTrades[d]++;
+				entry.unusualVolume[d] += usd;
 			}
 		}
 		for (const auction of auctionOutcomes(store.solutionsByStart(range), registry)) {
@@ -194,7 +209,7 @@ export async function buildSnapshot(
 		const trades = tradesOf.get(batch)!;
 		const values = trades.map((trade) => valuer.value(trade));
 		const priced = values.flatMap(({ usd }) => (usd === null ? [] : [usd]));
-		const surpluses = values.flatMap(({ surplus }) => (surplus === null ? [] : [surplus]));
+		const surpluses = values.flatMap(({ surplus }) => (surplus === null ? [] : [surplus.usd]));
 		return {
 			tx: batch.tx,
 			block: batch.block,
@@ -228,6 +243,9 @@ export async function buildSnapshot(
 			surplus: entry.surplus.map(subCents),
 			surplusTrades: entry.surplusTrades,
 			surplusVolume: entry.surplusVolume.map(cents),
+			unusualSurplus: entry.unusualSurplus.map(subCents),
+			unusualTrades: entry.unusualTrades,
+			unusualVolume: entry.unusualVolume.map(cents),
 			cost: entry.cost.map(subCents),
 			entered: entry.entered,
 			won: entry.won,

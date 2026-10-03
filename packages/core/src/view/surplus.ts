@@ -21,6 +21,23 @@ export interface SurplusCostFigures {
 	 * solver happens to settle. Null without such trades.
 	 */
 	surplusRate: number | null;
+	/**
+	 * The part of `surplus` from unusual trades, whose surplus is more than a tenth of their
+	 * value: CoW's own split (see `SnapshotSolver.unusualSurplus`). Null like `surplus`.
+	 */
+	unusualSurplus: number | null;
+	/** The unusual trades among `surplusTrades`; null like `surplus`. */
+	unusualTrades: number | null;
+	/** `unusualSurplus` ÷ `surplus`, a 0–1 ratio; null without surplus. */
+	unusualShare: number | null;
+	/** `surplus` without the unusual trades' part; null like `surplus`. */
+	typicalSurplus: number | null;
+	/** `surplusTrades` without the unusual ones; null like `surplus`. */
+	typicalTrades: number | null;
+	/** `typicalSurplus` ÷ `typicalTrades`; null without typical trades. */
+	typicalSurplusPerTrade: number | null;
+	/** `typicalSurplus` ÷ the USD volume of the typical trades; null without that volume. */
+	typicalSurplusRate: number | null;
 	/** Transaction cost in USD over the chain days. */
 	cost: number;
 	/** `cost` ÷ trades over the chain days; null without trades. */
@@ -37,7 +54,7 @@ export interface SurplusCostFigures {
 export interface SurplusCost {
 	/** Days of the window behind each figure. */
 	coverage: {
-		/** `surplus`, `surplusTrades`, `surplusPerTrade` and `surplusRate`. */
+		/** Every surplus figure: `surplus` to `typicalSurplusRate`. */
 		surplus: number;
 		/** `cost`, `costPerTrade` and `costPerBatch`. */
 		cost: number;
@@ -57,6 +74,9 @@ export function surplusAndCost(snapshot: Snapshot, view: View): SurplusCost {
 		let surplus = 0;
 		let surplusTrades = 0;
 		let surplusVolume = 0;
+		let unusualSurplus = 0;
+		let unusualTrades = 0;
+		let unusualVolume = 0;
 		let cost = 0;
 		let trades = 0;
 		let batches = 0;
@@ -66,17 +86,33 @@ export function surplusAndCost(snapshot: Snapshot, view: View): SurplusCost {
 			surplus += total(s.surplus, surplusDays);
 			surplusTrades += total(s.surplusTrades, surplusDays);
 			surplusVolume += total(s.surplusVolume, surplusDays);
+			unusualSurplus += total(s.unusualSurplus, surplusDays);
+			unusualTrades += total(s.unusualTrades, surplusDays);
+			unusualVolume += total(s.unusualVolume, surplusDays);
 			cost += total(s.cost, chainDays);
 			trades += total(s.trades, chainDays);
 			batches += total(s.batches, chainDays);
 			auctionCost += total(s.cost, auctionDays);
 			volume += total(s.volume, auctionDays);
 		}
+		const measured = surplusDays > 0;
+		// Typical is what the unusual trades leave. Without typical trades it is 0, not the float
+		// residue of a subtraction, and the clamp absorbs the residue otherwise.
+		const typicalTrades = surplusTrades - unusualTrades;
+		const typicalSurplus = typicalTrades > 0 ? Math.max(0, surplus - unusualSurplus) : 0;
+		const typicalVolume = typicalTrades > 0 ? surplusVolume - unusualVolume : 0;
 		return {
-			surplus: surplusDays > 0 ? surplus : null,
-			surplusTrades: surplusDays > 0 ? surplusTrades : null,
+			surplus: measured ? surplus : null,
+			surplusTrades: measured ? surplusTrades : null,
 			surplusPerTrade: surplusTrades > 0 ? surplus / surplusTrades : null,
 			surplusRate: surplusVolume > 0 ? surplus / surplusVolume : null,
+			unusualSurplus: measured ? unusualSurplus : null,
+			unusualTrades: measured ? unusualTrades : null,
+			unusualShare: surplus > 0 ? unusualSurplus / surplus : null,
+			typicalSurplus: measured ? typicalSurplus : null,
+			typicalTrades: measured ? typicalTrades : null,
+			typicalSurplusPerTrade: typicalTrades > 0 ? typicalSurplus / typicalTrades : null,
+			typicalSurplusRate: typicalVolume > 0 ? typicalSurplus / typicalVolume : null,
 			cost,
 			costPerTrade: trades > 0 ? cost / trades : null,
 			costPerBatch: batches > 0 ? cost / batches : null,

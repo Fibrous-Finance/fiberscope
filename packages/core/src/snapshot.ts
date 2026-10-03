@@ -94,6 +94,20 @@ export interface SnapshotSolver {
 	 */
 	surplusVolume: number[];
 	/**
+	 * The part of `surplus` from unusual trades: those whose surplus is more than a tenth of
+	 * their value, that is whose ratio (bought × limitSell − sold × limitBuy) ÷ (bought ×
+	 * limitSell) exceeds 0.1, decided exactly on the amounts. The split is CoW's own: its Dune
+	 * query "V3: Total User Surplus" (dune.com/queries/1368423) calls a trade's surplus unusual
+	 * when surplus_usd > 0.1 × usd_value, reasonable otherwise. Such surplus comes from limits
+	 * set far from the market, so it says more about the order than about how it was settled.
+	 * Typical surplus is `surplus` minus this. Length `coverage.surplusDays`.
+	 */
+	unusualSurplus: number[];
+	/** The unusual trades among `surplusTrades`. Length `coverage.surplusDays`. */
+	unusualTrades: number[];
+	/** USD value (as in `volume`) of those unusual trades. Length `coverage.surplusDays`. */
+	unusualVolume: number[];
+	/**
 	 * Transaction cost in USD: each batch's transaction fee, gas used × effective gas price plus
 	 * the L1 data fee, converted at the Chainlink ETH/USD rate of its block and split evenly
 	 * between the batches the transaction holds, as gas is. To a hundredth of a cent: a batch

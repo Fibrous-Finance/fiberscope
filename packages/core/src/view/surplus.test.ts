@@ -23,6 +23,9 @@ function solver(id: string, s: Partial<SnapshotSolver> = {}): SnapshotSolver {
 		surplus: [],
 		surplusTrades: [],
 		surplusVolume: [],
+		unusualSurplus: [],
+		unusualTrades: [],
+		unusualVolume: [],
 		cost: [],
 		entered: [],
 		won: [],
@@ -65,6 +68,10 @@ const partial = snapshot({ chainDays: 10, auctionDays: 7, surplusDays: 3 }, [
 		surplus: days(3, 5),
 		surplusTrades: days(3, 10),
 		surplusVolume: days(3, 800),
+		// Each day, one of the ten trades beat its limit by more than a tenth of its value.
+		unusualSurplus: days(3, 2),
+		unusualTrades: days(3, 1),
+		unusualVolume: days(3, 100),
 	}),
 ]);
 
@@ -77,6 +84,13 @@ describe("surplusAndCost", () => {
 			surplusTrades: 30,
 			surplusPerTrade: 0.5,
 			surplusRate: 15 / 2_400,
+			unusualSurplus: 6,
+			unusualTrades: 3,
+			unusualShare: 0.4,
+			typicalSurplus: 9,
+			typicalTrades: 27,
+			typicalSurplusPerTrade: 9 / 27,
+			typicalSurplusRate: 9 / 2_100,
 			cost: 14,
 			costPerTrade: 14 / 140,
 			costPerBatch: 14 / 70,
@@ -111,6 +125,10 @@ describe("surplusAndCost", () => {
 			[a.surplus, a.surplusTrades, a.surplusPerTrade, a.surplusRate],
 			[null, null, null, null]
 		);
+		assert.deepEqual(
+			[a.unusualSurplus, a.unusualShare, a.typicalSurplus, a.typicalSurplusPerTrade],
+			[null, null, null, null]
+		);
 		assert.equal(a.cost, 0.04);
 		// Priced volume is missing too, so there is no cost per dollar.
 		assert.equal(a.costRate, null);
@@ -135,6 +153,11 @@ describe("surplusAndCost", () => {
 			[b.surplus, b.surplusTrades, b.surplusPerTrade, b.surplusRate],
 			[0, 0, null, null]
 		);
+		// No surplus, so no share of it is unusual.
+		assert.deepEqual(
+			[b.unusualSurplus, b.unusualShare, b.typicalSurplus, b.typicalSurplusPerTrade],
+			[0, null, 0, null]
+		);
 
 		// Without chain data nothing is ranked, and the network has nothing to average.
 		const empty = figures(snapshot({ chainDays: 0, auctionDays: 0, surplusDays: 0 }, []), "7d");
@@ -144,6 +167,13 @@ describe("surplusAndCost", () => {
 			surplusTrades: null,
 			surplusPerTrade: null,
 			surplusRate: null,
+			unusualSurplus: null,
+			unusualTrades: null,
+			unusualShare: null,
+			typicalSurplus: null,
+			typicalTrades: null,
+			typicalSurplusPerTrade: null,
+			typicalSurplusRate: null,
 			cost: 0,
 			costPerTrade: null,
 			costPerBatch: null,
@@ -186,5 +216,74 @@ describe("surplusAndCost", () => {
 		assert.equal(network.costRate, 1 / 97_000);
 		// The small solver's trades beat their limits by more per dollar, though less per trade.
 		assert.ok(rows.get("small")!.surplusRate! > rows.get("big")!.surplusRate!);
+	});
+
+	it("separates unusual surplus, so a few loose limits do not decide the comparison", () => {
+		const s = snapshot({ chainDays: 1, auctionDays: 1, surplusDays: 1 }, [
+			// Two of its 30 trades had limits far from the market and bring most of its surplus.
+			solver("loose", {
+				batches: [30],
+				trades: [30],
+				volume: [30_000],
+				surplus: [300],
+				surplusTrades: [30],
+				surplusVolume: [30_000],
+				unusualSurplus: [280],
+				unusualTrades: [2],
+				unusualVolume: [400],
+			}),
+			solver("tight", {
+				batches: [20],
+				trades: [30],
+				volume: [30_000],
+				surplus: [100],
+				surplusTrades: [30],
+				surplusVolume: [30_000],
+				unusualSurplus: [0],
+				unusualTrades: [0],
+				unusualVolume: [0],
+			}),
+			// Every one of its trades is unusual: nothing typical is left to average.
+			solver("odd", {
+				batches: [1],
+				trades: [1],
+				volume: [50],
+				surplus: [40],
+				surplusTrades: [1],
+				surplusVolume: [50],
+				unusualSurplus: [40],
+				unusualTrades: [1],
+				unusualVolume: [50],
+			}),
+		]);
+		const { rows, network } = figures(s, "24h");
+		const loose = rows.get("loose")!;
+		const tight = rows.get("tight")!;
+		// In total, loose gives three times tight's surplus per trade; typically, a fifth of it.
+		assert.equal(loose.surplusPerTrade, 10);
+		assert.equal(tight.surplusPerTrade, 100 / 30);
+		assert.equal(loose.unusualShare, 280 / 300);
+		assert.equal(loose.typicalSurplus, 20);
+		assert.equal(loose.typicalTrades, 28);
+		assert.equal(loose.typicalSurplusPerTrade, 20 / 28);
+		assert.equal(loose.typicalSurplusRate, 20 / 29_600);
+		assert.equal(tight.unusualShare, 0);
+		assert.equal(tight.typicalSurplusPerTrade, 100 / 30);
+		assert.equal(tight.typicalSurplusRate, 100 / 30_000);
+
+		const odd = rows.get("odd")!;
+		assert.deepEqual(
+			[odd.unusualShare, odd.typicalSurplus, odd.typicalTrades, odd.typicalSurplusPerTrade],
+			[1, 0, 0, null]
+		);
+		assert.equal(odd.typicalSurplusRate, null);
+
+		// The network's typical figures leave out every unusual trade.
+		assert.equal(network.unusualSurplus, 320);
+		assert.equal(network.unusualTrades, 3);
+		assert.equal(network.unusualShare, 320 / 440);
+		assert.equal(network.typicalSurplus, 120);
+		assert.equal(network.typicalSurplusPerTrade, 120 / 58);
+		assert.equal(network.typicalSurplusRate, 120 / 59_600);
 	});
 });

@@ -53,6 +53,8 @@ interface Settled {
 	sender?: string;
 	/** The transaction's recipient; the settlement contract by default. */
 	recipient?: string;
+	/** The order's limit buy amount (WETH atoms); 0.4 WETH by default. */
+	limitBuy?: string;
 }
 
 /** Oldest first. Sector and Curve never settle; the stranger is not in the registry. */
@@ -76,9 +78,24 @@ const SETTLED: Settled[] = [
 	{ tx: "0xstranger", block: END - 30, solver: STRANGER, swaps: 1 },
 	// A buffer settlement: no trade, so no batch.
 	{ tx: "0xbuffer", block: END - 20, solver: ARC, trades: 0, swaps: 7 },
-	// Two batches in one transaction.
-	{ tx: "0xpair", block: END - 15, logIndex: 3, solver: ARC, swaps: 1 },
-	{ tx: "0xpair", block: END - 15, logIndex: 7, solver: ARC, swaps: 6 },
+	// Two batches in one transaction. Each fills 1,000 USDC for 0.5 WETH: the first against a
+	// limit of 0.45 WETH, a surplus of exactly a tenth of its value; the second one atom lower.
+	{
+		tx: "0xpair",
+		block: END - 15,
+		logIndex: 3,
+		solver: ARC,
+		swaps: 1,
+		limitBuy: "450000000000000000",
+	},
+	{
+		tx: "0xpair",
+		block: END - 15,
+		logIndex: 7,
+		solver: ARC,
+		swaps: 6,
+		limitBuy: "449999999999999999",
+	},
 	// Neither sender nor recipient is a solver: the auction's winning solution (Arc's) decides.
 	{ tx: "0xwon", block: END - 10, solver: ROUTER, sender: HELPER, recipient: ROUTER, swaps: 3 },
 	{
@@ -91,12 +108,10 @@ const SETTLED: Settled[] = [
 	},
 ];
 
-/** The trades' order: 1,000 USDC for at least 0.4 WETH; each trade fills it for 0.5 WETH. */
-const TERMS = {
-	limitSellAmount: "1000000000",
-	limitBuyAmount: "400000000000000000",
-	feeAmount: "0",
-};
+/** Every trade sells 1,000 USDC for 0.5 WETH; its order asked for at least `limitBuy`. */
+function terms(limitBuy = "400000000000000000") {
+	return { limitSellAmount: "1000000000", limitBuyAmount: limitBuy, feeAmount: "0" };
+}
 
 /** Builds the snapshot; `unread` transactions keep their calldata unread for order terms. */
 async function build(unread: string[] = []): Promise<Snapshot> {
@@ -113,7 +128,7 @@ async function build(unread: string[] = []): Promise<Snapshot> {
 				trades,
 				swaps,
 			})),
-			trades: SETTLED.flatMap(({ tx, block, trades = 1, logIndex = 10 }) =>
+			trades: SETTLED.flatMap(({ tx, block, trades = 1, logIndex = 10, limitBuy }) =>
 				Array.from({ length: trades }, (_, i) => ({
 					tx,
 					logIndex: logIndex - trades + i,
@@ -123,7 +138,7 @@ async function build(unread: string[] = []): Promise<Snapshot> {
 					buyToken: WETH,
 					sellAmount: "1000000000",
 					buyAmount: "500000000000000000",
-					terms: TERMS,
+					terms: terms(limitBuy),
 				}))
 			),
 			// 400K gas at 0.01 gwei plus 0.0000001 ETH of L1 fee: 0.0000041 ETH, $0.0082.
@@ -142,13 +157,13 @@ async function build(unread: string[] = []): Promise<Snapshot> {
 	);
 	for (const tx of unread)
 		store.db.prepare("UPDATE txs SET terms_read = NULL WHERE tx = ?").run(tx);
-	// The auction 0xwon settled priced USDC at $1 and WETH at $2,000.
+	// The auction of 0xwon and 0xpair priced USDC at $1 and WETH at $2,000.
 	store.saveCompetition(
 		{
 			auctionId: 1,
 			startBlock: END - 14,
 			deadlineBlock: END - 11,
-			txHashes: ["0xwon"],
+			txHashes: ["0xwon", "0xpair"],
 			prices: new Map(),
 			solutions: [
 				{
@@ -165,7 +180,10 @@ async function build(unread: string[] = []): Promise<Snapshot> {
 			[USDC, "500000000000000000000000000"],
 			[WETH, "1000000000000000000"],
 		],
-		[{ tx: "0xwon", priced: true }],
+		[
+			{ tx: "0xwon", priced: true },
+			{ tx: "0xpair", priced: true },
+		],
 		0
 	);
 	store.setAuctionRange(range);
@@ -252,11 +270,12 @@ describe("snapshot", () => {
 		const read = await build();
 		assert.deepEqual(read.coverage, { chainDays: 3, auctionDays: 3, surplusDays: 3 });
 		const arc = read.solvers.find((solver) => solver.id === "arc");
-		// Only 0xwon's auction is priced: $1,000 traded, 0.1 WETH over the 0.4 asked of 0.5.
-		assert.deepEqual(arc?.volume, [1_000, 0, 0]);
-		assert.deepEqual(arc?.surplus, [200, 0, 0]);
-		assert.deepEqual(arc?.surplusTrades, [1, 0, 0]);
-		assert.deepEqual(arc?.surplusVolume, [1_000, 0, 0]);
+		// Only the auction of 0xwon and 0xpair is priced: three trades of $1,000. 0xwon got 0.1
+		// WETH over the 0.4 asked of 0.5, a surplus of $200; each 0xpair trade about $100.
+		assert.deepEqual(arc?.volume, [3_000, 0, 0]);
+		assert.deepEqual(arc?.surplus, [400, 0, 0]);
+		assert.deepEqual(arc?.surplusTrades, [3, 0, 0]);
+		assert.deepEqual(arc?.surplusVolume, [3_000, 0, 0]);
 		assert.deepEqual(
 			read.latestSettlements
 				.filter(({ tx }) => tx === "0xwon")
@@ -267,7 +286,16 @@ describe("snapshot", () => {
 		// 0xold, two days back, is still unread: surplus stops at the day after it.
 		const unread = await build(["0xold"]);
 		assert.deepEqual(unread.coverage, { chainDays: 3, auctionDays: 3, surplusDays: 2 });
-		assert.deepEqual(unread.solvers.find((solver) => solver.id === "arc")?.surplus, [200, 0]);
+		assert.deepEqual(unread.solvers.find((solver) => solver.id === "arc")?.surplus, [400, 0]);
+	});
+
+	test("surplus of more than a tenth of the trade's value counts as unusual", async () => {
+		const arc = (await build()).solvers.find((solver) => solver.id === "arc");
+		// 0xwon (a fifth) and the second 0xpair trade (a tenth and a hair) are unusual; the first
+		// 0xpair trade, at exactly a tenth, is not.
+		assert.deepEqual(arc?.unusualTrades, [2, 0, 0]);
+		assert.deepEqual(arc?.unusualSurplus, [300, 0, 0]);
+		assert.deepEqual(arc?.unusualVolume, [2_000, 0, 0]);
 	});
 
 	test("the registry lists every registry solver, also the ones that never settled", async () => {

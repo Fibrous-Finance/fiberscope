@@ -6,10 +6,10 @@ import {
 	batchCostUsd,
 	creditedAddress,
 	priceToken,
-	tradeSurplusUsd,
+	tradeSurplus,
 	tradeVolumeUsd,
 } from "./rules.ts";
-import type { BlockRange } from "./rules.ts";
+import type { BlockRange, TradeSurplus } from "./rules.ts";
 import type { SolutionRow, Store, TradeValueRow } from "./store.ts";
 
 /** Stored rows turned into methodology facts, shared by the snapshot and the window report. */
@@ -66,8 +66,8 @@ export interface TradeValue {
 	usd: number | null;
 	/** How many of the trade's two sides had a native price. */
 	pricedSides: number;
-	/** Trader surplus in USD (see tradeSurplusUsd); null when unpriced or without order terms. */
-	surplus: number | null;
+	/** Trader surplus (see tradeSurplus); null when unpriced or without order terms. */
+	surplus: TradeSurplus | null;
 }
 
 /** Values trades with their own auction's native prices and ETH/USD at their block. */
@@ -99,7 +99,7 @@ export class TradeValuer {
 		return {
 			usd,
 			pricedSides: usd === null ? 0 : Number(sellPrice !== null) + Number(buyPrice !== null),
-			surplus: tradeSurplusUsd(usd, trade),
+			surplus: tradeSurplus(usd, trade),
 		};
 	}
 }

@@ -164,8 +164,8 @@ async function writeSnapshot(store: Store, rpc: Rpc, env: Env, out: string): Pro
 	);
 	log(
 		`  priced trades in the surplus days: ${fmt(stats.surplusPriced)}, ` +
-			`${fmt(stats.noSurplus)} without order terms; ` +
-			`batches without an ETH/USD rate: ${fmt(stats.uncosted)}`
+			`${fmt(stats.noSurplus)} without order terms, ${fmt(stats.unusual)} with unusual ` +
+			`surplus; batches without an ETH/USD rate: ${fmt(stats.uncosted)}`
 	);
 	if (env.upload) {
 		const { bucket, key } = env.upload;

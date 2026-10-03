@@ -9,7 +9,7 @@ import {
 	completeBuckets,
 	creditedAddress,
 	priceToken,
-	tradeSurplusUsd,
+	tradeSurplus,
 	tradeVolumeUsd,
 	windowStart,
 } from "./rules.ts";
@@ -95,9 +95,9 @@ describe("trade surplus", () => {
 
 	test("is the trade's value times how far the executed price beat the limit", () => {
 		// 0.05 WETH more than the limit asked, of the 0.45 bought: a ninth.
-		assert.ok(Math.abs(tradeSurplusUsd(900, sell)! - 100) < 1e-9);
+		assert.ok(Math.abs(tradeSurplus(900, sell)!.usd - 100) < 1e-9);
 		// Filled exactly at the limit: no surplus.
-		assert.equal(tradeSurplusUsd(900, { ...sell, buyAmount: "400000000000000000" }), 0);
+		assert.equal(tradeSurplus(900, { ...sell, buyAmount: "400000000000000000" })?.usd, 0);
 	});
 
 	test("uses the same expression for buy orders: what the trader saved of the limit", () => {
@@ -109,7 +109,7 @@ describe("trade surplus", () => {
 			limitBuyAmount: "1000000000000000000000",
 			feeAmount: "0",
 		};
-		assert.ok(Math.abs(tradeSurplusUsd(1_000, buy)! - 100) < 1e-9);
+		assert.ok(Math.abs(tradeSurplus(1_000, buy)!.usd - 100) < 1e-9);
 	});
 
 	test("compares prices, so a partial fill at the same price has the same ratio", () => {
@@ -119,20 +119,37 @@ describe("trade surplus", () => {
 			limitSellAmount: "2000000000",
 			limitBuyAmount: "800000000000000000",
 		};
-		assert.ok(Math.abs(tradeSurplusUsd(900, half)! - 100) < 1e-9);
+		assert.ok(Math.abs(tradeSurplus(900, half)!.usd - 100) < 1e-9);
 	});
 
 	test("leaves the fee out of the amount sold", () => {
 		// The same trade with 1 USDC of signed fee on top: the surplus does not change.
 		const withFee = { ...sell, sellAmount: "1001000000", feeAmount: "1000000" };
-		assert.ok(Math.abs(tradeSurplusUsd(900, withFee)! - 100) < 1e-9);
+		assert.ok(Math.abs(tradeSurplus(900, withFee)!.usd - 100) < 1e-9);
+	});
+
+	test("is unusual only when it is more than a tenth of the trade's value", () => {
+		// A ninth of the value: unusual.
+		assert.equal(tradeSurplus(900, sell)?.unusual, true);
+		// Exactly a tenth (0.45 WETH bought where 0.405 was asked) is still reasonable; one atom
+		// less asked tips it over. The value does not matter: the ratio decides.
+		const tenth = { ...sell, limitBuyAmount: "405000000000000000" };
+		assert.ok(Math.abs(tradeSurplus(900, tenth)!.usd - 90) < 1e-9);
+		assert.equal(tradeSurplus(900, tenth)?.unusual, false);
+		assert.equal(tradeSurplus(1, tenth)?.unusual, false);
+		const over = { ...sell, limitBuyAmount: "404999999999999999" };
+		assert.equal(tradeSurplus(900, over)?.unusual, true);
+		assert.equal(
+			tradeSurplus(900, { ...sell, buyAmount: "400000000000000000" })?.unusual,
+			false
+		);
 	});
 
 	test("has none without a value or without order terms", () => {
-		assert.equal(tradeSurplusUsd(null, sell), null);
-		assert.equal(tradeSurplusUsd(900, { ...sell, limitSellAmount: null }), null);
-		assert.equal(tradeSurplusUsd(900, { ...sell, feeAmount: null }), null);
-		assert.equal(tradeSurplusUsd(900, { ...sell, limitSellAmount: "0" }), null);
+		assert.equal(tradeSurplus(null, sell), null);
+		assert.equal(tradeSurplus(900, { ...sell, limitSellAmount: null }), null);
+		assert.equal(tradeSurplus(900, { ...sell, feeAmount: null }), null);
+		assert.equal(tradeSurplus(900, { ...sell, limitSellAmount: "0" }), null);
 	});
 });
 

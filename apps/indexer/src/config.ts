@@ -28,13 +28,14 @@ export const DEFAULT_SNAPSHOT_PATH = fileURLToPath(
 	new URL("../../web/data/snapshot.json", import.meta.url)
 );
 
-/** The R2 object every snapshot is uploaded to, through the Cloudflare API. */
+/** The R2 object every snapshot is uploaded to, through R2's S3 API. */
 export interface R2Target {
 	accountId: string;
 	bucket: string;
 	key: string;
-	/** A Cloudflare API token that can write to the bucket (Workers R2 Storage: Edit). */
-	token: string;
+	/** The S3 credentials of an R2 API token that can write objects to the bucket. */
+	accessKeyId: string;
+	secretAccessKey: string;
 }
 
 export interface Env {
@@ -65,11 +66,15 @@ function r2Target(env: NodeJS.ProcessEnv): R2Target | null {
 	const bucket = env.SNAPSHOT_R2_BUCKET;
 	if (!bucket) return null;
 	const accountId = env.CLOUDFLARE_ACCOUNT_ID;
-	const token = env.CLOUDFLARE_API_TOKEN;
-	if (!accountId || !token) {
-		throw new Error("SNAPSHOT_R2_BUCKET needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN");
+	const accessKeyId = env.R2_ACCESS_KEY_ID;
+	const secretAccessKey = env.R2_SECRET_ACCESS_KEY;
+	if (!accountId || !accessKeyId || !secretAccessKey) {
+		throw new Error(
+			"SNAPSHOT_R2_BUCKET needs CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY"
+		);
 	}
-	return { accountId, bucket, key: env.SNAPSHOT_R2_KEY || `${NETWORK.id}/snapshot.json`, token };
+	const key = env.SNAPSHOT_R2_KEY || `${NETWORK.id}/snapshot.json`;
+	return { accountId, bucket, key, accessKeyId, secretAccessKey };
 }
 
 function positive(env: NodeJS.ProcessEnv, name: string, fallback: number): number {

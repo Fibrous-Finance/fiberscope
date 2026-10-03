@@ -33,8 +33,8 @@ const USAGE = `Usage:
 
 Every command takes --db <path> (default DB_PATH, else ${relative(process.cwd(), DEFAULT_DB_PATH)}).
 Environment: BASE_RPC_URL, BASE_RPC_RPS, COW_API_RPS, REFRESH_MINUTES. With SNAPSHOT_R2_BUCKET
-(plus CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN and optionally SNAPSHOT_R2_KEY, default
-${NETWORK.id}/snapshot.json) every snapshot written is also uploaded to that R2 bucket.
+(plus CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and optionally SNAPSHOT_R2_KEY,
+default ${NETWORK.id}/snapshot.json) every snapshot written is also uploaded to that R2 bucket.
 `;
 
 async function main(): Promise<void> {

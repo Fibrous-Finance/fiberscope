@@ -43,12 +43,12 @@ CoW solver registry + on-chain allow-list                 ─┘      (SQLite)
 
 ### Data sources
 
-| Source                                                                                                     | Provides                                                               |
-| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `GPv2Settlement` (`0x9008D19f58AAbD9eD0D60971565AA8510560ab41`): `Settlement` and `Trade` events, receipts | Batches, trades, gas, and the transaction's sender and recipient       |
-| CoW API `GET /api/v2/solver_competition/by_tx_hash/{tx}`                                                   | Every solution in the auction (solver, ranking, winner), native prices |
-| [CoW's solver registry](https://cms.cow.fi/api/solver-networks) and `GPv2AllowListAuthentication`          | Solver names and their prod and barn addresses                         |
-| Chainlink ETH/USD on Base                                                                                  | The dollar rate at each settlement                                     |
+| Source                                                                                                                    | Provides                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `GPv2Settlement` (`0x9008D19f58AAbD9eD0D60971565AA8510560ab41`): `Settlement`, `Trade` and `Interaction` events, receipts | Batches, trades, DEX swaps, gas, and the transaction's sender and recipient |
+| CoW API `GET /api/v2/solver_competition/by_tx_hash/{tx}`                                                                  | Every solution in the auction (solver, ranking, winner), native prices      |
+| [CoW's solver registry](https://cms.cow.fi/api/solver-networks) and `GPv2AllowListAuthentication`                         | Solver names and their prod and barn addresses, active or retired           |
+| Chainlink ETH/USD on Base                                                                                                 | The dollar rate at each settlement                                          |
 
 ### Methodology in brief
 

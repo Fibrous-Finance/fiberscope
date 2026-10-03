@@ -48,6 +48,8 @@ export interface BatchRow {
 	block: number;
 	solver: string;
 	trades: number;
+	/** Interaction events other than approvals and WETH unwraps. */
+	swaps: number;
 	sender: string;
 	recipient: string | null;
 	gasUsed: number;
@@ -350,7 +352,7 @@ export class Store {
 
 	batchRows(range: BlockRange): BatchRow[] {
 		return this.#all(
-			`SELECT s.tx, s.log_index AS logIndex, s.block, s.solver, s.trades, t.sender,
+			`SELECT s.tx, s.log_index AS logIndex, s.block, s.solver, s.trades, s.swaps, t.sender,
 				t.to_address AS recipient, t.gas_used AS gasUsed, l.is_solver AS senderIsSolver,
 				r.is_solver AS recipientIsSolver,
 				(SELECT COUNT(*) FROM settlements x WHERE x.tx = s.tx AND x.trades > 0) AS txBatches

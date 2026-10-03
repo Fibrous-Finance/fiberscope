@@ -111,6 +111,30 @@ describe("registry merge", () => {
 		assert.deepEqual(registry.addresses("sector"), []);
 	});
 
+	test("lists every solver with one entry per environment and address", () => {
+		// The CMS lists Sector's address for prod twice, retired and active, and for barn.
+		const sectorRetired: RegistryEntry = { ...sectorProd, active: false };
+		const registry = new Registry(
+			[sectorRetired, sectorBarn, sectorProd, rizzolverOld],
+			[rizzolverNew]
+		);
+		assert.deepEqual(
+			new Map(registry.solvers().map(({ id, entries }) => [id, new Set(entries)])),
+			new Map([
+				["sector", new Set([sectorProd, sectorBarn])],
+				["rizzolver", new Set([rizzolverOld, rizzolverNew])],
+			])
+		);
+	});
+
+	test("an override replaces every CMS entry of its address in the listing", () => {
+		const renamed: RegistryEntry = { ...sectorProd, solverId: "sector-v2", name: "Sector v2" };
+		const registry = new Registry([sectorProd, sectorBarn], [renamed]);
+		assert.deepEqual(registry.solvers(), [
+			{ id: "sector-v2", name: "Sector v2", entries: [renamed] },
+		]);
+	});
+
 	test("an unregistered address is its own id, without a name", () => {
 		const registry = new Registry([sectorProd], []);
 		assert.equal(registry.has("0x9999"), false);

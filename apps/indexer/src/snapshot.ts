@@ -1,5 +1,7 @@
 import type {
 	AuctionSummary,
+	CreditedSettlement,
+	RegisteredSolver,
 	SettlementSummary,
 	Snapshot,
 	SnapshotSolver,
@@ -10,12 +12,13 @@ import { NETWORK, timeOf } from "./config.ts";
 import { auctionOutcomes, loadBatches, TradeValuer } from "./facts.ts";
 import type { Batch } from "./facts.ts";
 import { shortAddress } from "./log.ts";
-import type { Registry, SolverIdentity } from "./registry.ts";
+import type { Registry, RegistryEntry, SolverIdentity } from "./registry.ts";
 import { bucketOf, completeBuckets, windowStart } from "./rules.ts";
 import type { Store, TradeValueRow } from "./store.ts";
 
 const LATEST_AUCTIONS = 48;
 const LATEST_SETTLEMENTS = 6;
+const LATEST_NETWORK_SETTLEMENTS = 50;
 
 export interface SnapshotOptions {
 	store: Store;
@@ -40,6 +43,7 @@ interface Tally {
 	seen: Set<string>;
 	batches: number[];
 	trades: number[];
+	swaps: number[];
 	gas: number[];
 	volume: number[];
 	entered: number[];
@@ -71,6 +75,7 @@ export async function buildSnapshot(
 				seen: new Set(),
 				batches: zeros(chainDays),
 				trades: zeros(chainDays),
+				swaps: zeros(chainDays),
 				gas: zeros(chainDays),
 				volume: zeros(auctionDays),
 				entered: zeros(auctionDays),
@@ -83,6 +88,8 @@ export async function buildSnapshot(
 	};
 
 	const creditedTo = new Map<string, Tally>();
+	// The latest batches of all solvers together, oldest first.
+	const networkLatest: Batch[] = [];
 	if (chainDays > 0) {
 		for (const batch of loadBatches(store, registry, {
 			from: windowStart(end, chainDays),
@@ -93,9 +100,12 @@ export async function buildSnapshot(
 			entry.seen.add(batch.address);
 			entry.batches[d]++;
 			entry.trades[d] += batch.trades;
+			entry.swaps[d] += batch.swaps;
 			entry.gas[d] += batch.gas;
 			entry.latest.push(batch);
 			if (entry.latest.length > LATEST_SETTLEMENTS) entry.latest.shift();
+			networkLatest.push(batch);
+			if (networkLatest.length > LATEST_NETWORK_SETTLEMENTS) networkLatest.shift();
 			creditedTo.set(`${batch.tx}:${batch.logIndex}`, entry);
 		}
 	}
@@ -128,18 +138,31 @@ export async function buildSnapshot(
 		}
 	}
 
-	const latestBySolver = new Map<Tally, { batch: Batch; trades: TradeValueRow[] }[]>();
-	const tokens: string[] = [];
-	for (const entry of tallies.values()) {
-		const latest = entry.latest.toReversed().map((batch) => ({
-			batch,
-			trades: store.settlementTrades(batch.tx, batch.logIndex),
-		}));
-		for (const { trades } of latest) tokens.push(trades[0].sellToken, trades[0].buyToken);
-		latestBySolver.set(entry, latest);
+	// The trades of every listed settlement: the network's latest and each solver's latest.
+	const listed = [...networkLatest, ...[...tallies.values()].flatMap((entry) => entry.latest)];
+	const tradesOf = new Map<Batch, TradeValueRow[]>();
+	for (const batch of listed) {
+		if (!tradesOf.has(batch)) {
+			tradesOf.set(batch, store.settlementTrades(batch.tx, batch.logIndex));
+		}
 	}
-	const symbols = await options.symbols(tokens);
+	const symbols = await options.symbols(
+		[...tradesOf.values()].flatMap(([first]) => [first.sellToken, first.buyToken])
+	);
 	const symbol = (token: string) => symbols.get(token) ?? shortAddress(token);
+	const summary = (batch: Batch): SettlementSummary => {
+		const trades = tradesOf.get(batch)!;
+		const priced = trades.map((trade) => valuer.value(trade).usd).filter((usd) => usd !== null);
+		return {
+			tx: batch.tx,
+			block: batch.block,
+			time: timeOf(batch.block) * 1000,
+			trades: batch.trades,
+			pair: { sell: symbol(trades[0].sellToken), buy: symbol(trades[0].buyToken) },
+			volume: priced.length === 0 ? null : cents(priced.reduce((a, b) => a + b, 0)),
+			gas: Math.round(batch.gas),
+		};
+	};
 
 	const solvers: SnapshotSolver[] = [...tallies.values()]
 		.sort(
@@ -154,30 +177,45 @@ export async function buildSnapshot(
 			addresses: addressesOf(entry, registry),
 			batches: entry.batches,
 			trades: entry.trades,
+			swaps: entry.swaps,
 			gas: entry.gas.map(Math.round),
 			volume: entry.volume.map(cents),
 			entered: entry.entered,
 			won: entry.won,
-			latestSettlements: latestBySolver
-				.get(entry)!
-				.map(({ batch, trades }): SettlementSummary => {
-					const values = trades.map((trade) => valuer.value(trade).usd);
-					const priced = values.filter((usd) => usd !== null);
-					return {
-						tx: batch.tx,
-						block: batch.block,
-						time: timeOf(batch.block) * 1000,
-						trades: batch.trades,
-						pair: {
-							sell: symbol(trades[0].sellToken),
-							buy: symbol(trades[0].buyToken),
-						},
-						volume:
-							priced.length === 0 ? null : cents(priced.reduce((a, b) => a + b, 0)),
-						gas: Math.round(batch.gas),
-					};
-				}),
+			latestSettlements: entry.latest.toReversed().map(summary),
 		}));
+
+	const latestSettlements: CreditedSettlement[] = networkLatest.toReversed().map((batch) => ({
+		...summary(batch),
+		solver: batch.solver.id,
+		swaps: batch.swaps,
+	}));
+
+	const directory: RegisteredSolver[] = registry
+		.solvers()
+		.map(({ id, name, entries }) => {
+			const history = tallies.get(id);
+			const last = history?.latest.at(-1);
+			return {
+				id,
+				name,
+				active: entries.some((entry) => entry.active),
+				addresses: entries
+					.toSorted(addressOrder)
+					.map(({ env, address, active }) => ({ env, address, active })),
+				lastSettlement: last
+					? { tx: last.tx, block: last.block, time: timeOf(last.block) * 1000 }
+					: null,
+				batches: history ? sum(history.batches) : 0,
+			};
+		})
+		.sort(
+			(a, b) =>
+				(b.lastSettlement?.block ?? -1) - (a.lastSettlement?.block ?? -1) ||
+				Number(b.active) - Number(a.active) ||
+				a.name.localeCompare(b.name) ||
+				a.id.localeCompare(b.id)
+		);
 
 	const latestAuctions: AuctionSummary[] = auctionOutcomes(
 		auctionRange ? store.latestSolutions(auctionRange, LATEST_AUCTIONS) : [],
@@ -200,6 +238,8 @@ export async function buildSnapshot(
 		auctions: { count, solutions },
 		solvers,
 		latestAuctions,
+		latestSettlements,
+		directory,
 	} satisfies Snapshot;
 	return { snapshot, stats };
 }
@@ -211,13 +251,17 @@ function addressesOf(entry: Tally, registry: Registry): SolverAddress[] {
 		return [...entry.seen].map((address) => ({ env: "prod", address }));
 	return registered
 		.filter((address) => address.active || entry.seen.has(address.address))
-		.sort(
-			(a, b) =>
-				Number(a.env === "barn") - Number(b.env === "barn") ||
-				Number(b.active) - Number(a.active) ||
-				a.address.localeCompare(b.address)
-		)
+		.sort(addressOrder)
 		.map(({ env, address }) => ({ env, address }));
+}
+
+/** Prod before barn, active before inactive, then by address. */
+function addressOrder(a: RegistryEntry, b: RegistryEntry): number {
+	return (
+		Number(a.env === "barn") - Number(b.env === "barn") ||
+		Number(b.active) - Number(a.active) ||
+		a.address.localeCompare(b.address)
+	);
 }
 
 function zeros(length: number): number[] {

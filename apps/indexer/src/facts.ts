@@ -17,6 +17,8 @@ export interface Batch {
 	solver: SolverIdentity;
 	viaRouter: boolean;
 	trades: number;
+	/** DEX swaps: Interaction events other than approvals and WETH unwraps. */
+	swaps: number;
 	/** Gas used by the transaction, split evenly if it holds several batches. */
 	gas: number;
 }
@@ -42,6 +44,7 @@ export function loadBatches(store: Store, registry: Registry, range: BlockRange)
 			solver: registry.identify(address),
 			viaRouter: row.solver === ROUTER,
 			trades: row.trades,
+			swaps: row.swaps,
 			gas: row.gasUsed / row.txBatches,
 		};
 	});

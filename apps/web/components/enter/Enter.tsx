@@ -7,6 +7,7 @@ import type { Entrant } from "@fiberscope/core";
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
+import { LatestSettlements } from "@/components/enter/LatestSettlements";
 import { Tape } from "@/components/enter/Tape";
 import { FootLine, Section } from "@/components/ui/Section";
 
@@ -16,7 +17,10 @@ import { useFormat } from "@/lib/format";
 const BAR_GRID =
 	"grid grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_clamp(84px,12vw,150px)] gap-4";
 
-/** Who enters, who wins: how often each solver enters and wins, and the latest auctions. */
+/**
+ * Who enters, who wins: how often each solver enters and wins, the latest auctions and the latest
+ * settlements of every solver.
+ */
 export function Enter() {
 	const t = useTranslations("Enter");
 	const tc = useTranslations("Common");
@@ -25,6 +29,11 @@ export function Enter() {
 	const { snapshot, layout } = useDashboard();
 	const competition = view.competition;
 	const hasTape = view.tape.auctions.length > 0;
+	// Auction data covers fewer days than the window: the sentence and a footnote say so.
+	const coverage =
+		competition && view.coverage.auction < view.days
+			? { covered: view.coverage.auction, days: view.days }
+			: null;
 
 	// The rank in `view.rows` decides whether "N others" in the legend highlights a solver.
 	const rankIndex = new Map(view.rows.map((row, index) => [row.id, index]));
@@ -35,6 +44,7 @@ export function Enter() {
 	const top = competition?.entrants[0];
 	const sentence = competition
 		? [
+				coverage ? t("coverage", coverage) : null,
 				t("sentence", {
 					entrants: f.fixed(competition.entrantsPerAuction, 1),
 					solutions: Math.round(competition.solutionsPerAuction),
@@ -53,7 +63,7 @@ export function Enter() {
 
 	const missing = competition?.withoutAuctions ?? [];
 	const note = [
-		hasTape ? t("note") : null,
+		hasTape ? t(layout.compact ? "noteCompact" : "note") : null,
 		missing.length > 0
 			? t("noAuctions", {
 					names: new Intl.ListFormat(f.locale, { type: "unit", style: "short" }).format(
@@ -68,12 +78,7 @@ export function Enter() {
 	return (
 		<Section id="enter">
 			<div className="max-w-[720px]">
-				<div className="flex items-baseline gap-3">
-					<h2 className="section-title">{t("title")}</h2>
-					<span className="font-mono text-[11px] leading-[normal] font-medium tracking-[.06em] text-act">
-						{t("new")}
-					</span>
-				</div>
+				<h2 className="section-title">{t("title")}</h2>
 				<p className="mt-3 answer">{sentence}</p>
 			</div>
 			{competition ? <Bars entrants={competition.entrants} rankIndex={rankIndex} /> : null}
@@ -86,10 +91,9 @@ export function Enter() {
 				/>
 			) : null}
 			<FootLine source={t("source")}>{note}</FootLine>
-			{competition && view.coverage.auction < view.days ? (
-				<p className="mt-1.5 foot-line">
-					{tc("coverage.auction", { covered: view.coverage.auction, days: view.days })}
-				</p>
+			{coverage ? <p className="mt-1.5 foot-line">{t("footnote", coverage)}</p> : null}
+			{snapshot!.latestSettlements.length > 0 ? (
+				<LatestSettlements rankIndex={rankIndex} />
 			) : null}
 		</Section>
 	);

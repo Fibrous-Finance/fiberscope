@@ -2,6 +2,8 @@
 
 Open-source analytics for [CoW Protocol](https://cow.fi) solvers, starting with Base.
 
+Live for Base at [fiberscope.kermo.workers.dev](https://fiberscope.kermo.workers.dev).
+
 CoW Protocol settles user orders through batch auctions in which solvers compete to find the best
 settlement. Fiberscope shows who wins those auctions, by how much, whether that is changing, and
 how efficiently each solver settles: batches, trades, volume, gas, and the auction-level
@@ -126,7 +128,8 @@ site.
 - [x] Design ([docs/design-brief.md](docs/design-brief.md))
 - [x] Indexer for Base, validated against an independent 24-hour measurement
 - [x] Web app
-- [ ] Hosting for the indexer and the site
+- [x] Site on Cloudflare Workers, data in R2
+- [ ] Always-on hosting for the indexer
 - [ ] Public launch and CoW Grants application
 - [ ] More CoW Protocol networks: Ethereum, Arbitrum One, Gnosis Chain, and others
 

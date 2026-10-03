@@ -18,6 +18,10 @@ export function Facts({ view, leader }: { view: View; leader: Row }) {
 	const second = view.rows[1];
 	const run = view.leaderRun;
 	const lowest = view.gas.lowest;
+	// The daily leader can differ from the window's leader (it took over inside the window), so
+	// the run names its solver then: "Leading since" belongs to it, not to the leader above.
+	const days = run ? t(run.atLeast ? "runAtLeast" : "run", { days: run.days }) : t("noRun");
+	const runner = run && run.solver.id !== leader.id ? run.solver : null;
 
 	const facts = [
 		{
@@ -39,7 +43,8 @@ export function Facts({ view, leader }: { view: View; leader: Row }) {
 			href: "#change",
 			label: t("since"),
 			value: run ? f.day(run.since) : DASH,
-			caption: run ? t(run.atLeast ? "runAtLeast" : "run", { days: run.days }) : t("noRun"),
+			caption: runner ? t("runBy", { name: runner.label, run: days }) : days,
+			mono: runner?.unnamed,
 		},
 		{
 			href: "#eff",

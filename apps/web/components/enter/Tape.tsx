@@ -9,6 +9,7 @@ import type { TapeCell, TapeRow as TapeRowData, View } from "@fiberscope/core";
 
 import { useHover } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
+import { arrow } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
 
@@ -112,7 +113,7 @@ export function Tape({
 							rel="noopener"
 							className="whitespace-nowrap quiet max-wide:inline-flex max-wide:min-h-11 max-wide:items-center"
 						>
-							{tc("cowExplorer")}
+							{tc.rich("cowExplorer", { arrow })}
 						</a>
 					) : null}
 				</span>

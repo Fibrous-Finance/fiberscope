@@ -20,7 +20,7 @@ export interface Format {
 	usd(value: number | null): string;
 	/** Gas units: 644K · 1.37M */
 	gas(units: number | null): string;
-	/** A 0–1 ratio as a percentage: 46.9% */
+	/** A 0–1 ratio as a percentage: 46.9%. Only 0 and 1 show as 0% and 100%: <1%, >99%. */
 	percent(ratio: number | null, digits?: number): string;
 	/** Signed percentage points without the unit: +6.5 · −0.3 · ±0.0 */
 	points(value: number): string;
@@ -117,10 +117,12 @@ export function createFormat(locale: string): Format {
 		fixed,
 		usd(value) {
 			if (value === null) return DASH;
-			if (value >= 1e6) return usd2.format(value);
-			if (value >= 1e5) return usd0.format(value);
-			if (value >= 1e4) return usd1.format(value);
-			if (value >= 1e3) return usd2.format(value);
+			// Each tier starts where the one below would round up into it, so 999,600 reads
+			// "$1.00M", not "$1M", and 999.60 reads "$1.00K", not "$1,000".
+			if (value >= 999_500) return usd2.format(Math.max(value, 1e6));
+			if (value >= 99_950) return usd0.format(Math.max(value, 1e5));
+			if (value >= 9_995) return usd1.format(Math.max(value, 1e4));
+			if (value >= 999.5) return usd2.format(Math.max(value, 1e3));
 			// A positive amount under a dollar would otherwise round to "$0" or "$1".
 			if (value > 0 && value < 1) return `<${usdWhole.format(1)}`;
 			return usdWhole.format(Math.max(0, value));
@@ -141,6 +143,11 @@ export function createFormat(locale: string): Format {
 				});
 				percents.set(digits, f);
 			}
+			// A solver that won a few auctions did not win "0%" of them, and one that missed a
+			// few did not enter "100%".
+			const step = 10 ** -(digits + 2);
+			if (ratio > 0 && ratio < step / 2) return `<${f.format(step)}`;
+			if (ratio < 1 && ratio >= 1 - step / 2) return `>${f.format(1 - step)}`;
 			return f.format(ratio);
 		},
 		points(value) {

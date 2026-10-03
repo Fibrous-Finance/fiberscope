@@ -1,7 +1,7 @@
 {
 	"title": "How efficiently",
-	"sentence": "{solver} uses the least gas per trade among solvers with {minBatches}+ batches: {gas}, against a {average} network average.",
-	"sentenceAll": "{solver} uses the least gas per trade: {gas}, against a {average} network average.",
+	"sentence": "{solver} uses the least gas per trade among solvers with {minBatches}+ batches: {gas}, against a network average of {average}.",
+	"sentenceAll": "{solver} uses the least gas per trade: {gas}, against a network average of {average}.",
 	"sentenceSwaps": "Across the network, a trade takes {swaps} DEX swaps on average.",
 	"legend": {
 		"average": "Network average",

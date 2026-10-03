@@ -1,9 +1,9 @@
 {
 	"title": "Who is winning",
-	"answer": "{leader} leads with {share} of {measure}{rival, select, yes {, {ratio} {runnerUp}} other {}}.{byVolume, select, yes { By volume, {volumeLeader} leads with {volumeShare}.} other {}}",
+	"answer": "{lead, select, tie {{leader} and {runnerUp} tie for the lead with {share} of {measure} each.} alone {{leader} leads with {share} of {measure}.} other {{leader} leads with {share} of {measure}, {ratio} {runnerUp}.}}{byVolume, select, yes { By volume, {volumeLeader} leads with {volumeShare}.} partial { By volume (last {volumeDays, plural, =1 {24\u00a0hours} other {#\u00a0days}}), {volumeLeader} leads with {volumeShare}.} other {}}",
 	"copyMarkdown": "Copy as Markdown",
 	"downloadCsv": "Download CSV",
-	"markdownSource": "Fiberscope · {network} · {window}",
+	"markdownSource": "Fiberscope · {network} · Share: share of {measure} · {window}",
 	"columns": {
 		"rank": "#",
 		"solver": "Solver",
@@ -12,7 +12,7 @@
 		"participation": "Entered",
 		"winRate": "Win rate",
 		"partial": "{label}†",
-		"sorted": "{label} {direction, select, ascending {↑} other {↓}}",
+		"sorted": "{label} <arrow>{direction, select, ascending {↑} other {↓}}</arrow>",
 		"spark": "{days}d share"
 	},
 	"rankChange": {
@@ -23,11 +23,11 @@
 	"meta": "{value} · {entered} in · {winRate} win · {gas} gas",
 	"metaNoAuctions": "{value} · {gas} gas · no auction data",
 	"retired": "Retired",
-	"note": "Click a row for details. {earlier, select, yes {▲▼ rank change against {previous}.} other {No earlier window to compare yet.}} {window}.",
-	"auctionCoverage": "† Volume, Entered and Win rate cover the last {covered} of {days, plural, one {# day} other {# days}}.",
+	"note": "Click a row for details. {earlier, select, yes {<arrow>▲▼</arrow> rank change against {previous}.} other {No earlier window to compare yet.}} {window}.",
+	"auctionCoverage": "{covered, plural, =0 {† Volume, Entered and Win rate need auction data, and this window has none yet.} other {† Volume, Entered and Win rate cover the last {covered} of {days, plural, one {# day} other {# days}}.}}",
 	"source": "Source: CoW Protocol API · {network} settlement events",
 	"detail": {
-		"shareOf": "Share of {measure} · last {days, plural, one {# day} other {# days}}",
+		"shareOf": "Share of {measure} · last {days, plural, =1 {24 hours} other {# days}}",
 		"trend": "{points} since {date}",
 		"chart": "Daily share of {measure}, {start} to {end}: from {first} to {last}",
 		"labels": {
@@ -39,7 +39,7 @@
 			"trades": "{count} per batch",
 			"volume": "{value} average trade",
 			"average": "Network average {value}",
-			"gas": "{percent} {direction, select, below {below} other {above}} network avg",
+			"gas": "{direction, select, below {{percent} below network avg} above {{percent} above network avg} other {Same as network avg}}",
 			"participation": "Average solver {percent}",
 			"winRate": "Won {percent} of all auctions",
 			"noAuctionData": "No auction data"
@@ -52,12 +52,11 @@
 		"rankLine": "{batches} batches · {trades} trades · {volume} volume",
 		"rank": "#{rank}",
 		"gasVsNetwork": "Gas per trade vs network",
-		"gasScale": "{gas} gas per trade against a {average} network average",
+		"gasScale": "{gas} gas per trade against a network average of {average}",
 		"lower": "Lower",
 		"networkAverage": "Dashed: network avg",
 		"higher": "Higher",
 		"addresses": "Submission addresses",
-		"registry": "{status, select, active {Active} other {Inactive}} in CoW’s registry",
 		"env": {
 			"prod": "Prod",
 			"barn": "Barn"
@@ -77,22 +76,22 @@
 	},
 	"registry": {
 		"title": "Solver registry",
-		"summary": "All {total} solvers in CoW’s registry for {network}, with their addresses and last settlement.",
+		"summary": "{total, plural, one {The # solver} other {All # solvers}} in CoW’s registry for {network}, with {total, plural, one {its} other {their}} addresses and last settlement.",
 		"intro": "{settled, plural, one {# has} other {# have}} settled since {since}; {unsettled, plural, one {# has} other {# have}} not. Newest settlement first.",
 		"columns": {
 			"solver": "Solver",
 			"status": "Status",
 			"prod": "Prod address",
 			"barn": "Barn address",
-			"last": "Last settlement"
+			"last": "Last settlement UTC"
 		},
 		"status": "{status, select, active {Active} other {Inactive}}",
 		"retiredNote": "· retired",
 		"none": "None since {since}",
-		"last": "Last settlement {time}",
+		"last": "Last settlement {time}\u00a0UTC",
 		"never": "No settlement since {since}",
 		"unsettled": "{open, select, yes {Hide} other {Show}} the {count} that {count, plural, one {has} other {have}} not settled since {since}",
-		"note": "A retired address is one the solver no longer submits from.",
-		"source": "Source: CoW’s solver registry · {network} settlement events"
+		"note": "A retired address is one CoW’s registry marks inactive.",
+		"source": "Source: CoW’s solver registry · {network} settlement events · on-chain solver allow-list"
 	}
 }

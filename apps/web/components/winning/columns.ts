@@ -13,6 +13,13 @@ export const COLUMNS: readonly SortKey[] = [
 	"winRate",
 ];
 
+/** Columns that need auction data: "Volume†" when it covers only part of the window. */
+const AUCTION_COLUMNS: Partial<Record<SortKey, true>> = {
+	volume: true,
+	participation: true,
+	winRate: true,
+};
+
 /** Header labels of the sortable columns; the detail's stats use them too. */
 export function useColumnLabels(): Record<SortKey, string> {
 	const t = useTranslations("Winning.columns");
@@ -26,6 +33,21 @@ export function useColumnLabels(): Record<SortKey, string> {
 		participation: t("participation"),
 		winRate: t("winRate"),
 	};
+}
+
+/**
+ * The table's header labels: the auction columns end in "†" when auction data covers only part
+ * of the window. Copy as Markdown uses them too, so a pasted table keeps its footnote mark.
+ */
+export function useHeaderLabels(partial: boolean): Record<SortKey, string> {
+	const t = useTranslations("Winning.columns");
+	const labels = useColumnLabels();
+	return Object.fromEntries(
+		COLUMNS.map((key) => [
+			key,
+			partial && AUCTION_COLUMNS[key] ? t("partial", { label: labels[key] }) : labels[key],
+		])
+	) as Record<SortKey, string>;
 }
 
 /** A sortable column's value as the table shows it. */

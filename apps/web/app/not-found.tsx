@@ -6,13 +6,16 @@ import { getTranslations } from "next-intl/server";
 
 import { Footer } from "@/components/frame/Footer";
 import { Header } from "@/components/frame/Header";
+import { arrow } from "@/components/ui/Section";
 
 import { loadSnapshot } from "@/lib/snapshot";
 import { dataStatus } from "@/lib/status";
 
 export async function generateMetadata(): Promise<Metadata> {
 	const t = await getTranslations("Meta");
-	return { title: t("notFoundTitle"), robots: { index: false } };
+	// Next.js marks not-found responses noindex itself; a robots field here or inherited from the
+	// layout would add a second tag.
+	return { title: t("notFoundTitle"), robots: null };
 }
 
 export default async function NotFound() {
@@ -31,7 +34,7 @@ export default async function NotFound() {
 					<h1 className="mt-[18px] max-w-[19ch] headline">{t("headline")}</h1>
 					<p className="mt-6 max-w-[560px] answer">{t("text")}</p>
 					<Link href="/" className="mt-9 btn-teal">
-						{t("back")}
+						{t.rich("back", { arrow })}
 					</Link>
 				</main>
 				<Footer away />

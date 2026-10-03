@@ -16,7 +16,7 @@
 		"gnosis": "Gnosis Chain"
 	},
 	"status": {
-		"live": "Updated {time} UTC",
+		"live": "Updated {time}\u00a0UTC",
 		"liveTitle": "Data to block {block} · updated every {minutes, plural, one {minute} other {# minutes}}",
 		"delayed": "Delayed",
 		"delayedTitle": "Last updated {age}, at {asOf}{polling, select, yes { · the page checks for new data every minute} other {}}",
@@ -25,7 +25,7 @@
 		"loadingTitle": "Loading the latest data",
 		"error": "Data unavailable",
 		"errorShort": "No data",
-		"errorTitle": "Fiberscope’s data service didn’t respond · last try {time} UTC"
+		"errorTitle": "Fiberscope’s data service didn’t respond · last try {time}\u00a0UTC"
 	},
 	"appearance": {
 		"title": "Appearance: {mode, select, light {Light} dark {Dark} other {Auto ({theme, select, dark {dark} other {light}})}} · click to change"

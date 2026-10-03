@@ -41,9 +41,9 @@ export const HISTORY_DAYS: Record<Period, number> = {
 const SPARK_MIN_DAYS = 14;
 /**
  * "Lowest gas / trade" prefers solvers with at least this many batches per covered day of the
- * window; when none has that many, it takes the lowest of all.
+ * window; when none has that many, it takes the lowest of all. Methodology states both.
  */
-const MIN_BATCHES_PER_DAY = 100;
+export const MIN_BATCHES_PER_DAY = 100;
 /** A gain smaller than this (percentage points) is not worth a sentence. */
 const MIN_GAIN_POINTS = 0.1;
 /** Solvers with fewer trades are drawn as hollow dots in the gas chart. */
@@ -108,6 +108,7 @@ export interface Row extends SolverRef {
 export type Fraction =
 	| {
 			key:
+				| "all"
 				| "moreThanHalf"
 				| "half"
 				| "nearlyHalf"
@@ -121,13 +122,13 @@ export type Fraction =
 
 export interface LeaderRun {
 	solver: SolverRef;
-	/** Consecutive rolling days, ending with the latest, on which the solver led the daily measure. */
+	/** Consecutive rolling days, ending with the latest, on which the solver alone led the daily measure. */
 	days: number;
 	/** The day the run started (end time of its first rolling day). */
 	since: number;
 	/** The run reaches back to the start of the data, so it may be longer. */
 	atLeast: boolean;
-	/** The solver that led the day before the run started. */
+	/** The solver that alone led the day before the run started; null when no one did. */
 	previous: SolverRef | null;
 }
 
@@ -230,8 +231,9 @@ export function solverRef(solver: SnapshotSolver): SolverRef {
 	};
 }
 
-/** The headline's "{fraction} of all {network} {measure} went to one solver". */
+/** The headline's "{fraction} of all {network} {measure} went to one solver"; "all" only at 100%. */
 export function fractionOf(share: number): Fraction {
+	if (share >= 1) return { key: "all" };
 	if (share >= 0.55) return { key: "moreThanHalf" };
 	if (share >= 0.5) return { key: "half" };
 	if (share >= 0.44) return { key: "nearlyHalf" };
@@ -407,17 +409,23 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 				)
 			: null;
 
-	// The current run of the daily leader, over every covered day.
+	// The current run of the daily leader, over every covered day. A day on which two solvers
+	// tie for the most has no leader: neither "topped" it.
 	const leaderOf = (d: number) => {
 		let best = -1;
 		let bestValue = 0;
+		let tied = false;
 		series.forEach((s, i) => {
-			if ((s[d] ?? 0) > bestValue) {
-				bestValue = s[d] ?? 0;
+			const value = s[d] ?? 0;
+			if (value > bestValue) {
+				bestValue = value;
 				best = i;
+				tied = false;
+			} else if (value > 0 && value === bestValue) {
+				tied = true;
 			}
 		});
-		return best;
+		return tied ? -1 : best;
 	};
 	let leaderRun: LeaderRun | null = null;
 	const today = measureCoverage > 0 ? leaderOf(0) : -1;

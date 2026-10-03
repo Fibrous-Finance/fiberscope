@@ -3,15 +3,15 @@
 	"terms": {
 		"batches": {
 			"term": "Batches",
-			"text": "Settlement transactions a solver executed on Base in the window that filled at least one order. One auction can settle as several batches."
+			"text": "Settlements a solver executed on Base in the window that filled at least one order. One auction can settle as several batches."
 		},
 		"trades": {
 			"term": "Trades",
-			"text": "User orders filled inside those batches."
+			"text": "Orders filled inside those batches. An order filled in parts counts once per fill."
 		},
 		"volume": {
 			"term": "Volume",
-			"text": "USD value of filled orders. Each trade counts at the lower of its sell and buy value, priced with the token prices CoW used in that auction and Chainlink’s ETH/USD rate at settlement."
+			"text": "USD value of filled orders. Each trade counts at the lower of its sell and buy value, priced with the token prices CoW used in that auction and Chainlink’s ETH/USD rate at settlement. With only one side priced, that side counts; with neither, the trade adds nothing."
 		},
 		"share": {
 			"term": "Share",
@@ -19,7 +19,7 @@
 		},
 		"gas": {
 			"term": "Gas/trade",
-			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost."
+			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas / trade” considers only solvers with at least {minBatches} batches per day of the window, or every solver when none has that many."
 		},
 		"swaps": {
 			"term": "DEX swaps",
@@ -35,7 +35,7 @@
 		},
 		"entered": {
 			"term": "Entered",
-			"text": "Share of the window’s auctions in which the solver submitted at least one solution. Only auctions that ended in a settlement count."
+			"text": "Share of the window’s auctions in which the solver submitted at least one solution. Only auctions that ended in a settlement count. “Average solver” is the mean over the table’s solvers that entered at least one auction."
 		},
 		"winRate": {
 			"term": "Win rate",
@@ -43,11 +43,11 @@
 		},
 		"leadingSince": {
 			"term": "Leading since",
-			"text": "First day of the current unbroken run in which the same solver ranked #1 by daily share."
+			"text": "First day of the current unbroken run in which the same solver alone ranked #1 by daily share."
 		},
 		"sources": {
 			"term": "Sources",
-			"text": "Settlement events and receipts on Base, CoW Protocol’s solver-competition API, CoW’s solver registry and Chainlink’s ETH/USD feed."
+			"text": "Settlement events, receipts and token symbols on Base, the settlement contract’s on-chain solver allow-list, CoW Protocol’s solver-competition API, CoW’s solver registry and Chainlink’s ETH/USD feed."
 		},
 		"attribution": {
 			"term": "Attribution",
@@ -55,11 +55,11 @@
 		},
 		"registry": {
 			"term": "Registry",
-			"text": "Status and submission addresses as CoW’s solver registry lists them for Base. A retired address is one the solver no longer submits from."
+			"text": "Status and submission addresses as CoW’s solver registry lists them for Base, plus addresses it does not list as active that settle on Base and are on the settlement contract’s on-chain solver allow-list; those are shown as active (today one: Rizzolver’s 0x8f58…5cb7). A retired address is one the registry marks inactive."
 		},
 		"freshness": {
 			"term": "Freshness",
-			"text": "Updated every {minutes, plural, one {minute} other {# minutes}}. The figures run to block {block}, mined {date} at {time}\u00a0UTC.",
+			"text": "Updated every {minutes, plural, one {minute} other {# minutes}}. The figures run to block {block}, produced {date} at {time}\u00a0UTC.",
 			"noData": "Updated every {minutes, plural, one {minute} other {# minutes}}."
 		},
 		"windows": {
@@ -73,7 +73,7 @@
 		},
 		"names": {
 			"term": "Names",
-			"text": "From CoW’s public solver registry, checked against the on-chain allow-list. Solvers without a public name are shown by address."
+			"text": "From CoW’s public solver registry. Solvers without a public name are shown by address."
 		}
 	},
 	"disclosureLabel": "Disclosure.",

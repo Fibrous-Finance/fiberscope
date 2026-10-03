@@ -69,6 +69,7 @@
 			"prod": "Prod",
 			"barn": "Barn"
 		},
+		"copyAddress": "{env, select, prod {Copy prod address} barn {Copy barn address} other {Copy address}}",
 		"settlements": "Latest settlements",
 		"settlementColumns": {
 			"time": "Time\u00a0UTC",

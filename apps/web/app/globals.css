@@ -218,18 +218,21 @@
 }
 
 /*
- * Rows that open a detail draw their focus ring inside themselves, above the sticky columns.
- * The auction tape draws it on the selected column instead (see the tape).
+ * Rows that open a detail draw their focus ring inside themselves, above the sticky columns: on a
+ * focused row, or on a row whose button has focus (the leaderboard table). The auction tape draws
+ * it on the selected column instead (see the tape).
  */
 @utility focus-inset {
 	position: relative;
 
-	&:focus-visible {
+	&:focus-visible,
+	& :focus-visible {
 		outline: none;
 		box-shadow: none;
 	}
 
-	&:focus-visible::after {
+	&:focus-visible::after,
+	&:has(:focus-visible)::after {
 		content: "";
 		position: absolute;
 		inset: 0;

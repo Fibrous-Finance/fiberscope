@@ -137,14 +137,14 @@ function Addresses({ addresses }: { addresses: RegisteredAddress[] }) {
 	if (addresses.length === 0) return <span className="text-fa">{DASH}</span>;
 	return (
 		<span className="flex min-w-0 flex-col gap-0.5">
-			{addresses.map((a) => (
+			{addresses.map((a, index) => (
 				<span key={a.address} className="flex items-baseline gap-2 whitespace-nowrap">
 					<a
 						href={`${BASE.scan}/address/${a.address}`}
 						target="_blank"
 						rel="noopener"
 						title={a.address}
-						className={`hover:text-act hover:no-underline ${a.active ? "text-fg" : "text-fa"}`}
+						className={`${reach(index, addresses.length)} hover:text-act hover:no-underline ${a.active ? "text-fg" : "text-fa"}`}
 					>
 						{shortAddress(a.address)}
 					</a>
@@ -153,6 +153,19 @@ function Addresses({ addresses }: { addresses: RegisteredAddress[] }) {
 			))}
 		</span>
 	);
+}
+
+/**
+ * Stacked links are 20px tall and 22px apart. Each target still reaches 24px without moving the
+ * link: the first into the row's padding above, the last into the padding below, and a middle one
+ * into both 2px gaps (three links fit exactly; a longer stack's middle links would share theirs).
+ * A lone link has no neighbor to crowd it.
+ */
+function reach(index: number, count: number): string {
+	if (count === 1) return "";
+	if (index === 0) return "-mt-1 pt-1";
+	if (index === count - 1) return "-mb-1 pb-1";
+	return "-my-0.5 py-0.5";
 }
 
 /** Compact: one block per solver, its addresses listed under it, ready to select. */

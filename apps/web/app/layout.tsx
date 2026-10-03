@@ -37,6 +37,8 @@ export async function generateMetadata(): Promise<Metadata> {
 		openGraph: {
 			title: t("title"),
 			description: t("ogDescription"),
+			// The canonical address; metadataBase makes it absolute.
+			url: "/",
 			type: "website",
 			siteName: "Fiberscope",
 			images: [image],

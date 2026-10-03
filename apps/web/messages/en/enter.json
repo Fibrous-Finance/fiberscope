@@ -17,7 +17,7 @@
 	"tape": {
 		"title": "{count, plural, one {Latest auction} other {Latest # auctions}}",
 		"label": "{count, plural, one {Latest auction} other {Latest # auctions}}. Left and right arrow keys move between auctions, Home and End jump to the first and last, and Enter opens the selected one in CoW Explorer.",
-		"readout": "#{id} · {time} UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
+		"readout": "#{id} · {time}\u00a0UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
 	},
 	"note": "Click an auction to open its settlement in CoW Explorer.",
 	"noteCompact": "Tap an auction to select it; the CoW Explorer link above opens it.",
@@ -41,7 +41,7 @@
 		"line": "{trades, plural, one {# trade} other {# trades}} · {swaps, plural, one {# swap} other {# swaps}} · {volume} · {gas} gas",
 		"more": "Show {count} more",
 		"fewer": "Show fewer",
-		"note": "Swaps: DEX interactions in the settlement, not counting token approvals and WETH unwraps.",
-		"source": "Source: {network} settlement events"
+		"note": "Swaps: interactions in the settlement, not counting token approvals and WETH unwraps.",
+		"source": "Source: CoW Protocol API · {network} settlement events"
 	}
 }

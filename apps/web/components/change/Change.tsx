@@ -53,6 +53,10 @@ export function Change({
 					? t("leader.after", { ...values, previous: run.previous.label })
 					: t("leader.alone", values)
 		);
+	} else {
+		// Nothing settled in the last 24 hours, or two solvers tied for the most.
+		const span = asOf ? t("network.spanTo", { days: 1, asOf }) : t("network.span", { days: 1 });
+		sentences.push(t("leader.none", { measure, span }));
 	}
 	if (gain) {
 		const points = tc("points", { value: f.points(gain.points) });

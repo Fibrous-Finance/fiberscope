@@ -11,8 +11,8 @@ import { useFormat } from "@/lib/format";
 
 /**
  * All solvers together: the measure per day of the period and its change on the period before,
- * then one bar per day over the small multiples' days, the period's days darker. Hovering the
- * chart reads out the day under the pointer.
+ * then one bar per day over the small multiples' days, the period's days bolder (darker in the
+ * light theme, lighter in the dark one). Hovering the chart reads out the day under the pointer.
  */
 export function Network({
 	activity,
@@ -23,7 +23,7 @@ export function Network({
 	activity: NetworkActivity;
 	period: Period;
 	measure: Measure;
-	/** While the data is delayed, the time it runs to; the caption then reads "to {asOf}". */
+	/** While delayed, the time the data runs to; the caption and note then read "to {asOf}". */
 	asOf?: string;
 }) {
 	const t = useTranslations("Change.network");
@@ -67,7 +67,9 @@ export function Network({
 		first > 0
 			? t("starts", { measure, date: date(first) })
 			: window < count
-				? t("darker", { days: window })
+				? asOf
+					? t("windowTo", { days: window, asOf })
+					: t("window", { days: window })
 				: "";
 	const known = totals.filter((total) => total !== null);
 

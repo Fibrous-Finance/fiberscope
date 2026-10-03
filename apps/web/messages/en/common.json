@@ -31,9 +31,9 @@
 		"90d": "the previous 90 days",
 		"180d": "the previous 180 days"
 	},
-	"utc": "{time} UTC",
-	"points": "{value} pp",
-	"window": "{start} – {end} UTC",
+	"utc": "{time}\u00a0UTC",
+	"points": "{value}\u00a0pp",
+	"window": "{start} – {end}\u00a0UTC",
 	"cowExplorer": "CoW Explorer ↗",
 	"explorer": "Explorer ↗",
 	"basescan": "Basescan ↗",

@@ -6,12 +6,12 @@ import type { CSSProperties, Dispatch, HTMLAttributes, SetStateAction } from "re
 import { useTranslations } from "next-intl";
 
 import { autoRange, FIRST_DIRECTION, linePath } from "@fiberscope/core";
-import type { Measure, Row, SortKey } from "@fiberscope/core";
+import type { Measure, Row } from "@fiberscope/core";
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { BAR_MIN_TONE, isHot, TEAL, tone } from "@/components/dashboard/tones";
 import { Caret } from "@/components/ui/Section";
-import { cellText, COLUMNS, useColumnLabels } from "@/components/winning/columns";
+import { cellText, COLUMNS, useHeaderLabels } from "@/components/winning/columns";
 import { DetailCompact, DetailWide } from "@/components/winning/Detail";
 
 import { useFormat } from "@/lib/format";
@@ -21,12 +21,6 @@ const GRID =
 	"grid grid-cols-[36px_minmax(180px,1.6fr)_minmax(140px,1.3fr)_minmax(64px,.7fr)_minmax(64px,.7fr)_minmax(76px,.8fr)_minmax(76px,.8fr)_minmax(70px,.7fr)_minmax(70px,.7fr)_84px] items-center gap-x-4";
 /** Once the table is scrolled sideways, the sticky Solver column ends in a hairline. */
 const EDGE = "shadow-[inset_-1px_0_0_var(--ln2)]";
-/** Columns that need auction data: "Volume†" when it covers only part of the window. */
-const AUCTION_COLUMNS: Partial<Record<SortKey, true>> = {
-	volume: true,
-	participation: true,
-	winRate: true,
-};
 /** Sparklines span at least 4 percentage points. */
 const SPARK_MIN_SPAN = 0.04;
 
@@ -60,7 +54,6 @@ export function Table({ rows }: { rows: Row[] }) {
 	const { sort, setSort, open, setOpen } = useDashboard();
 	const { hovered, setHovered } = useHover();
 	const t = useTranslations("Winning.columns");
-	const labels = useColumnLabels();
 	const scroller = useRef<HTMLDivElement>(null);
 	const [scroll, setScroll] = useState<Scroll>({ width: 0, scrolled: false, more: false });
 
@@ -73,7 +66,7 @@ export function Table({ rows }: { rows: Row[] }) {
 	}, []);
 
 	const leaderShare = view.rows[0]?.share ?? 0;
-	const partial = view.coverage.auction < view.days;
+	const labels = useHeaderLabels(view.coverage.auction < view.days);
 
 	return (
 		<div className="relative mt-8 hidden wide:block">
@@ -96,10 +89,7 @@ export function Table({ rows }: { rows: Row[] }) {
 						</span>
 						{COLUMNS.map((key) => {
 							const active = sort.key === key;
-							const label =
-								partial && AUCTION_COLUMNS[key]
-									? t("partial", { label: labels[key] })
-									: labels[key];
+							const label = labels[key];
 							return (
 								<button
 									key={key}

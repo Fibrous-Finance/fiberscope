@@ -3,7 +3,7 @@
 	"nav": "Footer",
 	"methodology": "Methodology",
 	"source": "Source code ↗",
-	"dataSources": "Data from the CoW Protocol API, Base settlement events and CoW’s solver registry.",
+	"dataSources": "Data from the CoW Protocol API, Base settlement events, CoW’s solver registry and Chainlink.",
 	"independent": "Independent project, not affiliated with CoW DAO.",
 	"builtBy": "Built by Fibrous"
 }

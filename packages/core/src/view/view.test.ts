@@ -146,6 +146,33 @@ describe("buildView", () => {
 		assert.equal(all.leaderRun?.previous, null);
 	});
 
+	it("gives a tied day no leader, so a tie neither tops nor extends a run", () => {
+		// Today A and B tie: no one topped it.
+		const today = buildView(
+			snapshot(2, 0, [
+				solver("a", "A", { batches: [7, 9] }),
+				solver("b", "B", { batches: [7, 1] }),
+			]),
+			"24h",
+			"batches"
+		);
+		assert.equal(today.leaderRun, null);
+
+		// B leads today and yesterday; the day before, A and B tied, so B took over from no one.
+		const earlier = buildView(
+			snapshot(4, 0, [
+				solver("a", "A", { batches: [1, 1, 5, 9] }),
+				solver("b", "B", { batches: [6, 6, 5, 1] }),
+			]),
+			"24h",
+			"batches"
+		);
+		assert.equal(earlier.leaderRun?.solver.id, "b");
+		assert.equal(earlier.leaderRun?.days, 2);
+		assert.equal(earlier.leaderRun?.atLeast, false);
+		assert.equal(earlier.leaderRun?.previous, null);
+	});
+
 	it("aligns daily shares with the history dates, oldest first", () => {
 		const s = snapshot(3, 0, [
 			solver("a", "A", { batches: [1, 3, 0] }),
@@ -231,7 +258,9 @@ describe("tapeCell", () => {
 });
 
 describe("fractionOf", () => {
-	it("uses the design's thresholds", () => {
+	it("uses the design's thresholds, and All only when one solver has everything", () => {
+		assert.deepEqual(fractionOf(1), { key: "all" });
+		assert.deepEqual(fractionOf(0.999), { key: "moreThanHalf" });
 		assert.deepEqual(fractionOf(0.55), { key: "moreThanHalf" });
 		assert.deepEqual(fractionOf(0.469), { key: "nearlyHalf" });
 		assert.deepEqual(fractionOf(0.18), { key: "oneInFive" });

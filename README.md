@@ -22,7 +22,7 @@ minutes.
 <table>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/images/who-is-winning.webp" alt="Who is winning over 7 days: the solver table ranked by share of batches, with the leader's detail open, showing its daily share, its figures against the network average, its submission addresses and its latest settlements.">
+<img src="docs/images/who-is-winning.webp" alt="Who is winning over 7 days: the solver table ranked by share of batches, with the leader's detail open: its daily share, its figures against the network average, its latest auctions, its submission addresses and its latest settlements.">
 <p><b>Who is winning.</b> Each solver's share of batches, trades or volume over 24 hours, 7, 30, 90 or 180 days, with rank changes, entry and win rates. A row opens the solver's detail.</p>
 </td>
 <td width="50%" valign="top">
@@ -33,7 +33,7 @@ minutes.
 <tr>
 <td width="50%" valign="top">
 <img src="docs/images/who-enters.webp" alt="Who enters, who wins: a bar per solver for the share of auctions it entered and the share it won, and a tape of the latest 48 auctions marking who entered and who won each.">
-<p><b>Who enters, who wins.</b> How often each solver enters an auction and how often it wins, a tape of the latest auctions, and the latest settlements.</p>
+<p><b>Who enters, who wins.</b> How often each solver enters an auction and how often it wins, and a tape of the latest 48 auctions: who entered each and who won it.</p>
 </td>
 <td width="50%" valign="top">
 <img src="docs/images/how-efficiently.webp" alt="How efficiently: gas, transaction cost and DEX swaps per trade for each solver, as dots against a dashed network average.">
@@ -46,7 +46,7 @@ minutes.
 <p><b>Trader surplus.</b> How far trades beat the limit prices their users signed, in basis points of volume, with surplus from limits far from the market set apart.</p>
 </td>
 <td width="50%" valign="top">
-<img src="docs/images/mobile.webp" alt="Fiberscope on a phone: the overview, the solver list, and a solver's detail.">
+<img src="docs/images/mobile.webp" alt="Fiberscope on a phone: the overview, the solver list over 7 days, and the leader's detail.">
 <p><b>On a phone.</b> The same page in a compact layout.</p>
 </td>
 </tr>

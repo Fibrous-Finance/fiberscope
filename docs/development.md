@@ -157,8 +157,9 @@ pnpm --filter @fiberscope/web run preview   # build and serve the Worker locally
 
 `preview` takes overrides for the Worker's variables from `apps/web/.dev.vars`. To run your own
 copy, create an R2 bucket and set `bucket_name` and `SITE_URL` in `wrangler.jsonc`.
-`apps/web/public/_headers` gives the fingerprinted files under `/_next/static/` a one-year,
-immutable cache policy.
+`apps/web/public/_headers` sets the cache policy of static files: one year, immutable, for the
+fingerprinted files under `/_next/static/`, and one day for the icons and the social image
+(`favicon.svg`, `apple-touch-icon.png` and `og-image.png`), which keep their names when they change.
 
 ### Search engines
 

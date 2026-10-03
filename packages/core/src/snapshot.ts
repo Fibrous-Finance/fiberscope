@@ -25,12 +25,15 @@ export interface Snapshot {
 	refreshMinutes: number;
 	/**
 	 * How many buckets hold complete data.
-	 * - `chainDays`: batches, trades, swaps and gas (settlement events and receipts), and the
+	 * - `chainDays`: batches, trades, swaps, gas and cost (settlement events and receipts), and the
 	 *   settlement history behind `latestSettlements` and `registry`.
 	 * - `auctionDays`: volume, entered, won and the auction totals. Volume is priced with each
 	 *   auction's native prices, so it needs the auction data too.
+	 * - `surplusDays`: surplus. It is priced like volume and needs each trade's signed order
+	 *   terms, read from its settlement's calldata, so it covers the auction days whose calldata
+	 *   has been read: never more than `auctionDays`, and as many once that reading is done.
 	 */
-	coverage: { chainDays: number; auctionDays: number };
+	coverage: { chainDays: number; auctionDays: number; surplusDays: number };
 	/** Auction totals per bucket; length `coverage.auctionDays`. */
 	auctions: {
 		/** Auctions that produced at least one settlement. */
@@ -72,6 +75,31 @@ export interface SnapshotSolver {
 	gas: number[];
 	/** USD value of those trades (see Methodology). Length `coverage.auctionDays`. */
 	volume: number[];
+	/**
+	 * Trader surplus in USD, as Dune's CoW Protocol trades model defines `surplus_usd`: each
+	 * trade's USD value (as in `volume`) times how far its executed price beat the limit price
+	 * the trader signed, (bought × limitSell − sold × limitBuy) ÷ (bought × limitSell). Bought
+	 * and sold are the executed amounts, sold without the order's fee; limitSell and limitBuy
+	 * are the signed sell and buy amounts, read from the settle() calldata. The same expression
+	 * holds for sell and buy orders, whole or partial fills. Summed over the trades that have
+	 * it: priced trades whose order terms the calldata gave. To a hundredth of a cent. Length
+	 * `coverage.surplusDays`.
+	 */
+	surplus: number[];
+	/** The trades `surplus` sums over. Length `coverage.surplusDays`. */
+	surplusTrades: number[];
+	/**
+	 * USD value (as in `volume`) of the trades `surplus` sums over. Length
+	 * `coverage.surplusDays`.
+	 */
+	surplusVolume: number[];
+	/**
+	 * Transaction cost in USD: each batch's transaction fee, gas used × effective gas price plus
+	 * the L1 data fee, converted at the Chainlink ETH/USD rate of its block and split evenly
+	 * between the batches the transaction holds, as gas is. To a hundredth of a cent: a batch
+	 * often costs less than a cent. Length `coverage.chainDays`.
+	 */
+	cost: number[];
 	/** Auctions in which the solver submitted at least one solution. Length `coverage.auctionDays`. */
 	entered: number[];
 	/** Auctions the solver won, alone or with other winners. Length `coverage.auctionDays`. */
@@ -108,8 +136,15 @@ export interface SettlementSummary {
 	pair: { sell: string; buy: string };
 	/** USD; null when the auction's prices are unavailable. */
 	volume: number | null;
+	/**
+	 * Trader surplus in USD (see `SnapshotSolver.surplus`) of the trades that have it; null when
+	 * none has.
+	 */
+	surplus: number | null;
 	/** Gas units used. */
 	gas: number;
+	/** Transaction cost in USD (see `SnapshotSolver.cost`); null without an ETH/USD rate. */
+	cost: number | null;
 }
 
 /** A settlement of the network-wide list: its summary and the credited solver. */

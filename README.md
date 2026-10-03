@@ -33,7 +33,7 @@ auction-level view: which solvers enter each auction and how often they win.
 ## How it works
 
 ```text
-Base RPC (settlement events, receipts, Chainlink ETH/USD) ─┐
+Base RPC (events, receipts, calldata, Chainlink ETH/USD)  ─┐
 CoW API (solver competition, native prices)               ─┼─> apps/indexer ─> snapshot.json ─> apps/web
 CoW solver registry + on-chain allow-list                 ─┘      (SQLite)
 ```
@@ -54,6 +54,10 @@ CoW solver registry + on-chain allow-list                 ─┘      (SQLite)
 | `GPv2AllowListAuthentication` `isSolver`                                                                                  | Whether a flash-loan router settlement's sender or recipient is a solver, for attribution                                                                                                  |
 | Chainlink ETH/USD on Base                                                                                                 | The dollar rate at each settlement: the latest answer at or before its block                                                                                                               |
 | ERC-20 `symbol()`                                                                                                         | Token symbols for the latest settlements' pairs                                                                                                                                            |
+
+Trader surplus also needs each trade's signed limit amounts and fee, which the indexer reads from
+the `settle()` calldata: the transaction's input, or what the flash-loan router or a solver
+contract passes on.
 
 ### Methodology in brief
 

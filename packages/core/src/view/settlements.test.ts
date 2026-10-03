@@ -23,6 +23,10 @@ function solver(
 		swaps: [],
 		gas: [],
 		volume: [],
+		surplus: [],
+		surplusTrades: [],
+		surplusVolume: [],
+		cost: [],
 		entered: [],
 		won: [],
 		latestSettlements: [],
@@ -39,7 +43,9 @@ function settled(solver: string, secondsAgo: number, volume: number | null): Cre
 		swaps: 3,
 		pair: { sell: "USDC", buy: "WETH" },
 		volume,
+		surplus: volume === null ? null : volume / 1000,
 		gas: 434_710,
+		cost: 0.0213,
 	};
 }
 
@@ -51,7 +57,7 @@ function snapshot(solvers: SnapshotSolver[], latest: CreditedSettlement[]): Snap
 		end: { block: 52_115_823, time: END },
 		lastRunAt: END,
 		refreshMinutes: 10,
-		coverage: { chainDays: 1, auctionDays: 1 },
+		coverage: { chainDays: 1, auctionDays: 1, surplusDays: 1 },
 		auctions: { count: [100], solutions: [900] },
 		solvers,
 		latestAuctions: [],

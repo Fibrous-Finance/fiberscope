@@ -91,7 +91,15 @@ const SETTLED: Settled[] = [
 	},
 ];
 
-async function build(): Promise<Snapshot> {
+/** The trades' order: 1,000 USDC for at least 0.4 WETH; each trade fills it for 0.5 WETH. */
+const TERMS = {
+	limitSellAmount: "1000000000",
+	limitBuyAmount: "400000000000000000",
+	feeAmount: "0",
+};
+
+/** Builds the snapshot; `unread` transactions keep their calldata unread for order terms. */
+async function build(unread: string[] = []): Promise<Snapshot> {
 	const store = new Store(":memory:");
 	const range = { from: 1, to: END };
 	store.commitChunk(
@@ -115,21 +123,26 @@ async function build(): Promise<Snapshot> {
 					buyToken: WETH,
 					sellAmount: "1000000000",
 					buyAmount: "500000000000000000",
+					terms: TERMS,
 				}))
 			),
+			// 400K gas at 0.01 gwei plus 0.0000001 ETH of L1 fee: 0.0000041 ETH, $0.0082.
 			txs: [...new Map(SETTLED.map((s) => [s.tx, s])).values()].map((s) => ({
 				tx: s.tx,
 				block: s.block,
 				sender: s.sender ?? s.solver,
 				recipient: s.recipient ?? SETTLEMENT,
 				gasUsed: 400_000,
-				gasPrice: "1",
-				l1Fee: "1",
+				gasPrice: "10000000",
+				l1Fee: "100000000000",
 			})),
-			prices: [],
+			prices: [{ block: 1, answer: 2_000e8 }],
 		},
 		range
 	);
+	for (const tx of unread)
+		store.db.prepare("UPDATE txs SET terms_read = NULL WHERE tx = ?").run(tx);
+	// The auction 0xwon settled priced USDC at $1 and WETH at $2,000.
 	store.saveCompetition(
 		{
 			auctionId: 1,
@@ -148,10 +161,14 @@ async function build(): Promise<Snapshot> {
 				},
 			],
 		},
-		[],
-		[{ tx: "0xwon", priced: false }],
+		[
+			[USDC, "500000000000000000000000000"],
+			[WETH, "1000000000000000000"],
+		],
+		[{ tx: "0xwon", priced: true }],
 		0
 	);
+	store.setAuctionRange(range);
 	store.setLastRunAt(Date.now());
 	const { snapshot } = await buildSnapshot({
 		store,
@@ -191,7 +208,9 @@ describe("snapshot", () => {
 			trades: 1,
 			pair: { sell: "USDC", buy: "WETH" },
 			volume: null,
+			surplus: null,
 			gas: 400_000,
+			cost: 0.0082,
 			solver: "rizzolver",
 			swaps: 2,
 		});
@@ -210,6 +229,45 @@ describe("snapshot", () => {
 			latestSettlements.slice(5).map((settlement) => settlement.tx),
 			Array.from({ length: 45 }, (_, i) => `0xarc${i}`)
 		);
+	});
+
+	test("a batch costs its tx's fee at ETH/USD, split between the tx's batches", async () => {
+		const { solvers, latestSettlements } = await build();
+		const arc = solvers.find((solver) => solver.id === "arc");
+		// Bucket 0: 52 one-batch txs, 0xwon, and the two batches of 0xpair at $0.0041 each.
+		assert.deepEqual(
+			arc?.cost,
+			[54 * 0.0082, 0, 0.0082].map((usd) => +usd.toFixed(4))
+		);
+		assert.deepEqual(
+			latestSettlements.slice(2, 4).map(({ tx, gas, cost }) => ({ tx, gas, cost })),
+			[
+				{ tx: "0xpair", gas: 200_000, cost: 0.0041 },
+				{ tx: "0xpair", gas: 200_000, cost: 0.0041 },
+			]
+		);
+	});
+
+	test("surplus covers the auction days whose calldata is read", async () => {
+		const read = await build();
+		assert.deepEqual(read.coverage, { chainDays: 3, auctionDays: 3, surplusDays: 3 });
+		const arc = read.solvers.find((solver) => solver.id === "arc");
+		// Only 0xwon's auction is priced: $1,000 traded, 0.1 WETH over the 0.4 asked of 0.5.
+		assert.deepEqual(arc?.volume, [1_000, 0, 0]);
+		assert.deepEqual(arc?.surplus, [200, 0, 0]);
+		assert.deepEqual(arc?.surplusTrades, [1, 0, 0]);
+		assert.deepEqual(arc?.surplusVolume, [1_000, 0, 0]);
+		assert.deepEqual(
+			read.latestSettlements
+				.filter(({ tx }) => tx === "0xwon")
+				.map(({ volume, surplus }) => ({ volume, surplus })),
+			[{ volume: 1_000, surplus: 200 }]
+		);
+
+		// 0xold, two days back, is still unread: surplus stops at the day after it.
+		const unread = await build(["0xold"]);
+		assert.deepEqual(unread.coverage, { chainDays: 3, auctionDays: 3, surplusDays: 2 });
+		assert.deepEqual(unread.solvers.find((solver) => solver.id === "arc")?.surplus, [200, 0]);
 	});
 
 	test("the registry lists every registry solver, also the ones that never settled", async () => {

@@ -4,8 +4,14 @@ import { backfillAuctions, catchUpAuctions, resolveRouterSenders } from "./aucti
 import type { AuctionStats, ChainWatch } from "./auctions.ts";
 import { CONFIRMATIONS, NETWORK } from "./config.ts";
 import type { CowApi } from "./cow.ts";
-import { backfillChain, catchUpChain, repairRouterRecipients } from "./ingest.ts";
-import type { IngestStats } from "./ingest.ts";
+import {
+	backfillChain,
+	backfillTerms,
+	catchUpChain,
+	repairRouterRecipients,
+	seedEthUsd,
+} from "./ingest.ts";
+import type { IngestStats, TermsStats } from "./ingest.ts";
 import { log } from "./log.ts";
 import { OVERRIDES } from "./overrides.ts";
 import { describeError } from "./pacer.ts";
@@ -31,6 +37,7 @@ export interface SyncOptions {
 export interface SyncStats {
 	chain: IngestStats;
 	auctions: AuctionStats;
+	terms: TermsStats;
 }
 
 /** Blocks the end may trail the head after a catch-up round before another round runs (5 min). */
@@ -40,8 +47,9 @@ const CATCH_UP_SLACK = 150;
  * Brings the database up to date. Router transactions stored without their recipient are
  * repaired first. Then chain and auction data catch up with the chain head, which makes the data
  * current (the last run time) and is when the snapshot is written. Then chain and auction history
- * are backfilled to the requested depths, within the budget if there is one, and the snapshot is
- * written again if history grew. Every step resumes where an interrupted or stopped run left off.
+ * are backfilled to the requested depths, and the order terms of trades stored before terms were
+ * kept are read, within the budget if there is one; the snapshot is written again if history
+ * grew. Every step resumes where an interrupted or stopped run left off.
  */
 export async function sync(
 	store: Store,
@@ -59,8 +67,10 @@ export async function sync(
 	const stats: SyncStats = {
 		chain: { ranges: 0, receipts: 0, seconds: 0 },
 		auctions: { txs: 0, lookups: 0, missing: 0, seconds: 0 },
+		terms: { txs: 0, trades: 0, read: 0, seconds: 0 },
 	};
 	await repairRouterRecipients(store, rpc);
+	await seedEthUsd(store, rpc);
 
 	// Catch up: chain data to the head, then the auctions of the new blocks. A long pause since
 	// the last run leaves the head far behind, so this repeats, at most three times, until the end
@@ -82,7 +92,9 @@ export async function sync(
 	// the CoW API rate limits are spent at the same time, and the chain reaches the auction depth
 	// before it goes deeper: auction history never waits for the full chain depth.
 	const head = empty ? await safeHead(rpc) : store.chainRange()!.to;
-	const historyBefore = [store.chainRange()?.from, store.auctionRange()?.from].join();
+	const history = () =>
+		[store.chainRange()?.from, store.auctionRange()?.from, store.newestTxWithoutTerms()].join();
+	const historyBefore = history();
 	const chain: ChainWatch = { done: false };
 	const abort = new AbortController();
 	const stop = budget === null ? abort.signal : AbortSignal.any([abort.signal, budget]);
@@ -112,16 +124,23 @@ export async function sync(
 			for (let waited = 0; waited < 20 && !chain.done; waited++) await sleep(500);
 		}
 	})();
-	const [chainDone, auctionsDone] = await Promise.allSettled([chainWork, auctionWork]);
+	// The RPC budget the chain backfill leaves goes to the terms of the trades stored without them.
+	const termsWork = backfillTerms(store, rpc, stats.terms, stop);
+	const [chainDone, auctionsDone, termsDone] = await Promise.allSettled([
+		chainWork,
+		auctionWork,
+		termsWork,
+	]);
 	if (chainDone.status === "rejected") throw chainDone.reason;
 	if (auctionsDone.status === "rejected") throw auctionsDone.reason;
+	if (termsDone.status === "rejected") throw termsDone.reason;
 	if (budget?.aborted) {
 		log(`sync: the ${budgetMinutes}-minute budget is spent; the next run resumes the backfill`);
 	}
+	await seedEthUsd(store, rpc);
 
 	if (empty && store.chainRange() !== null) store.setLastRunAt(Date.now());
-	const historyAfter = [store.chainRange()?.from, store.auctionRange()?.from].join();
-	if (historyAfter !== historyBefore && store.lastRunAt() !== null) await writeSnapshot?.();
+	if (history() !== historyBefore && store.lastRunAt() !== null) await writeSnapshot?.();
 	return stats;
 }
 

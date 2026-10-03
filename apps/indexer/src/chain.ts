@@ -6,6 +6,7 @@ import { log } from "./log.ts";
 import { backoff } from "./pacer.ts";
 import { RpcError } from "./rpc.ts";
 import type { Rpc, RpcCall } from "./rpc.ts";
+import type { OrderTerms } from "./terms.ts";
 
 export const SETTLEMENT = NETWORK.contracts.settlement;
 export const ROUTER = NETWORK.contracts.flashLoanRouter;
@@ -57,8 +58,14 @@ export interface TradeRow {
 	settlementLogIndex: number;
 	sellToken: string;
 	buyToken: string;
+	/** Sold, fee included. */
 	sellAmount: string;
 	buyAmount: string;
+	/**
+	 * The signed order's terms, read from the settle() calldata; absent when no settle() call in
+	 * the calldata reproduces the trade.
+	 */
+	terms?: OrderTerms;
 }
 
 /**
@@ -161,21 +168,36 @@ export interface Receipt {
 
 /** Fetches receipts, waiting briefly for any the node does not have yet. */
 export async function getReceipts(rpc: Rpc, txs: string[]): Promise<Map<string, Receipt>> {
-	const receipts = new Map<string, Receipt>();
+	return byHash<Receipt>(rpc, "eth_getTransactionReceipt", "receipt", txs);
+}
+
+/** Fetches the input (calldata) of transactions, waiting briefly for any the node lacks. */
+export async function getInputs(rpc: Rpc, txs: string[]): Promise<Map<string, string>> {
+	const found = await byHash<{ input: string }>(rpc, "eth_getTransactionByHash", "input", txs);
+	return new Map([...found].map(([tx, { input }]) => [tx, input]));
+}
+
+/** Fetches one result per transaction hash; the node may lag behind the logs for a moment. */
+async function byHash<T>(
+	rpc: Rpc,
+	method: string,
+	noun: string,
+	txs: string[]
+): Promise<Map<string, T>> {
+	const found = new Map<string, T>();
 	let pending = txs;
 	for (let attempt = 0; pending.length > 0; attempt++) {
 		if (attempt === 5)
-			throw new Error(`no receipt for ${pending.length} txs, e.g. ${pending[0]}`);
+			throw new Error(`no ${noun} for ${pending.length} txs, e.g. ${pending[0]}`);
 		if (attempt > 0) await sleep(backoff(attempt));
-		const calls = pending.map((tx) => ({ method: "eth_getTransactionReceipt", params: [tx] }));
-		const outcomes = await rpc.batch(calls);
+		const outcomes = await rpc.batch(pending.map((tx) => ({ method, params: [tx] })));
 		const missing: string[] = [];
 		outcomes.forEach((outcome, i) => {
 			if (!outcome.ok) throw outcome.error;
-			if (outcome.result) receipts.set(pending[i], outcome.result as Receipt);
+			if (outcome.result) found.set(pending[i], outcome.result as T);
 			else missing.push(pending[i]);
 		});
 		pending = missing;
 	}
-	return receipts;
+	return found;
 }

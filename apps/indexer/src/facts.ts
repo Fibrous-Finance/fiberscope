@@ -2,7 +2,13 @@ import { ROUTER } from "./chain.ts";
 import { ethUsdAt } from "./prices.ts";
 import type { PricePoint } from "./prices.ts";
 import type { Registry, SolverIdentity } from "./registry.ts";
-import { creditedAddress, priceToken, tradeVolumeUsd } from "./rules.ts";
+import {
+	batchCostUsd,
+	creditedAddress,
+	priceToken,
+	tradeSurplusUsd,
+	tradeVolumeUsd,
+} from "./rules.ts";
 import type { BlockRange } from "./rules.ts";
 import type { SolutionRow, Store, TradeValueRow } from "./store.ts";
 
@@ -21,9 +27,12 @@ export interface Batch {
 	swaps: number;
 	/** Gas used by the transaction, split evenly if it holds several batches. */
 	gas: number;
+	/** The transaction's cost in USD, split the same way; null without an ETH/USD rate. */
+	cost: number | null;
 }
 
 export function loadBatches(store: Store, registry: Registry, range: BlockRange): Batch[] {
+	const points = store.ethUsdPoints();
 	return store.batchRows(range).map((row) => {
 		const address = creditedAddress(
 			{
@@ -36,6 +45,7 @@ export function loadBatches(store: Store, registry: Registry, range: BlockRange)
 			(candidate) => registry.has(candidate),
 			() => store.apiWinner(row.tx)
 		);
+		const ethUsd = ethUsdAt(points, row.block);
 		return {
 			tx: row.tx,
 			logIndex: row.logIndex,
@@ -46,6 +56,7 @@ export function loadBatches(store: Store, registry: Registry, range: BlockRange)
 			trades: row.trades,
 			swaps: row.swaps,
 			gas: row.gasUsed / row.txBatches,
+			cost: ethUsd === null ? null : batchCostUsd(row, ethUsd),
 		};
 	});
 }
@@ -55,6 +66,8 @@ export interface TradeValue {
 	usd: number | null;
 	/** How many of the trade's two sides had a native price. */
 	pricedSides: number;
+	/** Trader surplus in USD (see tradeSurplusUsd); null when unpriced or without order terms. */
+	surplus: number | null;
 }
 
 /** Values trades with their own auction's native prices and ETH/USD at their block. */
@@ -69,7 +82,7 @@ export class TradeValuer {
 	}
 
 	value(trade: TradeValueRow): TradeValue {
-		if (trade.auctionId === null) return { usd: null, pricedSides: 0 };
+		if (trade.auctionId === null) return { usd: null, pricedSides: 0, surplus: null };
 		let prices = this.#prices.get(trade.auctionId);
 		if (!prices) {
 			if (this.#prices.size >= 4_096) this.#prices.clear();
@@ -86,6 +99,7 @@ export class TradeValuer {
 		return {
 			usd,
 			pricedSides: usd === null ? 0 : Number(sellPrice !== null) + Number(buyPrice !== null),
+			surplus: tradeSurplusUsd(usd, trade),
 		};
 	}
 }

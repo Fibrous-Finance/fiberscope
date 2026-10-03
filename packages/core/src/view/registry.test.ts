@@ -34,7 +34,7 @@ function snapshot(registry: RegisteredSolver[]): Snapshot {
 		end: { block: 52_115_823, time: END },
 		lastRunAt: END,
 		refreshMinutes: 10,
-		coverage: { chainDays: CHAIN_DAYS, auctionDays: 7 },
+		coverage: { chainDays: CHAIN_DAYS, auctionDays: 7, surplusDays: 7 },
 		auctions: { count: [], solutions: [] },
 		solvers: [],
 		latestAuctions: [],

@@ -52,6 +52,15 @@ export async function feedSegments(rpc: Rpc, from: number, to: number): Promise<
 	return [{ from, to: same, aggregator, seed }, ...(await feedSegments(rpc, switched, to))];
 }
 
+/** The ETH/USD answer the proxy gave at a block (8 decimals). */
+export async function answerAt(rpc: Rpc, block: number): Promise<number> {
+	const round = await rpc.call<string>(
+		"eth_call",
+		ethCall(FEED, SELECTOR.latestRoundData, block).params
+	);
+	return Number(int256(word(round, 1)));
+}
+
 /**
  * Price points inside a block range: the seeds of the segments that start in it, then every
  * AnswerUpdated the aggregator of its segment emitted. Logs from other aggregators are ignored.

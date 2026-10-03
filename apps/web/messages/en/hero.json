@@ -21,23 +21,23 @@
 	},
 	"mosaic": {
 		"label": {
-			"batches": "Mosaic of {total, plural, one {# batch} other {# batches}}, one square per {unit, plural, one {batch} other {# batches}}: {solvers}.",
-			"trades": "Mosaic of {total, plural, one {# trade} other {# trades}}, one square per {unit, plural, one {trade} other {# trades}}: {solvers}.",
+			"batches": "Mosaic of {total, plural, one {#\u00a0batch} other {#\u00a0batches}}, one square per {unit, plural, one {batch} other {#\u00a0batches}}: {solvers}.",
+			"trades": "Mosaic of {total, plural, one {#\u00a0trade} other {#\u00a0trades}}, one square per {unit, plural, one {trade} other {#\u00a0trades}}: {solvers}.",
 			"volume": "Mosaic of {total} in volume, one square per {unit, number, ::currency/USD precision-integer}: {solvers}."
 		},
 		"item": "{name} {share}",
 		"unit": {
-			"batches": "1 square = {unit, plural, one {# batch} other {# batches}}",
-			"trades": "1 square = {unit, plural, one {# trade} other {# trades}}",
-			"volume": "1 square = {unit, number, ::currency/USD precision-integer}"
+			"batches": "1\u00a0square = {unit, plural, one {#\u00a0batch} other {#\u00a0batches}}",
+			"trades": "1\u00a0square = {unit, plural, one {#\u00a0trade} other {#\u00a0trades}}",
+			"volume": "1\u00a0square = {unit, number, ::currency/USD precision-integer}"
 		},
 		"readout": {
-			"batches": "{name} · {value, plural, one {# batch} other {# batches}} · {share}",
-			"trades": "{name} · {value, plural, one {# trade} other {# trades}} · {share}",
+			"batches": "{name} · {value, plural, one {#\u00a0batch} other {#\u00a0batches}} · {share}",
+			"trades": "{name} · {value, plural, one {#\u00a0trade} other {#\u00a0trades}} · {share}",
 			"volume": "{name} · {value} · {share}"
 		},
 		"rest": "{count, plural, one {# smaller solver} other {# smaller solvers}} · {share}",
-		"others": "{count, plural, one {# other} other {# others}}"
+		"others": "{count, plural, one {#\u00a0other} other {#\u00a0others}}"
 	},
 	"facts": {
 		"share": "Leader’s share",
@@ -45,17 +45,19 @@
 		"versus": "vs {name}",
 		"alone": "No other solver",
 		"since": "Leading since",
-		"run": "{days, plural, one {# day in a row} other {# days in a row}}",
-		"runAtLeast": "{days, plural, other {#+ days in a row}}",
+		"run": "{days, plural, one {#\u00a0day in a row} other {#\u00a0days in a row}}",
+		"runAtLeast": "{days, plural, other {#+\u00a0days in a row}}",
 		"runBy": "{name} · {run}",
 		"noRun": "No leader today",
 		"gas": "Lowest gas / trade",
-		"noGas": "No gas data"
+		"noGas": "No gas data",
+		"gasBy": "{name} · {minBatches}+\u00a0batches"
 	},
 	"empty": {
 		"headline": "No batches settled on {network} in {span}.",
 		"noVolume": "No {network} volume data for {span} yet.",
-		"action": "Show the last {period}"
+		"action": "Show the last {period}",
+		"actionMeasure": "Show {measure}"
 	},
 	"error": {
 		"headline": "We couldn’t load the latest data.",

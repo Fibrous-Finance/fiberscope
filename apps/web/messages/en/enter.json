@@ -1,7 +1,7 @@
 {
 	"title": "Who enters, who wins",
-	"coverage": "Auction records cover the last {covered} of {days, plural, one {# day} other {# days}}.",
-	"sentence": "On average {entrants} solvers enter each auction, about {solutions, plural, one {# competing solution} other {# competing solutions}}.",
+	"coverage": "Auction records cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.",
+	"sentence": "On average {entrants}\u00a0solvers enter each auction, about {solutions, plural, one {# competing solution} other {# competing solutions}}.",
 	"top": "{solver} enters {participation} of auctions and wins {winRate} of those.",
 	"empty": "No auction data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}}, so entries and wins can’t be shown yet.",
 	"legend": {
@@ -15,15 +15,14 @@
 		"rates": "in · win rate"
 	},
 	"tape": {
-		"title": "{count, plural, one {Latest auction} other {Latest # auctions}}",
-		"label": "{count, plural, one {Latest auction} other {Latest # auctions}}. Left and right arrow keys move between auctions, Home and End jump to the first and last, and Enter opens the selected one in CoW Explorer.",
-		"readout": "#{id} · {time}\u00a0UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
+		"title": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}",
+		"label": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}. Left and right arrow keys move between auctions, Home and End jump to the first and last, and Enter opens the selected one in CoW Explorer.",
+		"readout": "#{id} · {time} UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
 	},
 	"note": "Click an auction to open its settlement in CoW Explorer.",
 	"noteCompact": "Tap an auction to select it; the CoW Explorer link above opens it.",
 	"noAuctions": "{names}: no auction data in this window.",
 	"source": "Source: CoW Protocol solver-competition API",
-	"footnote": "† Volume, Entered and Win rate cover the last {covered} of {days, plural, one {# day} other {# days}}.",
 	"settlements": {
 		"title": "Latest settlements",
 		"scope": "All solvers · newest first",
@@ -34,14 +33,23 @@
 			"swaps": "Swaps",
 			"pair": "Pair",
 			"volume": "Volume",
+			"surplus": "Surplus",
+			"cost": "Cost",
 			"gas": "Gas",
 			"links": "Links"
 		},
 		"pair": "{sell} → {buy}{more, plural, =0 {} other { +#}}",
-		"line": "{trades, plural, one {# trade} other {# trades}} · {swaps, plural, one {# swap} other {# swaps}} · {volume} · {gas} gas",
 		"more": "Show {count} more",
 		"fewer": "Show fewer",
-		"note": "Swaps: interactions in the settlement, not counting token approvals and WETH unwraps.",
-		"source": "Source: CoW Protocol API · {network} settlement events"
+		"note": "Swaps: interactions in the settlement, not counting token approvals and WETH unwraps. Cost: what the transaction paid on Base, L1 data fee included.",
+		"source": "Source: CoW Protocol API · {network} settlement events",
+		"items": {
+			"trades": "{trades, plural, one {#\u00a0trade} other {#\u00a0trades}}",
+			"swaps": "{swaps, plural, one {#\u00a0swap} other {#\u00a0swaps}}",
+			"volume": "{volume}",
+			"surplus": "{surplus}\u00a0surplus",
+			"cost": "{cost}\u00a0cost",
+			"gas": "{gas}\u00a0gas"
+		}
 	}
 }

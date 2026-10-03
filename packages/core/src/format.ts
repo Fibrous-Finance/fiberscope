@@ -18,6 +18,14 @@ export interface Format {
 	fixed(value: number, digits: number): string;
 	/** $4.87M · $286K · $53.0K · $3.56K · $56 · <$1 */
 	usd(value: number | null): string;
+	/** Dollars with cents under $100, for surplus: $36.40 · $0.08 · <$0.01; from $100 as `usd` */
+	usdCents(value: number | null): string;
+	/** Whole dollars with separators, for totals in sentences: $583,649 */
+	usdWhole(value: number | null): string;
+	/** Transaction cost in cents under a dollar: 0.7¢ · 1.8¢ · 12¢ · <0.1¢; then $1.24 */
+	cost(value: number | null): string;
+	/** A 0–1 ratio in basis points, whole and separated: 65 · 4,201 */
+	bps(ratio: number | null): string;
 	/** Gas units: 644K · 1.37M */
 	gas(units: number | null): string;
 	/** A 0–1 ratio as a percentage: 46.9%. Only 0 and 1 show as 0% and 100%: <1%, >99%. */
@@ -84,7 +92,13 @@ export function createFormat(locale: string): Format {
 	const usd2 = usdCompact(2);
 	const usd1 = usdCompact(1);
 	const usd0 = usdCompact(0);
-	const usdWhole = number({ style: "currency", currency: "USD", maximumFractionDigits: 0 });
+	const wholeUsd = number({ style: "currency", currency: "USD", maximumFractionDigits: 0 });
+	const centsUsd = number({
+		style: "currency",
+		currency: "USD",
+		minimumFractionDigits: 2,
+		maximumFractionDigits: 2,
+	});
 	const gasK = number({ notation: "compact", maximumFractionDigits: 0 });
 	const gasM = number({
 		notation: "compact",
@@ -105,28 +119,52 @@ export function createFormat(locale: string): Format {
 		}
 		return f.format(value);
 	};
+	// "13 Sep" never splits across lines: a no-break space joins the day and the month.
 	const day = (ms: number) => {
-		if (!english) return dayMonth.format(ms);
+		if (!english) return dayMonth.format(ms).replaceAll(" ", NBSP);
 		const d = new Date(ms);
-		return `${d.getUTCDate()} ${EN_MONTHS[d.getUTCMonth()]}`;
+		return `${d.getUTCDate()}${NBSP}${EN_MONTHS[d.getUTCMonth()]}`;
+	};
+	const usd = (value: number | null): string => {
+		if (value === null) return DASH;
+		// Each tier starts where the one below would round up into it, so 999,600 reads
+		// "$1.00M", not "$1M", and 999.60 reads "$1.00K", not "$1,000".
+		if (value >= 999_500) return usd2.format(Math.max(value, 1e6));
+		if (value >= 99_950) return usd0.format(Math.max(value, 1e5));
+		if (value >= 9_995) return usd1.format(Math.max(value, 1e4));
+		if (value >= 999.5) return usd2.format(Math.max(value, 1e3));
+		// A positive amount under a dollar would otherwise round to "$0" or "$1".
+		if (value > 0 && value < 1) return `<${wholeUsd.format(1)}`;
+		return wholeUsd.format(Math.max(0, value));
+	};
+	const usdCents = (value: number | null): string => {
+		if (value === null) return DASH;
+		if (value < 0) return `−${usdCents(-value)}`;
+		if (value === 0) return wholeUsd.format(0);
+		// Under half a cent, two decimals would print "$0.00".
+		if (value < 0.005) return `<${centsUsd.format(0.01)}`;
+		// Where cents would round up to "$100.00", whole dollars take over.
+		return Number(value.toFixed(2)) < 100 ? centsUsd.format(value) : usd(value);
 	};
 
 	return {
 		locale,
 		int: (value) => integer.format(value),
 		fixed,
-		usd(value) {
+		usd,
+		usdCents,
+		usdWhole: (value) => (value === null ? DASH : wholeUsd.format(value)),
+		cost(value) {
 			if (value === null) return DASH;
-			// Each tier starts where the one below would round up into it, so 999,600 reads
-			// "$1.00M", not "$1M", and 999.60 reads "$1.00K", not "$1,000".
-			if (value >= 999_500) return usd2.format(Math.max(value, 1e6));
-			if (value >= 99_950) return usd0.format(Math.max(value, 1e5));
-			if (value >= 9_995) return usd1.format(Math.max(value, 1e4));
-			if (value >= 999.5) return usd2.format(Math.max(value, 1e3));
-			// A positive amount under a dollar would otherwise round to "$0" or "$1".
-			if (value > 0 && value < 1) return `<${usdWhole.format(1)}`;
-			return usdWhole.format(Math.max(0, value));
+			if (value <= 0) return "0¢";
+			const cents = Math.round(value * 1e6) / 1e4;
+			if (cents < 0.05) return `<${fixed(0.1, 1)}¢`;
+			// Each step starts where the one below would round up into it: 9.96¢ reads "10¢".
+			if (Number(cents.toFixed(1)) < 10) return `${fixed(cents, 1)}¢`;
+			if (Math.round(cents) < 100) return `${integer.format(Math.round(cents))}¢`;
+			return usdCents(value);
 		},
+		bps: (ratio) => (ratio === null ? DASH : integer.format(Math.round(ratio * 10_000))),
 		gas(units) {
 			if (units === null) return DASH;
 			// From 999.5K on, rounding to whole thousands would print "1000K".
@@ -160,20 +198,25 @@ export function createFormat(locale: string): Format {
 		day,
 		dayTime: (ms) => `${day(ms)} ${hm.format(ms)}`,
 		date(ms) {
-			if (!english) return dayMonthYear.format(ms);
-			return `${day(ms)} ${new Date(ms).getUTCFullYear()}`;
+			if (!english) return dayMonthYear.format(ms).replaceAll(" ", NBSP);
+			return `${day(ms)}${NBSP}${new Date(ms).getUTCFullYear()}`;
 		},
 		ago(ms) {
 			// Minutes under an hour, rounded hours under 36 hours, then rounded days.
 			const minutes = Math.max(1, Math.round(ms / MINUTE_MS));
-			if (minutes < 60) return relative.format(-minutes, "minute");
-			if (minutes < 36 * 60) return relative.format(-Math.round(minutes / 60), "hour");
-			return relative.format(-Math.round(minutes / (24 * 60)), "day");
+			const [value, unit]: [number, Intl.RelativeTimeFormatUnit] =
+				minutes < 60
+					? [minutes, "minute"]
+					: minutes < 36 * 60
+						? [Math.round(minutes / 60), "hour"]
+						: [Math.round(minutes / (24 * 60)), "day"];
+			// "8 hours ago": the number and its unit stay on one line.
+			return relative.format(-value, unit).replace(/(\d) /u, `$1${NBSP}`);
 		},
 		asOf(ms, now) {
 			const time = `${hm.format(ms)}${NBSP}UTC`;
 			if (Math.floor(ms / DAY_MS) === Math.floor(now / DAY_MS)) return time;
-			return `${day(ms).replaceAll(" ", NBSP)}, ${time}`;
+			return `${day(ms)}, ${time}`;
 		},
 	};
 }

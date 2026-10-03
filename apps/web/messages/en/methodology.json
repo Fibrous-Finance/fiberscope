@@ -19,7 +19,11 @@
 		},
 		"gas": {
 			"term": "Gas/trade",
-			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas / trade” considers only solvers with at least {minBatches} batches per day of the window, or every solver when none has that many."
+			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas / trade” considers only solvers with at least {minBatches}\u00a0batches per day of the window, or every solver when none has that many."
+		},
+		"cost": {
+			"term": "Transaction cost",
+			"text": "What a settlement transaction paid on Base: gas used × gas price, plus the L1 data fee, in USD at Chainlink’s ETH/USD rate in its block. A transaction that holds several batches splits it evenly, as gas is split. Per trade: a solver’s cost divided by the trades it filled."
 		},
 		"swaps": {
 			"term": "DEX swaps",
@@ -29,9 +33,17 @@
 			"term": "Batch value",
 			"text": "Volume divided by batches. Trades per batch is trades divided by batches."
 		},
+		"surplus": {
+			"term": "Surplus",
+			"text": "How much better a trade executed than the limit price its user signed, in USD, valued like Volume. Dune’s formula: value × (bought × limit sell − sold × limit buy) ÷ (bought × limit sell), with the limits read from the settlement’s calldata. Compared in basis points (hundredths of a percent) of volume."
+		},
+		"unusual": {
+			"term": "Unusual surplus",
+			"text": "Surplus above a tenth of the trade’s value, CoW’s own cutoff (Dune query 1368423). It comes from limits set far from the market, such as very wide slippage or stale orders. “Typical” leaves these trades out; the unusual share is their part of a solver’s surplus."
+		},
 		"networkAverage": {
-			"term": "Network avg",
-			"text": "Gas per trade and DEX swaps per trade across all solvers, weighted by trades."
+			"term": "Network average",
+			"text": "Gas, transaction cost and DEX swaps per trade across all solvers, weighted by trades. Typical surplus across all solvers, weighted by volume."
 		},
 		"entered": {
 			"term": "Entered",
@@ -47,7 +59,11 @@
 		},
 		"sources": {
 			"term": "Sources",
-			"text": "Settlement events, receipts and token symbols on Base, the settlement contract’s on-chain solver allow-list, CoW Protocol’s solver-competition API, CoW’s solver registry and Chainlink’s ETH/USD feed."
+			"text": "Settlement events, calldata, receipts and token symbols on Base, the settlement contract’s on-chain solver allow-list, CoW Protocol’s solver-competition API, CoW’s solver registry and Chainlink’s ETH/USD feed."
+		},
+		"dune": {
+			"term": "Dune",
+			"text": "Surplus follows Dune’s definition (Spellbook’s cow_protocol_base.trades) with one difference: trades are valued at the lower of their two sides, as Volume is, where Dune takes the higher. Buy-order surplus follows Dune’s formula, which comes out slightly below CoW Explorer’s figure."
 		},
 		"attribution": {
 			"term": "Attribution",
@@ -59,8 +75,9 @@
 		},
 		"freshness": {
 			"term": "Freshness",
-			"text": "Updated every {minutes, plural, one {minute} other {# minutes}}. The figures run to block {block}, produced {date} at {time}\u00a0UTC.",
-			"noData": "Updated every {minutes, plural, one {minute} other {# minutes}}."
+			"text": "Updated every {minutes, plural, one {minute} other {#\u00a0minutes}}. The figures run to block {block}, produced {date} at {time}\u00a0UTC.",
+			"noData": "Updated every {minutes, plural, one {minute} other {#\u00a0minutes}}.",
+			"delayed": "Normally updated every {minutes, plural, one {minute} other {#\u00a0minutes}}. The figures run to block {block}, produced {date} at {time}\u00a0UTC."
 		},
 		"windows": {
 			"term": "Windows",
@@ -68,8 +85,8 @@
 		},
 		"coverage": {
 			"term": "Coverage",
-			"text": "Settlement history goes back {chain, plural, one {# day} other {# days}} and auction history {auction, plural, one {# day} other {# days}}. Volume, Entered and Win rate need auction data, so in a longer window they cover only the days that have it, and a note says so.",
-			"noData": "Volume, Entered and Win rate need auction data, so in a longer window they cover only the days that have it, and a note says so."
+			"text": "Settlement history goes back {chain, plural, one {#\u00a0day} other {#\u00a0days}}, auction history {auction, plural, one {#\u00a0day} other {#\u00a0days}} and surplus {surplus, plural, one {#\u00a0day} other {#\u00a0days}}. Volume, Entered and Win rate need auction data, and surplus also needs the terms each order was signed with, so in a longer window they cover only the days that have them, and a note says so.",
+			"noData": "Volume, Entered and Win rate need auction data, and surplus also needs the terms each order was signed with, so in a longer window they cover only the days that have them, and a note says so."
 		},
 		"names": {
 			"term": "Names",

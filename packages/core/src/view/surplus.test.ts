@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { Snapshot, SnapshotSolver } from "../snapshot.ts";
-import { surplusAndCost } from "./surplus.ts";
+import { surplusAndCost, surplusAxis, surplusRows } from "./surplus.ts";
 import { buildView } from "./view.ts";
 import type { Period } from "./view.ts";
 
@@ -83,10 +83,12 @@ describe("surplusAndCost", () => {
 			surplus: 15,
 			surplusTrades: 30,
 			surplusPerTrade: 0.5,
+			surplusVolume: 2_400,
 			surplusRate: 15 / 2_400,
 			unusualSurplus: 6,
 			unusualTrades: 3,
 			unusualShare: 0.4,
+			unusualTradeShare: 0.1,
 			typicalSurplus: 9,
 			typicalTrades: 27,
 			typicalSurplusPerTrade: 9 / 27,
@@ -166,10 +168,12 @@ describe("surplusAndCost", () => {
 			surplus: null,
 			surplusTrades: null,
 			surplusPerTrade: null,
+			surplusVolume: null,
 			surplusRate: null,
 			unusualSurplus: null,
 			unusualTrades: null,
 			unusualShare: null,
+			unusualTradeShare: null,
 			typicalSurplus: null,
 			typicalTrades: null,
 			typicalSurplusPerTrade: null,
@@ -285,5 +289,108 @@ describe("surplusAndCost", () => {
 		assert.equal(network.typicalSurplus, 120);
 		assert.equal(network.typicalSurplusPerTrade, 120 / 58);
 		assert.equal(network.typicalSurplusRate, 120 / 59_600);
+	});
+});
+
+describe("surplusAxis", () => {
+	const row = (surplusTrades: number | null, bps: number | null) => ({
+		surplusTrades,
+		typicalSurplusRate: bps === null ? null : bps / 10_000,
+	});
+
+	it("holds the network and every solver with 30+ surplus trades, not smaller ones", () => {
+		// 7D: the network's typical 101 bps; the largest solver with 30+ trades 263 bps; a solver
+		// with 12 trades at 316 bps lies beyond.
+		const axis = surplusAxis([row(25_000, 65), row(273, 263), row(12, 316)], 0.0101);
+		assert.equal(axis.max, 0.03);
+		assert.deepEqual(axis.ticks, [0, 0.01, 0.02, 0.03]);
+	});
+
+	it("counts a solver with exactly 30 surplus trades, and an end equal to the rate holds it", () => {
+		assert.equal(surplusAxis([row(30, 400)], 0.01).max, 0.04);
+		assert.equal(surplusAxis([row(29, 400)], 0.01).max, 0.01);
+		assert.equal(surplusAxis([row(30, 401)], 0.01).max, 0.05);
+	});
+
+	it("holds the network's typical rate when no solver reaches it", () => {
+		assert.equal(surplusAxis([row(500, 90)], 0.0133).max, 0.015);
+		assert.equal(surplusAxis([], null).max, 0.01);
+	});
+
+	it("ticks every 50 bps up to 200, every 100 up to 600, then every 200, and stops at 1,000", () => {
+		const bps = (axis: { ticks: number[] }) =>
+			axis.ticks.map((tick) => Math.round(tick * 10_000));
+		assert.deepEqual(bps(surplusAxis([row(100, 140)], null)), [0, 50, 100, 150]);
+		assert.deepEqual(
+			bps(surplusAxis([row(100, 550)], null)),
+			[0, 100, 200, 300, 400, 500, 600]
+		);
+		assert.deepEqual(bps(surplusAxis([row(100, 700)], null)), [0, 200, 400, 600, 800]);
+		const capped = surplusAxis([row(100, 2_500)], null);
+		assert.equal(capped.max, 0.1);
+		assert.equal(capped.ticks.at(-1), 0.1);
+	});
+
+	it("ignores solvers without a typical rate", () => {
+		// Every trade unusual: no typical rate to hold.
+		assert.equal(surplusAxis([row(40, null), row(null, null)], null).max, 0.01);
+	});
+});
+
+describe("surplusRows", () => {
+	const s = snapshot({ chainDays: 1, auctionDays: 1, surplusDays: 1 }, [
+		// The most batches, but little volume behind its surplus.
+		solver("busy", {
+			batches: [50],
+			trades: [60],
+			volume: [6_000],
+			surplus: [3],
+			surplusTrades: [60],
+			surplusVolume: [6_000],
+		}),
+		// Settled, but none of its trades had known order terms.
+		solver("unread", {
+			batches: [8],
+			trades: [8],
+			volume: [800],
+			surplus: [0],
+			surplusTrades: [0],
+			surplusVolume: [0],
+		}),
+		solver("large", {
+			batches: [5],
+			trades: [10],
+			volume: [90_000],
+			surplus: [40],
+			surplusTrades: [10],
+			surplusVolume: [90_000],
+		}),
+		// As much volume behind its surplus as busy.
+		solver("level", {
+			batches: [3],
+			trades: [3],
+			volume: [6_000],
+			surplus: [1],
+			surplusTrades: [3],
+			surplusVolume: [6_000],
+		}),
+	]);
+
+	it("lists solvers with surplus trades by the volume behind their surplus", () => {
+		const view = buildView(s, "24h", "batches");
+		const rows = surplusRows(view, surplusAndCost(s, view));
+		// Ties keep the view's order, by batches.
+		assert.deepEqual(
+			rows.map(({ row }) => row.id),
+			["large", "busy", "level"]
+		);
+		assert.equal(rows[0]!.row.rank, 3);
+		assert.equal(rows[0]!.figures.surplus, 40);
+	});
+
+	it("has no rows without surplus days", () => {
+		const unread = { ...s, coverage: { chainDays: 1, auctionDays: 1, surplusDays: 0 } };
+		const view = buildView(unread, "24h", "batches");
+		assert.deepEqual(surplusRows(view, surplusAndCost(unread, view)), []);
 	});
 });

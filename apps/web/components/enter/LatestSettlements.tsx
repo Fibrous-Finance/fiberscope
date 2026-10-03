@@ -16,13 +16,14 @@ import { useFormat } from "@/lib/format";
 const SHOWN = 10;
 /** Settlements this close to the end of the data show a clock time, older ones the day too. */
 const RECENT_MS = 12 * 3_600_000;
-/** Time, solver, trades, swaps, pair, volume, gas and links; the header and every row share it. */
+/** Time, solver, trades, swaps, pair, volume, surplus, cost, gas and links, in every row. */
 const GRID =
-	"grid grid-cols-[84px_minmax(110px,1fr)_52px_52px_minmax(0,1.7fr)_76px_64px_200px] items-center gap-x-3";
+	"grid grid-cols-[84px_minmax(110px,1fr)_52px_52px_minmax(0,1.7fr)_76px_72px_56px_64px_200px] items-center gap-x-3";
 
 /**
- * The newest settlements of every solver: a table on wide pages, two-line rows on compact ones.
- * Ten rows at first; a disclosure shows the rest. Hovering a row highlights its solver everywhere.
+ * The newest settlements of every solver: a table on wide pages that scrolls sideways under
+ * 1000px, rows with a wrapping figure list on compact ones. Ten rows at first; a disclosure shows
+ * the rest. Hovering a row highlights its solver everywhere.
  */
 export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number> }) {
 	const t = useTranslations("Enter.settlements");
@@ -38,6 +39,8 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 	const more = settlements.length - SHOWN;
 	const rows = (expanded ? settlements : settlements.slice(0, SHOWN)).map((s) => {
 		const volume = f.usd(s.volume);
+		const surplus = f.usdCents(s.surplus);
+		const cost = f.cost(s.cost);
 		const gas = f.gas(s.gas);
 		return {
 			tx: s.tx,
@@ -52,8 +55,17 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 				more: Math.max(0, s.trades - 1),
 			}),
 			volume,
+			surplus,
+			cost,
 			gas,
-			line: t("line", { trades: s.trades, swaps: s.swaps, volume, gas }),
+			items: [
+				t("items.trades", { trades: s.trades }),
+				t("items.swaps", { swaps: s.swaps }),
+				t("items.volume", { volume }),
+				t("items.surplus", { surplus }),
+				t("items.cost", { cost }),
+				t("items.gas", { gas }),
+			],
 			cow: `https://explorer.cow.fi/${network.explorerSlug}/tx/${s.tx}`,
 			scan: `${network.scan}/tx/${s.tx}`,
 		};
@@ -67,57 +79,66 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 					{t("scope")}
 				</span>
 			</div>
-			<div className="mt-3 hidden tabular-nums wide:block">
-				<div
-					className={`${GRID} box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-fa uppercase`}
-				>
-					<span>{t("columns.time")}</span>
-					<span>{t("columns.solver")}</span>
-					<span className="text-right">{t("columns.trades")}</span>
-					<span className="text-right">{t("columns.swaps")}</span>
-					<span className="pl-1.5">{t("columns.pair")}</span>
-					<span className="text-right">{t("columns.volume")}</span>
-					<span className="text-right">{t("columns.gas")}</span>
-					<span className="text-right">{t("columns.links")}</span>
-				</div>
-				{rows.map((row) => (
+			{/* Under 1000px the table scrolls sideways rather than squeezing the pair. */}
+			<div className="mt-3 hidden overflow-x-auto tabular-nums wide:block">
+				<div className="min-w-[1000px]">
 					<div
-						key={row.tx}
-						onMouseEnter={() => setHovered(row.solver.id)}
-						onMouseLeave={() => setHovered(null)}
-						className={`${GRID} box-content h-[38px] border-b border-ln font-mono text-[12.5px] leading-[normal] font-medium transition-colors duration-150 ${row.hot ? "bg-hov" : ""}`}
+						className={`${GRID} box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-fa uppercase`}
 					>
-						<span>{row.time}</span>
-						<span
-							className={`truncate text-[13.5px] transition-colors duration-200 ${row.solver.unnamed ? "font-mono" : "font-sans"} ${row.hot ? "text-teal" : ""}`}
-						>
-							{row.solver.label}
-						</span>
-						<span className="text-right">{row.trades}</span>
-						<span className="text-right">{row.swaps}</span>
-						<span className="truncate pl-1.5 font-sans text-[13px]">{row.pair}</span>
-						<span className="text-right">{row.volume}</span>
-						<span className="text-right">{row.gas}</span>
-						<span className="flex justify-end gap-3.5 text-[12px]">
-							<a
-								href={row.cow}
-								target="_blank"
-								rel="noopener"
-								className="whitespace-nowrap quiet"
-							>
-								{tc.rich("cowExplorer", { arrow })}
-							</a>
-							<a
-								href={row.scan}
-								target="_blank"
-								rel="noopener"
-								className="whitespace-nowrap quiet"
-							>
-								{tc.rich("basescan", { arrow })}
-							</a>
-						</span>
+						<span>{t("columns.time")}</span>
+						<span>{t("columns.solver")}</span>
+						<span className="text-right">{t("columns.trades")}</span>
+						<span className="text-right">{t("columns.swaps")}</span>
+						<span className="pl-1.5">{t("columns.pair")}</span>
+						<span className="text-right">{t("columns.volume")}</span>
+						<span className="text-right">{t("columns.surplus")}</span>
+						<span className="text-right">{t("columns.cost")}</span>
+						<span className="text-right">{t("columns.gas")}</span>
+						<span className="text-right">{t("columns.links")}</span>
 					</div>
-				))}
+					{rows.map((row) => (
+						<div
+							key={row.tx}
+							onMouseEnter={() => setHovered(row.solver.id)}
+							onMouseLeave={() => setHovered(null)}
+							className={`${GRID} box-content h-[38px] border-b border-ln font-mono text-[12.5px] leading-[normal] font-medium transition-colors duration-150 ${row.hot ? "bg-hov" : ""}`}
+						>
+							<span>{row.time}</span>
+							<span
+								className={`truncate text-[13.5px] transition-colors duration-200 ${row.solver.unnamed ? "font-mono" : "font-sans"} ${row.hot ? "text-teal" : ""}`}
+							>
+								{row.solver.label}
+							</span>
+							<span className="text-right">{row.trades}</span>
+							<span className="text-right">{row.swaps}</span>
+							<span className="truncate pl-1.5 font-sans text-[13px]">
+								{row.pair}
+							</span>
+							<span className="text-right">{row.volume}</span>
+							<span className="text-right">{row.surplus}</span>
+							<span className="text-right">{row.cost}</span>
+							<span className="text-right">{row.gas}</span>
+							<span className="flex justify-end gap-3.5 text-[12px]">
+								<a
+									href={row.cow}
+									target="_blank"
+									rel="noopener"
+									className="whitespace-nowrap quiet"
+								>
+									{tc.rich("cowExplorer", { arrow })}
+								</a>
+								<a
+									href={row.scan}
+									target="_blank"
+									rel="noopener"
+									className="whitespace-nowrap quiet"
+								>
+									{tc.rich("basescan", { arrow })}
+								</a>
+							</span>
+						</div>
+					))}
+				</div>
 			</div>
 			<div className="mt-3 border-t border-ln2 tabular-nums wide:hidden">
 				{rows.map((row) => (
@@ -137,27 +158,42 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 								{row.pair}
 							</span>
 						</div>
-						{/* Figures never wrap; the links take their own line when they don't fit. */}
-						<div className="flex flex-wrap items-center justify-between gap-x-4 font-mono text-[11.5px] leading-[normal] font-medium text-mu">
-							<span className="max-w-full truncate py-1.5">{row.line}</span>
-							<span className="ml-auto flex gap-[18px]">
-								<a
-									href={row.cow}
-									target="_blank"
-									rel="noopener"
-									className="flex min-h-11 items-center whitespace-nowrap quiet"
-								>
-									{tc.rich("explorer", { arrow })}
-								</a>
-								<a
-									href={row.scan}
-									target="_blank"
-									rel="noopener"
-									className="flex min-h-11 items-center whitespace-nowrap quiet"
-								>
-									{tc.rich("basescan", { arrow })}
-								</a>
-							</span>
+						{/*
+						 * The figures wrap as whole items. Each item's "·" sits in its 14px
+						 * ::before, and the list starts 14px left of the clipped edge, so a line
+						 * never begins with one. The links end the list at 44px tall, their
+						 * negative margins keeping the line gap of the figures. Clipping only
+						 * sideways keeps the links' overhang tappable.
+						 */}
+						<div className="overflow-x-clip">
+							<div className="-ml-3.5 flex flex-wrap items-center font-mono text-[11.5px] leading-[normal] font-medium text-mu">
+								{row.items.map((item, index) => (
+									<span
+										key={index}
+										className="py-1.5 whitespace-nowrap before:inline-block before:w-3.5 before:text-center before:content-['·']"
+									>
+										{item}
+									</span>
+								))}
+								<span className="-my-[11px] ml-auto flex gap-[18px] pl-3.5">
+									<a
+										href={row.cow}
+										target="_blank"
+										rel="noopener"
+										className="flex min-h-11 items-center whitespace-nowrap quiet"
+									>
+										{tc.rich("explorer", { arrow })}
+									</a>
+									<a
+										href={row.scan}
+										target="_blank"
+										rel="noopener"
+										className="flex min-h-11 items-center whitespace-nowrap quiet"
+									>
+										{tc.rich("basescan", { arrow })}
+									</a>
+								</span>
+							</div>
 						</div>
 					</div>
 				))}

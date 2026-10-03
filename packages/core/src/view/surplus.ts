@@ -1,5 +1,6 @@
 import type { Snapshot, SnapshotSolver } from "../snapshot.ts";
-import type { View } from "./view.ts";
+import { FEW_TRADES } from "./view.ts";
+import type { Row, View } from "./view.ts";
 
 /**
  * "What traders gained, what settling cost": trader surplus and transaction cost over the
@@ -15,6 +16,8 @@ export interface SurplusCostFigures {
 	surplusTrades: number | null;
 	/** `surplus` ÷ `surplusTrades`; null without such trades. */
 	surplusPerTrade: number | null;
+	/** The USD volume of `surplusTrades`, valued as Volume is; null like `surplus`. */
+	surplusVolume: number | null;
 	/**
 	 * `surplus` ÷ the USD volume of the same trades: surplus per dollar traded, a 0–1 ratio
 	 * (0.0008 is 8 bps). Unlike surplus per trade it does not grow with the size of the trades a
@@ -30,6 +33,8 @@ export interface SurplusCostFigures {
 	unusualTrades: number | null;
 	/** `unusualSurplus` ÷ `surplus`, a 0–1 ratio; null without surplus. */
 	unusualShare: number | null;
+	/** `unusualTrades` ÷ `surplusTrades`, a 0–1 ratio; null without such trades. */
+	unusualTradeShare: number | null;
 	/** `surplus` without the unusual trades' part; null like `surplus`. */
 	typicalSurplus: number | null;
 	/** `surplusTrades` without the unusual ones; null like `surplus`. */
@@ -105,10 +110,12 @@ export function surplusAndCost(snapshot: Snapshot, view: View): SurplusCost {
 			surplus: measured ? surplus : null,
 			surplusTrades: measured ? surplusTrades : null,
 			surplusPerTrade: surplusTrades > 0 ? surplus / surplusTrades : null,
+			surplusVolume: measured ? surplusVolume : null,
 			surplusRate: surplusVolume > 0 ? surplus / surplusVolume : null,
 			unusualSurplus: measured ? unusualSurplus : null,
 			unusualTrades: measured ? unusualTrades : null,
 			unusualShare: surplus > 0 ? unusualSurplus / surplus : null,
+			unusualTradeShare: surplusTrades > 0 ? unusualTrades / surplusTrades : null,
 			typicalSurplus: measured ? typicalSurplus : null,
 			typicalTrades: measured ? typicalTrades : null,
 			typicalSurplusPerTrade: typicalTrades > 0 ? typicalSurplus / typicalTrades : null,
@@ -126,6 +133,69 @@ export function surplusAndCost(snapshot: Snapshot, view: View): SurplusCost {
 		rows: new Map(view.rows.map((row) => [row.id, figures([byId.get(row.id)!])])),
 		network: figures(snapshot.solvers),
 	};
+}
+
+/** Basis points in a 0–1 ratio. */
+const BPS = 10_000;
+
+/**
+ * The ends the trader surplus axis can take, in basis points of volume; it stops at the last one
+ * even if a solver goes beyond.
+ */
+export const SURPLUS_AXIS_ENDS: readonly number[] = [100, 150, 200, 300, 400, 500, 600, 800, 1_000];
+
+export interface SurplusAxis {
+	/** The axis end as a 0–1 ratio of volume, like `surplusRate`: 0.04 is 400 bps. */
+	max: number;
+	/** Ticks from 0 to `max`, as ratios: every 50 bps up to 200, every 100 up to 600, then every 200. */
+	ticks: number[];
+}
+
+/**
+ * The smallest axis end that holds the network's typical surplus rate and that of every solver
+ * with at least `FEW_TRADES` surplus trades. Smaller solvers, and the all-trades rates that
+ * unusual trades lift, can lie beyond it; they sit at its end.
+ */
+export function surplusAxis(
+	rows: readonly Pick<SurplusCostFigures, "surplusTrades" | "typicalSurplusRate">[],
+	average: number | null
+): SurplusAxis {
+	let need = average ?? 0;
+	for (const row of rows) {
+		if ((row.surplusTrades ?? 0) >= FEW_TRADES && row.typicalSurplusRate !== null) {
+			need = Math.max(need, row.typicalSurplusRate);
+		}
+	}
+	const end =
+		SURPLUS_AXIS_ENDS.find((bps) => bps / BPS >= need) ??
+		SURPLUS_AXIS_ENDS[SURPLUS_AXIS_ENDS.length - 1]!;
+	const step = end <= 200 ? 50 : end <= 600 ? 100 : 200;
+	const ticks: number[] = [];
+	for (let bps = 0; bps <= end; bps += step) ticks.push(bps / BPS);
+	return { max: end / BPS, ticks };
+}
+
+/** A row of the trader surplus chart: a ranked solver and its figures. */
+export interface SurplusRow {
+	row: Row;
+	figures: SurplusCostFigures;
+}
+
+/**
+ * The trader surplus chart's rows: every ranked solver with surplus trades in the window, by the
+ * volume behind its surplus, largest first. The order says nothing about who gives the most
+ * surplus, and the large, stable figures come first. Ties keep the view's order.
+ */
+export function surplusRows(
+	view: Pick<View, "rows">,
+	surplus: Pick<SurplusCost, "rows">
+): SurplusRow[] {
+	const rows: SurplusRow[] = [];
+	for (const row of view.rows) {
+		const figures = surplus.rows.get(row.id);
+		if (figures && (figures.surplusTrades ?? 0) > 0) rows.push({ row, figures });
+	}
+	return rows.sort((a, b) => (b.figures.surplusVolume ?? 0) - (a.figures.surplusVolume ?? 0));
 }
 
 /** The newest `days` values of a daily series, added up; the series may be shorter. */

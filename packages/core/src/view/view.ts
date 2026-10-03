@@ -126,9 +126,15 @@ export interface LeaderRun {
 	days: number;
 	/** The day the run started (end time of its first rolling day). */
 	since: number;
-	/** The run reaches back to the start of the data, so it may be longer. */
+	/**
+	 * The day before the run has no data: the run reaches back to the start of the data (or to a
+	 * day without any), so it may be longer.
+	 */
 	atLeast: boolean;
-	/** The solver that alone led the day before the run started; null when no one did. */
+	/**
+	 * The solver that alone led the day before the run started; null when no one did. With
+	 * `atLeast` false, that day was a tie for the most: the run started "alone".
+	 */
 	previous: SolverRef | null;
 }
 
@@ -250,6 +256,16 @@ function sum(series: readonly number[], from: number, to: number): number {
 	let total = 0;
 	for (let i = from; i < Math.min(to, series.length); i++) total += series[i] ?? 0;
 	return total;
+}
+
+/**
+ * The measure's total over a period's window, as `View.total` counts it: 0 when nothing in the
+ * window counts toward it (no batches; for volume, no priced trade on the days with auction data).
+ */
+export function windowTotal(snapshot: Snapshot, period: Period, measure: Measure): number {
+	const { chainDays, auctionDays } = snapshot.coverage;
+	const days = Math.min(PERIOD_DAYS[period], measure === "volume" ? auctionDays : chainDays);
+	return snapshot.solvers.reduce((total, s) => total + sum(s[measure], 0, days), 0);
 }
 
 /** 1-based ranks by `value`, descending; ties keep the given order. Zero values get no rank. */
@@ -410,9 +426,11 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 			: null;
 
 	// The current run of the daily leader, over every covered day. A day on which two solvers
-	// tie for the most has no leader: neither "topped" it.
+	// tie for the most has no leader: neither "topped" it. A day without data has none either.
+	const NO_DATA = -1;
+	const TIE = -2;
 	const leaderOf = (d: number) => {
-		let best = -1;
+		let best = NO_DATA;
 		let bestValue = 0;
 		let tied = false;
 		series.forEach((s, i) => {
@@ -425,19 +443,19 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 				tied = true;
 			}
 		});
-		return tied ? -1 : best;
+		return tied ? TIE : best;
 	};
 	let leaderRun: LeaderRun | null = null;
-	const today = measureCoverage > 0 ? leaderOf(0) : -1;
+	const today = measureCoverage > 0 ? leaderOf(0) : NO_DATA;
 	if (today >= 0) {
 		let run = 1;
 		while (run < measureCoverage && leaderOf(run) === today) run++;
-		const before = run < measureCoverage ? leaderOf(run) : -1;
+		const before = run < measureCoverage ? leaderOf(run) : NO_DATA;
 		leaderRun = {
 			solver: solvers[today]!.ref,
 			days: run,
 			since: snapshot.end.time - (run - 1) * DAY_MS,
-			atLeast: run === measureCoverage,
+			atLeast: before === NO_DATA,
 			previous: before >= 0 ? solvers[before]!.ref : null,
 		};
 	}

@@ -29,6 +29,40 @@ describe("format", () => {
 		assert.equal(f.usd(999_600), "$1.00M");
 	});
 
+	it("writes surplus with cents below $100 and never as $0.00 or $100.00", () => {
+		assert.equal(f.usdCents(36.4), "$36.40");
+		assert.equal(f.usdCents(0.08), "$0.08");
+		assert.equal(f.usdCents(0.004), "<$0.01");
+		assert.equal(f.usdCents(0), "$0");
+		assert.equal(f.usdCents(99.994), "$99.99");
+		assert.equal(f.usdCents(99.996), "$100");
+		assert.equal(f.usdCents(1_234.5), "$1.23K");
+		assert.equal(f.usdCents(null), "—");
+	});
+
+	it("writes totals in sentences as whole dollars with separators", () => {
+		assert.equal(f.usdWhole(583_649.4), "$583,649");
+		assert.equal(f.usdWhole(null), "—");
+	});
+
+	it("writes transaction cost in cents until a dollar, moving up where rounding would", () => {
+		assert.equal(f.cost(0.0183), "1.8¢");
+		assert.equal(f.cost(0.0073), "0.7¢");
+		assert.equal(f.cost(0.0004), "<0.1¢");
+		assert.equal(f.cost(0), "0¢");
+		assert.equal(f.cost(0.0996), "10¢");
+		assert.equal(f.cost(0.12), "12¢");
+		assert.equal(f.cost(0.996), "$1.00");
+		assert.equal(f.cost(1.24), "$1.24");
+		assert.equal(f.cost(null), "—");
+	});
+
+	it("writes a ratio in whole basis points with separators", () => {
+		assert.equal(f.bps(0.02234), "223");
+		assert.equal(f.bps(0.42012), "4,201");
+		assert.equal(f.bps(null), "—");
+	});
+
 	it("switches gas to millions before thousands would round to 1000K", () => {
 		assert.equal(f.gas(644_123), "644K");
 		assert.equal(f.gas(999_400), "999K");
@@ -55,25 +89,25 @@ describe("format", () => {
 		assert.equal(f.percent(1), "100%");
 	});
 
-	it("writes English dates day first with three-letter months, in UTC", () => {
+	it("writes English dates day first with three-letter months, in UTC, never split", () => {
 		const t = Date.UTC(2026, 8, 13, 22, 10, 5);
-		assert.equal(f.day(t), "13 Sep");
-		assert.equal(f.dayTime(t), "13 Sep 22:10");
+		assert.equal(f.day(t), "13\u00a0Sep");
+		assert.equal(f.dayTime(t), "13\u00a0Sep 22:10");
 		assert.equal(f.clock(t), "22:10:05");
-		assert.equal(f.date(t), "13 Sep 2026");
+		assert.equal(f.date(t), "13\u00a0Sep\u00a02026");
 	});
 
-	it("says how old the data is in minutes, then rounded hours, then days", () => {
+	it("says how old the data is in minutes, then rounded hours, then days, unsplit", () => {
 		const minute = 60_000;
-		assert.equal(f.ago(20_000), "1 minute ago");
-		assert.equal(f.ago(47 * minute), "47 minutes ago");
-		assert.equal(f.ago(59 * minute + 29_000), "59 minutes ago");
-		assert.equal(f.ago(59 * minute + 31_000), "1 hour ago");
-		assert.equal(f.ago(472 * minute), "8 hours ago");
-		assert.equal(f.ago(35 * 60 * minute), "35 hours ago");
+		assert.equal(f.ago(20_000), "1\u00a0minute ago");
+		assert.equal(f.ago(47 * minute), "47\u00a0minutes ago");
+		assert.equal(f.ago(59 * minute + 29_000), "59\u00a0minutes ago");
+		assert.equal(f.ago(59 * minute + 31_000), "1\u00a0hour ago");
+		assert.equal(f.ago(472 * minute), "8\u00a0hours ago");
+		assert.equal(f.ago(35 * 60 * minute), "35\u00a0hours ago");
 		// From 36 hours on, days: 36 hours rounds to 2 days.
-		assert.equal(f.ago(36 * 60 * minute), "2 days ago");
-		assert.equal(f.ago(3_060 * minute), "2 days ago");
+		assert.equal(f.ago(36 * 60 * minute), "2\u00a0days ago");
+		assert.equal(f.ago(3_060 * minute), "2\u00a0days ago");
 	});
 
 	it("dates the as-of time only when it is another UTC day, with no-break spaces", () => {

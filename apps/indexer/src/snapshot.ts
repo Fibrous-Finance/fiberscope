@@ -158,6 +158,7 @@ export async function buildSnapshot(
 			block: batch.block,
 			time: timeOf(batch.block) * 1000,
 			trades: batch.trades,
+			swaps: batch.swaps,
 			pair: { sell: symbol(trades[0].sellToken), buy: symbol(trades[0].buyToken) },
 			volume: priced.length === 0 ? null : cents(priced.reduce((a, b) => a + b, 0)),
 			gas: Math.round(batch.gas),
@@ -185,13 +186,11 @@ export async function buildSnapshot(
 			latestSettlements: entry.latest.toReversed().map(summary),
 		}));
 
-	const latestSettlements: CreditedSettlement[] = networkLatest.toReversed().map((batch) => ({
-		...summary(batch),
-		solver: batch.solver.id,
-		swaps: batch.swaps,
-	}));
+	const latestSettlements: CreditedSettlement[] = networkLatest
+		.toReversed()
+		.map((batch) => ({ ...summary(batch), solver: batch.solver.id }));
 
-	const directory: RegisteredSolver[] = registry
+	const registered: RegisteredSolver[] = registry
 		.solvers()
 		.map(({ id, name, entries }) => {
 			const history = tallies.get(id);
@@ -239,7 +238,7 @@ export async function buildSnapshot(
 		solvers,
 		latestAuctions,
 		latestSettlements,
-		directory,
+		registry: registered,
 	} satisfies Snapshot;
 	return { snapshot, stats };
 }

@@ -39,7 +39,7 @@ function snapshot(chainDays: number, auctionDays: number, solvers: SnapshotSolve
 		solvers,
 		latestAuctions: [],
 		latestSettlements: [],
-		directory: [],
+		registry: [],
 	};
 }
 

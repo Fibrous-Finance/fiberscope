@@ -14,19 +14,22 @@
 		"24h": "24 hours",
 		"7d": "7 days",
 		"30d": "30 days",
-		"90d": "90 days"
+		"90d": "90 days",
+		"180d": "180 days"
 	},
 	"periodLabel": {
 		"24h": "24h",
 		"7d": "7d",
 		"30d": "30d",
-		"90d": "90d"
+		"90d": "90d",
+		"180d": "180d"
 	},
 	"previousPeriod": {
 		"24h": "the previous 24 hours",
 		"7d": "the previous 7 days",
 		"30d": "the previous 30 days",
-		"90d": "the previous 90 days"
+		"90d": "the previous 90 days",
+		"180d": "the previous 180 days"
 	},
 	"utc": "{time} UTC",
 	"points": "{value} pp",

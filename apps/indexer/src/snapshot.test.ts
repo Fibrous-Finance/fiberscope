@@ -212,9 +212,9 @@ describe("snapshot", () => {
 		);
 	});
 
-	test("the directory lists every registry solver, also the ones that never settled", async () => {
-		const { directory } = await build();
-		assert.deepEqual(directory, [
+	test("the registry lists every registry solver, also the ones that never settled", async () => {
+		const { registry } = await build();
+		assert.deepEqual(registry, [
 			{
 				id: "rizzolver",
 				name: "Rizzolver",

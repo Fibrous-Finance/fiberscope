@@ -12,16 +12,28 @@ import type {
  * locale-free: values are numbers (shares and rates are 0–1 ratios) and the UI formats them.
  */
 
-export type Period = "24h" | "7d" | "30d" | "90d";
+export type Period = "24h" | "7d" | "30d" | "90d" | "180d";
 export type Measure = "batches" | "trades" | "volume";
 
-export const PERIODS: readonly Period[] = ["24h", "7d", "30d", "90d"];
+export const PERIODS: readonly Period[] = ["24h", "7d", "30d", "90d", "180d"];
 export const MEASURES: readonly Measure[] = ["batches", "trades", "volume"];
 
 /** Days in each window. */
-export const PERIOD_DAYS: Record<Period, number> = { "24h": 1, "7d": 7, "30d": 30, "90d": 90 };
+export const PERIOD_DAYS: Record<Period, number> = {
+	"24h": 1,
+	"7d": 7,
+	"30d": 30,
+	"90d": 90,
+	"180d": 180,
+};
 /** Days of daily history drawn for each window: small multiples and the solver detail chart. */
-export const HISTORY_DAYS: Record<Period, number> = { "24h": 30, "7d": 30, "30d": 60, "90d": 90 };
+export const HISTORY_DAYS: Record<Period, number> = {
+	"24h": 30,
+	"7d": 30,
+	"30d": 60,
+	"90d": 90,
+	"180d": 180,
+};
 /** The table's sparkline covers at least this many days. */
 const SPARK_MIN_DAYS = 14;
 /** "Lowest gas / trade" only considers solvers with this many batches per day of the window. */

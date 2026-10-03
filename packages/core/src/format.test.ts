@@ -29,6 +29,40 @@ describe("format", () => {
 		assert.equal(f.usd(999_600), "$1.00M");
 	});
 
+	it("writes surplus with cents below $100 and never as $0.00 or $100.00", () => {
+		assert.equal(f.usdCents(36.4), "$36.40");
+		assert.equal(f.usdCents(0.08), "$0.08");
+		assert.equal(f.usdCents(0.004), "<$0.01");
+		assert.equal(f.usdCents(0), "$0");
+		assert.equal(f.usdCents(99.994), "$99.99");
+		assert.equal(f.usdCents(99.996), "$100");
+		assert.equal(f.usdCents(1_234.5), "$1.23K");
+		assert.equal(f.usdCents(null), "—");
+	});
+
+	it("writes totals in sentences as whole dollars with separators", () => {
+		assert.equal(f.usdWhole(583_649.4), "$583,649");
+		assert.equal(f.usdWhole(null), "—");
+	});
+
+	it("writes transaction cost in cents until a dollar, moving up where rounding would", () => {
+		assert.equal(f.cost(0.0183), "1.8¢");
+		assert.equal(f.cost(0.0073), "0.7¢");
+		assert.equal(f.cost(0.0004), "<0.1¢");
+		assert.equal(f.cost(0), "0¢");
+		assert.equal(f.cost(0.0996), "10¢");
+		assert.equal(f.cost(0.12), "12¢");
+		assert.equal(f.cost(0.996), "$1.00");
+		assert.equal(f.cost(1.24), "$1.24");
+		assert.equal(f.cost(null), "—");
+	});
+
+	it("writes a ratio in whole basis points with separators", () => {
+		assert.equal(f.bps(0.02234), "223");
+		assert.equal(f.bps(0.42012), "4,201");
+		assert.equal(f.bps(null), "—");
+	});
+
 	it("switches gas to millions before thousands would round to 1000K", () => {
 		assert.equal(f.gas(644_123), "644K");
 		assert.equal(f.gas(999_400), "999K");

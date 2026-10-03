@@ -126,9 +126,15 @@ export interface LeaderRun {
 	days: number;
 	/** The day the run started (end time of its first rolling day). */
 	since: number;
-	/** The run reaches back to the start of the data, so it may be longer. */
+	/**
+	 * The day before the run has no data: the run reaches back to the start of the data (or to a
+	 * day without any), so it may be longer.
+	 */
 	atLeast: boolean;
-	/** The solver that alone led the day before the run started; null when no one did. */
+	/**
+	 * The solver that alone led the day before the run started; null when no one did. With
+	 * `atLeast` false, that day was a tie for the most: the run started "alone".
+	 */
 	previous: SolverRef | null;
 }
 
@@ -410,9 +416,11 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 			: null;
 
 	// The current run of the daily leader, over every covered day. A day on which two solvers
-	// tie for the most has no leader: neither "topped" it.
+	// tie for the most has no leader: neither "topped" it. A day without data has none either.
+	const NO_DATA = -1;
+	const TIE = -2;
 	const leaderOf = (d: number) => {
-		let best = -1;
+		let best = NO_DATA;
 		let bestValue = 0;
 		let tied = false;
 		series.forEach((s, i) => {
@@ -425,19 +433,19 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 				tied = true;
 			}
 		});
-		return tied ? -1 : best;
+		return tied ? TIE : best;
 	};
 	let leaderRun: LeaderRun | null = null;
-	const today = measureCoverage > 0 ? leaderOf(0) : -1;
+	const today = measureCoverage > 0 ? leaderOf(0) : NO_DATA;
 	if (today >= 0) {
 		let run = 1;
 		while (run < measureCoverage && leaderOf(run) === today) run++;
-		const before = run < measureCoverage ? leaderOf(run) : -1;
+		const before = run < measureCoverage ? leaderOf(run) : NO_DATA;
 		leaderRun = {
 			solver: solvers[today]!.ref,
 			days: run,
 			since: snapshot.end.time - (run - 1) * DAY_MS,
-			atLeast: run === measureCoverage,
+			atLeast: before === NO_DATA,
 			previous: before >= 0 ? solvers[before]!.ref : null,
 		};
 	}

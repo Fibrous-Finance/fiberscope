@@ -15,6 +15,8 @@ export interface SurplusCostFigures {
 	surplusTrades: number | null;
 	/** `surplus` ÷ `surplusTrades`; null without such trades. */
 	surplusPerTrade: number | null;
+	/** The USD volume of `surplusTrades`, valued as Volume is; null like `surplus`. */
+	surplusVolume: number | null;
 	/**
 	 * `surplus` ÷ the USD volume of the same trades: surplus per dollar traded, a 0–1 ratio
 	 * (0.0008 is 8 bps). Unlike surplus per trade it does not grow with the size of the trades a
@@ -30,6 +32,8 @@ export interface SurplusCostFigures {
 	unusualTrades: number | null;
 	/** `unusualSurplus` ÷ `surplus`, a 0–1 ratio; null without surplus. */
 	unusualShare: number | null;
+	/** `unusualTrades` ÷ `surplusTrades`, a 0–1 ratio; null without such trades. */
+	unusualTradeShare: number | null;
 	/** `surplus` without the unusual trades' part; null like `surplus`. */
 	typicalSurplus: number | null;
 	/** `surplusTrades` without the unusual ones; null like `surplus`. */
@@ -105,10 +109,12 @@ export function surplusAndCost(snapshot: Snapshot, view: View): SurplusCost {
 			surplus: measured ? surplus : null,
 			surplusTrades: measured ? surplusTrades : null,
 			surplusPerTrade: surplusTrades > 0 ? surplus / surplusTrades : null,
+			surplusVolume: measured ? surplusVolume : null,
 			surplusRate: surplusVolume > 0 ? surplus / surplusVolume : null,
 			unusualSurplus: measured ? unusualSurplus : null,
 			unusualTrades: measured ? unusualTrades : null,
 			unusualShare: surplus > 0 ? unusualSurplus / surplus : null,
+			unusualTradeShare: surplusTrades > 0 ? unusualTrades / surplusTrades : null,
 			typicalSurplus: measured ? typicalSurplus : null,
 			typicalTrades: measured ? typicalTrades : null,
 			typicalSurplusPerTrade: typicalTrades > 0 ? typicalSurplus / typicalTrades : null,

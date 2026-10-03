@@ -180,6 +180,22 @@ describe("buildView", () => {
 		assert.equal(earlier.leaderRun?.previous, null);
 	});
 
+	it("counts a run as at least as long when the day before it has no data", () => {
+		// B leads today and yesterday; nothing settled the day before, so its run may be longer.
+		const v = buildView(
+			snapshot(4, 0, [
+				solver("a", "A", { batches: [1, 1, 0, 9] }),
+				solver("b", "B", { batches: [6, 6, 0, 1] }),
+			]),
+			"24h",
+			"batches"
+		);
+		assert.equal(v.leaderRun?.solver.id, "b");
+		assert.equal(v.leaderRun?.days, 2);
+		assert.equal(v.leaderRun?.atLeast, true);
+		assert.equal(v.leaderRun?.previous, null);
+	});
+
 	it("aligns daily shares with the history dates, oldest first", () => {
 		const s = snapshot(3, 0, [
 			solver("a", "A", { batches: [1, 3, 0] }),

@@ -8,11 +8,18 @@
 		"directory": ".open-next/assets",
 		"binding": "ASSETS",
 	},
+	// The indexer uploads the snapshot here; the site reads it through the binding.
+	"r2_buckets": [{ "binding": "SNAPSHOTS", "bucket_name": "fiberscope-data" }],
+	"vars": {
+		"SNAPSHOT_R2_KEY": "base/snapshot.json",
+		// The site's origin, for absolute link-preview URLs.
+		"SITE_URL": "https://fiberscope.kermo.workers.dev",
+		// Search engines are kept out (noindex) until launch; set "true" then.
+		"ALLOW_INDEXING": "false",
+	},
+	// Branch and pull-request builds get their own preview URLs (Workers Builds).
+	"preview_urls": true,
 	"observability": {
 		"enabled": true,
 	},
-	// SNAPSHOT_URL (where the indexer publishes snapshot.json, e.g. a public R2 bucket) and
-	// SITE_URL (the site's origin, for absolute link-preview URLs) are set in the Cloudflare
-	// dashboard per environment; keep_vars stops deploys from removing them.
-	"keep_vars": true,
 }

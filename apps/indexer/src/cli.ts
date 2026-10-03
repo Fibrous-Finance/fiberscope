@@ -2,7 +2,7 @@ import { mkdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import { parseArgs } from "node:util";
 
-import { DEFAULT_DB_PATH, DEFAULT_SNAPSHOT_PATH, NETWORK, readEnv } from "./config.ts";
+import { DEFAULT_DB_PATH, DEFAULT_SNAPSHOT_PATH, type Env, NETWORK, readEnv } from "./config.ts";
 import { CowApi } from "./cow.ts";
 import { duration, fmt, log } from "./log.ts";
 import { OVERRIDES } from "./overrides.ts";
@@ -12,6 +12,7 @@ import { buildSnapshot } from "./snapshot.ts";
 import { Store } from "./store.ts";
 import { resolveSymbols } from "./symbols.ts";
 import { sync } from "./sync.ts";
+import { uploadSnapshot } from "./upload.ts";
 import { windowReport } from "./window.ts";
 
 const USAGE = `Usage:
@@ -27,7 +28,9 @@ const USAGE = `Usage:
       Print totals and the per-solver table for a block range, from the database.
 
 Every command takes --db <path> (default ${relative(process.cwd(), DEFAULT_DB_PATH)}).
-Environment: BASE_RPC_URL, BASE_RPC_RPS, COW_API_RPS, REFRESH_MINUTES.
+Environment: BASE_RPC_URL, BASE_RPC_RPS, COW_API_RPS, REFRESH_MINUTES. With SNAPSHOT_R2_BUCKET
+(plus CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN and optionally SNAPSHOT_R2_KEY, default
+${NETWORK.id}/snapshot.json) every snapshot written is also uploaded to that R2 bucket.
 `;
 
 async function main(): Promise<void> {
@@ -68,7 +71,7 @@ async function main(): Promise<void> {
 				writeSnapshot:
 					snapshotPath === undefined
 						? null
-						: () => writeSnapshot(store, rpc, env.refreshMinutes, snapshotPath),
+						: () => writeSnapshot(store, rpc, env, snapshotPath),
 			};
 			const started = performance.now();
 			const stats = await sync(store, rpc, cow, options);
@@ -92,12 +95,7 @@ async function main(): Promise<void> {
 			log(`  database ${dbPath}: ${fmt(statSync(dbPath).size / 1e6, 1)} MB`);
 		} else if (command === "snapshot") {
 			const rpc = new Rpc(env.rpcUrl, env.rpcRps);
-			await writeSnapshot(
-				store,
-				rpc,
-				env.refreshMinutes,
-				values.out ?? DEFAULT_SNAPSHOT_PATH
-			);
+			await writeSnapshot(store, rpc, env, values.out ?? DEFAULT_SNAPSHOT_PATH);
 		} else if (command === "window") {
 			const from = wholeNumber(values.from, "from", null);
 			const to = wholeNumber(values.to, "to", null);
@@ -114,19 +112,15 @@ async function main(): Promise<void> {
 
 /**
  * Builds the snapshot and writes it to `out` atomically: to a temporary file in the same
- * directory, then renamed over `out`, so a reader never sees half a file.
+ * directory, then renamed over `out`, so a reader never sees half a file. Then uploads it, when
+ * R2 is configured; a failed upload is logged and sets the exit code without stopping the run.
  */
-async function writeSnapshot(
-	store: Store,
-	rpc: Rpc,
-	refreshMinutes: number,
-	out: string
-): Promise<void> {
+async function writeSnapshot(store: Store, rpc: Rpc, env: Env, out: string): Promise<void> {
 	const started = performance.now();
 	const { snapshot, stats } = await buildSnapshot({
 		store,
 		registry: new Registry(store.cmsEntries(), OVERRIDES),
-		refreshMinutes,
+		refreshMinutes: env.refreshMinutes,
 		symbols: (tokens) => resolveSymbols(rpc, store, tokens),
 	});
 	const json = JSON.stringify(snapshot);
@@ -145,6 +139,21 @@ async function writeSnapshot(
 		`  trades in the auction days: ${fmt(stats.trades)}, ${fmt(stats.unpriced)} unpriced, ` +
 			`${fmt(stats.oneSided)} priced on one side only`
 	);
+	if (env.upload) {
+		const { bucket, key } = env.upload;
+		const uploadStarted = performance.now();
+		try {
+			await uploadSnapshot(env.upload, json);
+			log(
+				`  uploaded to R2 ${bucket}/${key} in ${duration((performance.now() - uploadStarted) / 1000)}`
+			);
+		} catch (error) {
+			process.exitCode = 1;
+			log(
+				`  upload to R2 ${bucket}/${key} failed: ${error instanceof Error ? error.message : error}`
+			);
+		}
+	}
 }
 
 function wholeNumber(value: string | undefined, name: string, fallback: number | null): number {

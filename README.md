@@ -82,16 +82,19 @@ pnpm dev   # http://localhost:3000
 ```
 
 To keep the data live, rerun `sync` on a schedule, e.g. every 10 minutes with
-`--budget-minutes 8` so long backfills never hold up fresh data.
+`--budget-minutes 8` so long backfills never hold up fresh data. The indexer's `sync` and
+`snapshot` scripts read `apps/indexer/.env` when it exists.
 
-| Variable                      | Used by | Purpose                                                                    |
-| ----------------------------- | ------- | -------------------------------------------------------------------------- |
-| `BASE_RPC_URL`                | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                     |
-| `BASE_RPC_RPS`, `COW_API_RPS` | indexer | Request rates for the RPC and CoW's API                                    |
-| `REFRESH_MINUTES`             | indexer | The schedule the page expects; data older than three runs shows as delayed |
-| `SNAPSHOT_URL`                | web     | Where to fetch the snapshot in production                                  |
-| `SNAPSHOT_PATH`               | web     | A local snapshot file (default `data/snapshot.json`)                       |
-| `SITE_URL`                    | web     | The site's origin, for absolute link-preview URLs                          |
+| Variable                      | Used by | Purpose                                                                                                                |
+| ----------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `BASE_RPC_URL`                | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                                                                 |
+| `BASE_RPC_RPS`, `COW_API_RPS` | indexer | Request rates for the RPC and CoW's API                                                                                |
+| `REFRESH_MINUTES`             | indexer | The schedule the page expects; data older than three runs shows as delayed                                             |
+| `SNAPSHOT_R2_BUCKET`          | indexer | Also upload every snapshot to this R2 bucket; needs `CLOUDFLARE_ACCOUNT_ID` and a `CLOUDFLARE_API_TOKEN` with R2 write |
+| `SNAPSHOT_R2_KEY`             | both    | The snapshot's object key (default `base/snapshot.json`); the Worker reads it through its `SNAPSHOTS` binding          |
+| `SNAPSHOT_PATH`               | web     | The local snapshot file when `SNAPSHOT_R2_KEY` is unset (default `data/snapshot.json`)                                 |
+| `SITE_URL`                    | web     | The site's origin, for absolute link-preview URLs                                                                      |
+| `ALLOW_INDEXING`              | web     | `true` lets search engines index the site; otherwise every page is `noindex`                                           |
 
 ## Checks
 
@@ -103,15 +106,19 @@ The same run on every pull request (`.github/workflows/ci.yml`).
 
 ## Deploying
 
-The web app deploys to Cloudflare Workers with
-[OpenNext](https://opennext.js.org/cloudflare): `pnpm --filter @fiberscope/web deploy`, or
-`preview` to run the Workers build locally. `.github/workflows/deploy.yml` deploys `main` and
-uploads a preview version for each pull request once the `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` secrets and the `CLOUDFLARE_WORKERS_SUBDOMAIN` variable are set. Set
-`SNAPSHOT_URL` and `SITE_URL` on the Worker.
+The web app runs on Cloudflare Workers through [OpenNext](https://opennext.js.org/cloudflare).
+`apps/web/wrangler.jsonc` binds the R2 bucket `fiberscope-data` as `SNAPSHOTS` and sets the
+Worker's variables. `pnpm --filter @fiberscope/web run deploy` builds and deploys; `run preview`
+serves the Workers build locally, with `apps/web/.dev.vars` overriding variables.
 
-The indexer runs anywhere Node 24 runs. It needs a persistent disk for its database and must
-publish `snapshot.json` where `SNAPSHOT_URL` points (for example an R2 bucket).
+`.github/workflows/deploy.yml` deploys `main` and uploads a preview version for each pull request
+(`https://pr-<number>-fiberscope.<subdomain>.workers.dev`) once the `CLOUDFLARE_API_TOKEN` (an
+"Edit Cloudflare Workers" token) and `CLOUDFLARE_ACCOUNT_ID` secrets and the
+`CLOUDFLARE_WORKERS_SUBDOMAIN` variable are set.
+
+The indexer runs anywhere Node 24 runs. It needs a persistent disk for its database and
+`SNAPSHOT_R2_BUCKET`, with a token that can write to the bucket, so every snapshot reaches the
+site.
 
 ## Status
 

@@ -29,6 +29,8 @@ export async function generateMetadata(): Promise<Metadata> {
 			title: t("title"),
 			description: t("ogDescription"),
 		},
+		// Search engines stay out until launch, when the deployment sets ALLOW_INDEXING=true.
+		robots: process.env.ALLOW_INDEXING === "true" ? undefined : { index: false },
 	};
 }
 

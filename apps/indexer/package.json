@@ -7,8 +7,8 @@
 		"node": ">=24"
 	},
 	"scripts": {
-		"sync": "node src/cli.ts sync",
-		"snapshot": "node src/cli.ts snapshot",
+		"sync": "node --env-file-if-exists=.env src/cli.ts sync",
+		"snapshot": "node --env-file-if-exists=.env src/cli.ts snapshot",
 		"typecheck": "tsc",
 		"test": "node --test \"src/**/*.test.ts\""
 	},

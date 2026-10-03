@@ -61,6 +61,12 @@ export interface Row extends SolverRef {
 	/** Gas units used by the solver's batches. */
 	gas: number;
 	gasPerTrade: number | null;
+	/** DEX swaps in the solver's batches. */
+	swaps: number;
+	swapsPerTrade: number | null;
+	/** Volume ÷ batches over the auction-covered days. */
+	batchValue: number | null;
+	tradesPerBatch: number | null;
 	/** USD over the auction-covered days; null when the window has no auction data. */
 	volume: number | null;
 	/** Volume ÷ trades over the same auction-covered days. */
@@ -188,6 +194,11 @@ export interface View {
 		lowest: Row | null;
 		minBatches: number;
 	};
+	swaps: {
+		/** Trade-weighted average across all solvers: Σswaps ÷ Σtrades. */
+		average: number | null;
+		max: number | null;
+	};
 	competition: {
 		auctions: number;
 		solutionsPerAuction: number;
@@ -268,6 +279,7 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 		const entered = hasAuctions ? sum(s.entered, 0, auction) : null;
 		const won = hasAuctions ? sum(s.won, 0, auction) : null;
 		const tradesWithPrices = sum(s.trades, 0, auction);
+		const batchesWithPrices = sum(s.batches, 0, auction);
 		return {
 			ref,
 			source: s,
@@ -275,9 +287,12 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 			batches,
 			trades,
 			gas: sum(s.gas, 0, chain),
+			swaps: sum(s.swaps, 0, chain),
 			volume,
 			averageTrade:
 				volume !== null && tradesWithPrices > 0 ? volume / tradesWithPrices : null,
+			batchValue:
+				volume !== null && batchesWithPrices > 0 ? volume / batchesWithPrices : null,
 			entered,
 			won,
 			value: sum(series[i] ?? [], 0, measure === "volume" ? auction : chain),
@@ -338,6 +353,10 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 			trades: s.trades,
 			gas: s.gas,
 			gasPerTrade: s.trades > 0 ? s.gas / s.trades : null,
+			swaps: s.swaps,
+			swapsPerTrade: s.trades > 0 ? s.swaps / s.trades : null,
+			batchValue: s.batchValue,
+			tradesPerBatch: s.batches > 0 ? s.trades / s.batches : null,
 			volume: s.volume,
 			averageTrade: s.averageTrade,
 			entered: s.entered,
@@ -426,6 +445,10 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 	const gasTrades = withGas.reduce((a, r) => a + r.trades, 0);
 	const minBatches = MIN_BATCHES_PER_DAY * chain;
 	const byGas = [...withGas].sort((a, b) => (a.gasPerTrade ?? 0) - (b.gasPerTrade ?? 0));
+	const maxSwaps = withGas.reduce<number | null>(
+		(max, r) => Math.max(max ?? 0, r.swapsPerTrade ?? 0),
+		null
+	);
 
 	let competition: View["competition"] = null;
 	if (hasAuctions && auctions !== null) {
@@ -504,6 +527,10 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 			max: byGas.length > 0 ? (byGas[byGas.length - 1]!.gasPerTrade ?? null) : null,
 			lowest: byGas.find((r) => r.batches >= minBatches) ?? byGas[0] ?? null,
 			minBatches,
+		},
+		swaps: {
+			average: gasTrades > 0 ? withGas.reduce((a, r) => a + r.swaps, 0) / gasTrades : null,
+			max: maxSwaps,
 		},
 		competition,
 		tape: {

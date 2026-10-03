@@ -27,9 +27,12 @@ export function Enter() {
 	const f = useFormat();
 	const view = useView();
 	const { snapshot, layout, status } = useDashboard();
-	const competition = view.competition;
+	const top = view.competition?.entrants[0];
+	// No auction data in the window (or no solver entered): the empty sentence alone, then
+	// Latest settlements.
+	const competition = top ? view.competition : null;
 	const hasTape = view.tape.auctions.length > 0;
-	// Auction data covers fewer days than the window: the sentence and a footnote say so.
+	// Auction data covers fewer days than the window: the sentence opens with the covered span.
 	const coverage =
 		competition && view.coverage.auction < view.days
 			? { covered: view.coverage.auction, days: view.days }
@@ -41,30 +44,28 @@ export function Enter() {
 	const explorer = (tx: string | null) =>
 		tx ? `https://explorer.cow.fi/${slug}/tx/${tx}` : undefined;
 
-	const top = competition?.entrants[0];
-	const sentence = competition
-		? [
-				coverage ? t("coverage", coverage) : null,
-				t("sentence", {
-					entrants: f.fixed(competition.entrantsPerAuction, 1),
-					solutions: Math.round(competition.solutionsPerAuction),
-				}),
-				top
-					? t("top", {
-							solver: top.label,
-							participation: f.percent(top.participation),
-							winRate: f.percent(top.winRate),
-						})
-					: null,
-			]
-				.filter(Boolean)
-				.join(" ")
-		: t("empty", {
-				period: tc(`period.${view.period}`),
-				// While delayed: "the 24 hours to 09:49 UTC".
-				delayed: status.delayed ? "yes" : "no",
-				asOf: status.asOf ?? "",
-			});
+	const sentence =
+		competition && top
+			? [
+					coverage ? t("coverage", coverage) : null,
+					t("sentence", {
+						entrants: f.fixed(competition.entrantsPerAuction, 1),
+						solutions: Math.round(competition.solutionsPerAuction),
+					}),
+					t("top", {
+						solver: top.label,
+						participation: f.percent(top.participation),
+						winRate: f.percent(top.winRate),
+					}),
+				]
+					.filter(Boolean)
+					.join(" ")
+			: t("empty", {
+					period: tc(`period.${view.period}`),
+					// While delayed: "the 24 hours to 09:49 UTC".
+					delayed: status.delayed ? "yes" : "no",
+					asOf: status.asOf ?? "",
+				});
 
 	const missing = competition?.withoutAuctions ?? [];
 	const note = [
@@ -86,17 +87,20 @@ export function Enter() {
 				<h2 className="section-title">{t("title")}</h2>
 				<p className="mt-3 answer">{sentence}</p>
 			</div>
-			{competition ? <Bars entrants={competition.entrants} rankIndex={rankIndex} /> : null}
-			{hasTape ? (
-				<Tape
-					tape={view.tape}
-					compact={layout.compact}
-					rankIndex={rankIndex}
-					explorer={explorer}
-				/>
+			{competition ? (
+				<>
+					<Bars entrants={competition.entrants} rankIndex={rankIndex} />
+					{hasTape ? (
+						<Tape
+							tape={view.tape}
+							compact={layout.compact}
+							rankIndex={rankIndex}
+							explorer={explorer}
+						/>
+					) : null}
+					<FootLine source={t("source")}>{note}</FootLine>
+				</>
 			) : null}
-			<FootLine source={t("source")}>{note}</FootLine>
-			{coverage ? <p className="mt-1.5 foot-line">{t("footnote", coverage)}</p> : null}
 			{snapshot!.latestSettlements.length > 0 ? (
 				<LatestSettlements rankIndex={rankIndex} />
 			) : null}

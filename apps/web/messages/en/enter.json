@@ -17,13 +17,12 @@
 	"tape": {
 		"title": "{count, plural, one {Latest auction} other {Latest # auctions}}",
 		"label": "{count, plural, one {Latest auction} other {Latest # auctions}}. Left and right arrow keys move between auctions, Home and End jump to the first and last, and Enter opens the selected one in CoW Explorer.",
-		"readout": "#{id} · {time}\u00a0UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
+		"readout": "#{id} · {time} UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
 	},
 	"note": "Click an auction to open its settlement in CoW Explorer.",
 	"noteCompact": "Tap an auction to select it; the CoW Explorer link above opens it.",
 	"noAuctions": "{names}: no auction data in this window.",
 	"source": "Source: CoW Protocol solver-competition API",
-	"footnote": "† Volume, Entered and Win rate cover the last {covered} of {days, plural, one {# day} other {# days}}.",
 	"settlements": {
 		"title": "Latest settlements",
 		"scope": "All solvers · newest first",
@@ -34,14 +33,23 @@
 			"swaps": "Swaps",
 			"pair": "Pair",
 			"volume": "Volume",
+			"surplus": "Surplus",
+			"cost": "Cost",
 			"gas": "Gas",
 			"links": "Links"
 		},
 		"pair": "{sell} → {buy}{more, plural, =0 {} other { +#}}",
-		"line": "{trades, plural, one {# trade} other {# trades}} · {swaps, plural, one {# swap} other {# swaps}} · {volume} · {gas} gas",
 		"more": "Show {count} more",
 		"fewer": "Show fewer",
-		"note": "Swaps: interactions in the settlement, not counting token approvals and WETH unwraps.",
-		"source": "Source: CoW Protocol API · {network} settlement events"
+		"note": "Swaps: interactions in the settlement, not counting token approvals and WETH unwraps. Cost: what the transaction paid on Base, L1 data fee included.",
+		"source": "Source: CoW Protocol API · {network} settlement events",
+		"items": {
+			"trades": "{trades, plural, one {# trade} other {# trades}}",
+			"swaps": "{swaps, plural, one {# swap} other {# swaps}}",
+			"volume": "{volume}",
+			"surplus": "{surplus} surplus",
+			"cost": "{cost} cost",
+			"gas": "{gas} gas"
+		}
 	}
 }

@@ -13,6 +13,7 @@ function solver(id: string, name: string | null, s: Partial<SnapshotSolver> = {}
 		addresses: [{ env: "prod", address: `0x${id.padEnd(40, "0")}` }],
 		batches: [],
 		trades: [],
+		swaps: [],
 		gas: [],
 		volume: [],
 		entered: [],
@@ -37,6 +38,8 @@ function snapshot(chainDays: number, auctionDays: number, solvers: SnapshotSolve
 		},
 		solvers,
 		latestAuctions: [],
+		latestSettlements: [],
+		directory: [],
 	};
 }
 

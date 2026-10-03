@@ -22,7 +22,8 @@ export interface Snapshot {
 	refreshMinutes: number;
 	/**
 	 * How many buckets hold complete data.
-	 * - `chainDays`: batches, trades and gas (settlement events and receipts).
+	 * - `chainDays`: batches, trades, swaps and gas (settlement events and receipts), and the
+	 *   settlement history behind `latestSettlements` and `directory`.
 	 * - `auctionDays`: volume, entered, won and the auction totals. Volume is priced with each
 	 *   auction's native prices, so it needs the auction data too.
 	 */
@@ -38,6 +39,14 @@ export interface Snapshot {
 	solvers: SnapshotSolver[];
 	/** The latest auctions (at most 48), oldest first. */
 	latestAuctions: AuctionSummary[];
+	/** The most recent settlements of all solvers together (at most 50), newest first. */
+	latestSettlements: CreditedSettlement[];
+	/**
+	 * Every solver in CoW's registry for the network, inactive ones and ones without a settlement
+	 * included. The most recent settlement first; then the solvers without one, active first,
+	 * by name.
+	 */
+	directory: RegisteredSolver[];
 }
 
 export interface SnapshotSolver {
@@ -51,6 +60,11 @@ export interface SnapshotSolver {
 	batches: number[];
 	/** Trades (filled orders) in those settlements. Length `coverage.chainDays`. */
 	trades: number[];
+	/**
+	 * DEX swaps in those settlements: their interactions other than ERC-20 approvals and WETH
+	 * unwraps. Length `coverage.chainDays`.
+	 */
+	swaps: number[];
 	/** Gas units used by those settlements. Length `coverage.chainDays`. */
 	gas: number[];
 	/** USD value of those trades (see Methodology). Length `coverage.auctionDays`. */
@@ -91,4 +105,35 @@ export interface SettlementSummary {
 	volume: number | null;
 	/** Gas units used. */
 	gas: number;
+}
+
+/** A settlement of the network-wide list: its summary, the credited solver and its DEX swaps. */
+export interface CreditedSettlement extends SettlementSummary {
+	/** Id of the solver credited with the settlement (`SnapshotSolver.id`). */
+	solver: string;
+	/** Interactions other than ERC-20 approvals and WETH unwraps. */
+	swaps: number;
+}
+
+/** A solver as CoW's registry lists it, with its history in `coverage.chainDays`. */
+export interface RegisteredSolver {
+	/** The registry's id for the solver, as in `SnapshotSolver.id`. */
+	id: string;
+	name: string;
+	/** At least one of its addresses is active. */
+	active: boolean;
+	/**
+	 * Every registered address, prod before barn, active first. An address registered in both
+	 * environments is listed for each.
+	 */
+	addresses: RegisteredAddress[];
+	/** Its most recent settlement; null when it has none in `coverage.chainDays`. */
+	lastSettlement: Pick<SettlementSummary, "tx" | "block" | "time"> | null;
+	/** Settlements with at least one trade in `coverage.chainDays`. */
+	batches: number;
+}
+
+export interface RegisteredAddress extends SolverAddress {
+	/** Whether the registry lists the address as active; inactive addresses are retired. */
+	active: boolean;
 }

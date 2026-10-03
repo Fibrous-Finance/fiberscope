@@ -17,7 +17,13 @@ fi
 interval=$((${REFRESH_MINUTES:-10} * 60))
 while :; do
 	started=$(date +%s)
-	node --env-file-if-exists=.env src/cli.ts sync "$@" &
+	# Each run reads ./.env when it exists. Node is only given the flag then: without the file,
+	# --env-file-if-exists logs a notice on every run.
+	if [ -f .env ]; then
+		node --env-file=.env src/cli.ts sync "$@" &
+	else
+		node src/cli.ts sync "$@" &
+	fi
 	child=$!
 	wait "$child" || echo "loop: sync exited with status $?" >&2
 	remaining=$((interval - $(date +%s) + started))

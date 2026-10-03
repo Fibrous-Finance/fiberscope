@@ -19,6 +19,13 @@ export interface SolverIdentity {
 	name: string | null;
 }
 
+/** A solver as the registry lists it, with one entry per environment and address. */
+export interface ListedSolver {
+	id: string;
+	name: string;
+	entries: RegistryEntry[];
+}
+
 const CMS_URL = "https://cms.cow.fi/api/solver-networks";
 
 /**
@@ -28,6 +35,8 @@ const CMS_URL = "https://cms.cow.fi/api/solver-networks";
 export class Registry {
 	readonly #byAddress = new Map<string, RegistryEntry>();
 	readonly #names = new Map<string, string>();
+	/** One entry per environment and address, keyed `env:address`. */
+	readonly #listings = new Map<string, RegistryEntry>();
 
 	constructor(cms: readonly RegistryEntry[], overrides: readonly RegistryEntry[]) {
 		const preferred = [...cms].sort((a, b) => preference(a) - preference(b));
@@ -38,6 +47,14 @@ export class Registry {
 		for (const entry of [...overrides, ...preferred]) {
 			if (!this.#names.has(entry.solverId)) this.#names.set(entry.solverId, entry.name);
 		}
+		const overridden = new Set(overrides.map((entry) => entry.address));
+		for (const entry of preferred) {
+			const key = `${entry.env}:${entry.address}`;
+			if (!overridden.has(entry.address) && !this.#listings.has(key)) {
+				this.#listings.set(key, entry);
+			}
+		}
+		for (const entry of overrides) this.#listings.set(`${entry.env}:${entry.address}`, entry);
 	}
 
 	has(address: string): boolean {
@@ -53,6 +70,24 @@ export class Registry {
 	/** Every address registered under a solver id. */
 	addresses(solverId: string): RegistryEntry[] {
 		return [...this.#byAddress.values()].filter((entry) => entry.solverId === solverId);
+	}
+
+	/**
+	 * Every solver the registry lists. An address the CMS lists twice for one environment keeps
+	 * its active entry; an override replaces every CMS entry of its address.
+	 */
+	solvers(): ListedSolver[] {
+		const solvers = new Map<string, ListedSolver>();
+		for (const entry of this.#listings.values()) {
+			let solver = solvers.get(entry.solverId);
+			if (!solver) {
+				const name = this.#names.get(entry.solverId) ?? entry.name;
+				solver = { id: entry.solverId, name, entries: [] };
+				solvers.set(entry.solverId, solver);
+			}
+			solver.entries.push(entry);
+		}
+		return [...solvers.values()];
 	}
 }
 

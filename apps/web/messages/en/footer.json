@@ -1,6 +1,9 @@
 {
 	"tagline": "Analytics for CoW Protocol solvers",
+	"nav": "Footer",
 	"methodology": "Methodology",
-	"builtBy": "Built by Fibrous",
-	"independent": "Independent project, not affiliated with CoW DAO."
+	"source": "Source code ↗",
+	"dataSources": "Data from the CoW Protocol API, Base settlement events and CoW’s solver registry.",
+	"independent": "Independent project, not affiliated with CoW DAO.",
+	"builtBy": "Built by Fibrous"
 }

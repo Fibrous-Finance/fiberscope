@@ -156,7 +156,7 @@ export function Dashboard({ result, selection }: { result: SnapshotResult; selec
 						) : state === "loading" ? (
 							<WinningSkeleton />
 						) : null}
-						<Methodology status={status} />
+						<Methodology />
 					</main>
 					<Footer />
 				</div>

@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 
-import type { HeaderStatus } from "@/components/frame/Header";
+import { useDashboard } from "@/components/dashboard/context";
 import { Section } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
@@ -14,35 +14,60 @@ const METRICS = [
 	"volume",
 	"share",
 	"gas",
+	"swaps",
+	"batchValue",
 	"networkAverage",
 	"entered",
 	"winRate",
 	"leadingSince",
 ] as const;
-const SOURCES = ["sources", "attribution", "freshness", "windows", "names"] as const;
+const SOURCES = [
+	"sources",
+	"attribution",
+	"registry",
+	"freshness",
+	"windows",
+	"coverage",
+	"names",
+] as const;
 type Term = (typeof METRICS)[number] | (typeof SOURCES)[number];
 
-export function Methodology({ status }: { status: HeaderStatus }) {
+export function Methodology() {
 	const t = useTranslations("Methodology");
 	const f = useFormat();
+	const { snapshot, status } = useDashboard();
+	// Without figures on the page (error, or reloading after one), the definitions leave out the
+	// numbers that describe the data.
+	const data = status.state === "error" || status.state === "loading" ? null : snapshot;
 
 	const text = (key: Term) => {
-		if (key !== "freshness") return t(`terms.${key}.text`);
-		const minutes = status.refreshMinutes;
-		return status.lastRunAt === null
-			? t("terms.freshness.unknown", { minutes })
-			: t("terms.freshness.text", {
-					minutes,
-					date: f.date(status.lastRunAt),
-					time: f.time(status.lastRunAt),
-					block: f.int(status.endBlock ?? 0),
-				});
+		if (key === "freshness") {
+			const minutes = status.refreshMinutes;
+			return data
+				? t("terms.freshness.text", {
+						minutes,
+						block: f.int(data.end.block),
+						date: f.date(data.end.time),
+						time: f.time(data.end.time),
+					})
+				: t("terms.freshness.noData", { minutes });
+		}
+		if (key === "coverage") {
+			return data
+				? t("terms.coverage.text", {
+						chain: data.coverage.chainDays,
+						auction: data.coverage.auctionDays,
+					})
+				: t("terms.coverage.noData");
+		}
+		return t(`terms.${key}.text`);
 	};
+	// Compact: one column, each term 14px above its definition.
 	const list = (keys: readonly Term[]) => (
-		<dl className="grid grid-cols-[max-content_minmax(0,1fr)] content-start gap-x-6 gap-y-3 text-[14px] leading-[1.55]">
+		<dl className="grid grid-cols-1 content-start text-[14px] leading-[1.55] wide:grid-cols-[max-content_minmax(0,1fr)] wide:gap-x-6 wide:gap-y-3">
 			{keys.map((key) => (
 				<div key={key} className="contents">
-					<dt className="font-mono text-[12px] leading-[1.8] font-medium">
+					<dt className="mt-3.5 font-mono text-[12px] leading-[1.8] font-medium wide:mt-0">
 						{t(`terms.${key}.term`)}
 					</dt>
 					<dd className="text-mu">{text(key)}</dd>

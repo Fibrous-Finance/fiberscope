@@ -186,25 +186,22 @@ export function MosaicSkeleton() {
 	);
 }
 
-/** Nothing settled in the window: a faint empty field and the way to a longer window. */
+/** Nothing settled in the window: the faint empty field and a button for the next longer window. */
 export function EmptyMosaic() {
 	const t = useTranslations("Hero.empty");
 	const tc = useTranslations("Common");
 	const { period, setPeriod } = useDashboard();
 	const longer = PERIODS[PERIODS.indexOf(period) + 1];
 	return (
-		<div className={`${GRID} mt-[clamp(36px,5vw,60px)] grid place-items-center bg-fg/4`}>
-			<div className="mx-4 box-content max-w-[420px] rounded-[14px] bg-bg px-[26px] py-[22px] text-center shadow-[0_0_0_1px_var(--ln2)]">
-				<h2 className="text-[16px] font-semibold tracking-[-0.01em]">{t("title")}</h2>
-				<p className="mt-1.5 mb-4 text-[14px] leading-[1.5] text-mu">
-					{t("text", { network: tc("network"), period: tc(`period.${period}`) })}
-				</p>
-				{longer ? (
+		<div className="mt-[clamp(36px,5vw,60px)]">
+			<div aria-hidden="true" className={`${GRID} bg-fg/4`} />
+			{longer ? (
+				<div className="mt-5 flex">
 					<button type="button" onClick={() => setPeriod(longer)} className="btn-teal">
 						{t("action", { period: tc(`period.${longer}`) })}
 					</button>
-				) : null}
-			</div>
+				</div>
+			) : null}
 		</div>
 	);
 }

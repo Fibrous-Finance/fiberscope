@@ -6,7 +6,7 @@ import type { CSSProperties, Dispatch, HTMLAttributes, SetStateAction } from "re
 import { useTranslations } from "next-intl";
 
 import { autoRange, FIRST_DIRECTION, linePath } from "@fiberscope/core";
-import type { Measure, Row } from "@fiberscope/core";
+import type { Measure, Row, SortKey } from "@fiberscope/core";
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { BAR_MIN_TONE, isHot, TEAL, tone } from "@/components/dashboard/tones";
@@ -21,6 +21,12 @@ const GRID =
 	"grid grid-cols-[36px_minmax(180px,1.6fr)_minmax(140px,1.3fr)_minmax(64px,.7fr)_minmax(64px,.7fr)_minmax(76px,.8fr)_minmax(76px,.8fr)_minmax(70px,.7fr)_minmax(70px,.7fr)_84px] items-center gap-x-4";
 /** Once the table is scrolled sideways, the sticky Solver column ends in a hairline. */
 const EDGE = "shadow-[inset_-1px_0_0_var(--ln2)]";
+/** Columns that need auction data: "Volume†" when it covers only part of the window. */
+const AUCTION_COLUMNS: Partial<Record<SortKey, true>> = {
+	volume: true,
+	participation: true,
+	winRate: true,
+};
 /** Sparklines span at least 4 percentage points. */
 const SPARK_MIN_SPAN = 0.04;
 
@@ -67,6 +73,7 @@ export function Table({ rows }: { rows: Row[] }) {
 	}, []);
 
 	const leaderShare = view.rows[0]?.share ?? 0;
+	const partial = view.coverage.auction < view.days;
 
 	return (
 		<div className="relative mt-8 hidden wide:block">
@@ -89,6 +96,10 @@ export function Table({ rows }: { rows: Row[] }) {
 						</span>
 						{COLUMNS.map((key) => {
 							const active = sort.key === key;
+							const label =
+								partial && AUCTION_COLUMNS[key]
+									? t("partial", { label: labels[key] })
+									: labels[key];
 							return (
 								<button
 									key={key}
@@ -107,13 +118,13 @@ export function Table({ rows }: { rows: Row[] }) {
 								>
 									{active
 										? t("sorted", {
-												label: labels[key],
+												label,
 												direction:
 													sort.direction === 1
 														? "ascending"
 														: "descending",
 											})
-										: labels[key]}
+										: label}
 								</button>
 							);
 						})}
@@ -266,7 +277,11 @@ function ListRow({
 }) {
 	const t = useTranslations("Winning");
 	const f = useFormat();
-	const value = measure === "volume" ? f.usd(row.volume) : f.int(row[measure]);
+	const value = t("metaValue", {
+		measure,
+		count: measure === "volume" ? 0 : row[measure],
+		volume: f.usd(row.volume),
+	});
 	const gas = f.gas(row.gasPerTrade);
 
 	return (

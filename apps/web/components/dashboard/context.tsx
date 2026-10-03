@@ -10,19 +10,33 @@ import type { Measure, Period, Snapshot, Sort, View } from "@fiberscope/core";
  */
 
 /** How fresh the data is. "empty" is not a data state: it depends on the period (`View.total`). */
-export type DataState = "live" | "stale" | "loading" | "error";
+export type DataState = "live" | "delayed" | "loading" | "error";
 
 export interface Status {
+	/**
+	 * live: the newest block in the data is at most 30 minutes old; delayed: older than that;
+	 * loading: Retry now is fetching; error: the data could not be loaded.
+	 */
 	state: DataState;
-	/** The last completed indexer run (Unix ms); null when nothing loaded. */
-	lastRunAt: number | null;
+	/** The clock the status was read at (Unix ms); it ticks every 30 seconds. */
+	now: number;
+	/** When the newest block in the data was mined (Unix ms); null when nothing loaded. */
+	dataTime: number | null;
 	endBlock: number | null;
+	/** Minutes between data updates. */
 	refreshMinutes: number;
-	/** Whole minutes since the last run. */
-	delayMinutes: number;
-	/** When the failed load was attempted (error state). */
-	attemptedAt: number | null;
-	/** Reload the data (shows the loading state until it arrives). */
+	/** When the failed request was made (error state); null otherwise. */
+	failedAt: number | null;
+	/** When the page fetches again on its own: every minute while delayed or in error. */
+	nextTryAt: number;
+	/** `state` is "delayed": period wording reads "in the {period} to {asOf}". */
+	delayed: boolean;
+	/**
+	 * `dataTime` as "09:49 UTC", or "3 Oct, 09:49 UTC" on another UTC day, with no-break spaces;
+	 * null when nothing loaded.
+	 */
+	asOf: string | null;
+	/** Fetch the data now, showing the loading state until it arrives. */
 	retry: () => void;
 }
 

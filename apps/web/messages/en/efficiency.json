@@ -2,11 +2,20 @@
 	"title": "How efficiently",
 	"sentence": "{solver} uses the least gas per trade among solvers with {minBatches}+ batches: {gas}, against a {average} network average.",
 	"sentenceAll": "{solver} uses the least gas per trade: {gas}, against a {average} network average.",
+	"sentenceSwaps": "Across the network, a trade takes {swaps} DEX swaps on average.",
 	"legend": {
-		"average": "Network average {value}",
+		"average": "Network average",
 		"few": "Fewer than {count} trades",
 		"size": "Dot size: trades"
 	},
+	"header": {
+		"gas": "Gas per trade · avg {average}",
+		"swaps": "DEX swaps/trade · avg {average}",
+		"swapsShort": "Swaps"
+	},
 	"dot": "{gas} gas per trade over {trades, plural, one {# trade} other {# trades}}",
+	"swapsDot": "{swaps} DEX swaps per trade over {trades, plural, one {# trade} other {# trades}}",
+	"note": "Swaps beyond the axis sit at its end, marked ›.",
+	"noteCompact": "Swaps: DEX swaps per trade.",
 	"source": "Source: Base settlement transactions"
 }

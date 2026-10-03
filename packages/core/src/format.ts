@@ -6,6 +6,9 @@
 
 /** Shown wherever a value is unknown. */
 export const DASH = "—";
+const NBSP = "\u00a0";
+const MINUTE_MS = 60_000;
+const DAY_MS = 86_400_000;
 
 export interface Format {
 	locale: string;
@@ -13,7 +16,7 @@ export interface Format {
 	int(value: number): string;
 	/** A plain decimal with fixed digits: 1.05, 8.0 */
 	fixed(value: number, digits: number): string;
-	/** $4.87M · $286K · $53.0K · $3.56K · $56 */
+	/** $4.87M · $286K · $53.0K · $3.56K · $56 · <$1 */
 	usd(value: number | null): string;
 	/** Gas units: 644K · 1.37M */
 	gas(units: number | null): string;
@@ -33,6 +36,13 @@ export interface Format {
 	dayTime(ms: number): string;
 	/** 2 Oct 2026 */
 	date(ms: number): string;
+	/** An age of `ms` milliseconds, in the unit a reader would use: 47 minutes ago · 8 hours ago */
+	ago(ms: number): string;
+	/**
+	 * The time every figure is as of: "09:49 UTC" on the same UTC day as `now`, otherwise
+	 * "3 Oct, 09:49 UTC". No-break spaces keep "3 Oct" and "09:49 UTC" on one line.
+	 */
+	asOf(ms: number, now: number): string;
 }
 
 /**
@@ -85,6 +95,7 @@ export function createFormat(locale: string): Format {
 	const hms = dates({ hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
 	const dayMonth = dates({ day: "numeric", month: "short" });
 	const dayMonthYear = dates({ day: "numeric", month: "short", year: "numeric" });
+	const relative = new Intl.RelativeTimeFormat(locale, { numeric: "always" });
 
 	const fixed = (value: number, digits: number) => {
 		let f = decimals.get(digits);
@@ -110,6 +121,8 @@ export function createFormat(locale: string): Format {
 			if (value >= 1e5) return usd0.format(value);
 			if (value >= 1e4) return usd1.format(value);
 			if (value >= 1e3) return usd2.format(value);
+			// A positive amount under a dollar would otherwise round to "$0" or "$1".
+			if (value > 0 && value < 1) return `<${usdWhole.format(1)}`;
 			return usdWhole.format(Math.max(0, value));
 		},
 		gas(units) {
@@ -142,6 +155,18 @@ export function createFormat(locale: string): Format {
 		date(ms) {
 			if (!english) return dayMonthYear.format(ms);
 			return `${day(ms)} ${new Date(ms).getUTCFullYear()}`;
+		},
+		ago(ms) {
+			// Minutes under an hour, rounded hours under 36 hours, then rounded days.
+			const minutes = Math.max(1, Math.round(ms / MINUTE_MS));
+			if (minutes < 60) return relative.format(-minutes, "minute");
+			if (minutes < 36 * 60) return relative.format(-Math.round(minutes / 60), "hour");
+			return relative.format(-Math.round(minutes / (24 * 60)), "day");
+		},
+		asOf(ms, now) {
+			const time = `${hm.format(ms)}${NBSP}UTC`;
+			if (Math.floor(ms / DAY_MS) === Math.floor(now / DAY_MS)) return time;
+			return `${day(ms).replaceAll(" ", NBSP)}, ${time}`;
 		},
 	};
 }

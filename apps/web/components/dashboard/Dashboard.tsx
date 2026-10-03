@@ -22,15 +22,15 @@ import { Efficiency } from "@/components/efficiency/Efficiency";
 import { Enter } from "@/components/enter/Enter";
 import { Footer } from "@/components/frame/Footer";
 import { Header } from "@/components/frame/Header";
-import { StaleBanner } from "@/components/frame/StaleBanner";
 import { Hero } from "@/components/hero/Hero";
 import { Methodology } from "@/components/methodology/Methodology";
 import { Winning, WinningSkeleton } from "@/components/winning/Winning";
 
+import { useFormat } from "@/lib/format";
 import { selectionQuery } from "@/lib/selection";
 import type { Selection } from "@/lib/selection";
 import type { SnapshotResult } from "@/lib/snapshot";
-import { dataStatus, MINUTE } from "@/lib/status";
+import { dataStatus } from "@/lib/status";
 
 const COMPACT_QUERY = "(max-width: 759.98px)";
 /** Before the page measures itself: the content width at 1280px. */
@@ -46,6 +46,7 @@ function subscribeCompact(onChange: () => void) {
 
 export function Dashboard({ result, selection }: { result: SnapshotResult; selection: Selection }) {
 	const router = useRouter();
+	const f = useFormat();
 	const snapshot = result.ok ? result.snapshot : null;
 	const [period, setPeriod] = useState<Period>(selection.period);
 	const [measure, setMeasure] = useState<Measure>(selection.measure);
@@ -71,13 +72,15 @@ export function Dashboard({ result, selection }: { result: SnapshotResult; selec
 	);
 
 	const fresh = dataStatus(result, now);
+	const state = retrying ? "loading" : fresh.state;
 	const status: Status = {
 		...fresh,
-		state: retrying ? "loading" : fresh.state,
+		state,
+		delayed: state === "delayed",
+		asOf: fresh.dataTime === null ? null : f.asOf(fresh.dataTime, now),
+		// A fetch in a transition: loading until the data (or the error) arrives.
 		retry: () => startRetry(() => router.refresh()),
 	};
-	const stale = fresh.state === "stale";
-	const { state, refreshMinutes } = status;
 
 	// Shared links: the period, measure and open solver live in the query string.
 	useEffect(() => {
@@ -86,18 +89,29 @@ export function Dashboard({ result, selection }: { result: SnapshotResult; selec
 		if (query !== search) window.history.replaceState(null, "", `${pathname}${query}${hash}`);
 	}, [period, measure, open]);
 
-	// Relative times tick; the data reloads on the indexer's schedule, every minute while late.
+	// The age of the data ticks: it turns delayed 30 minutes after its newest block.
 	useEffect(() => {
 		const timer = setInterval(() => setClock(Date.now()), 30_000);
 		return () => clearInterval(timer);
 	}, []);
+	// Fetch again at `nextTryAt` without reloading the page, and keep that pace until a response
+	// replaces this result: every minute while delayed or in error.
+	const { nextTryAt } = fresh;
+	const pace = nextTryAt - result.at;
 	useEffect(() => {
-		const every = (stale || !result.ok ? 1 : refreshMinutes) * MINUTE;
-		const reload = setInterval(() => {
-			if (document.visibilityState === "visible") router.refresh();
-		}, every);
-		return () => clearInterval(reload);
-	}, [router, stale, result.ok, refreshMinutes]);
+		let timer = 0;
+		const fetchAt = (at: number) => {
+			timer = window.setTimeout(
+				() => {
+					if (document.visibilityState === "visible") router.refresh();
+					fetchAt(Date.now() + pace);
+				},
+				Math.max(0, at - Date.now())
+			);
+		};
+		fetchAt(nextTryAt);
+		return () => window.clearTimeout(timer);
+	}, [router, nextTryAt, pace]);
 
 	// Measure before the first paint, so the mosaic never draws a frame at the default width.
 	useLayoutEffect(() => {
@@ -115,7 +129,9 @@ export function Dashboard({ result, selection }: { result: SnapshotResult; selec
 		return () => clearTimeout(timer);
 	}, []);
 
-	const showData = (state === "live" || state === "stale") && view !== null && view.total > 0;
+	// Below the hero: every section while the window has data, the first one's placeholder while
+	// loading; Methodology and the footer always.
+	const showData = (state === "live" || state === "delayed") && view !== null && view.total > 0;
 
 	return (
 		<DashboardContext
@@ -142,21 +158,22 @@ export function Dashboard({ result, selection }: { result: SnapshotResult; selec
 		>
 			<HoverContext value={{ hovered, setHovered }}>
 				<Header status={status} />
-				{state === "stale" ? <StaleBanner status={status} /> : null}
 				<div className="page">
 					<main ref={mainRef}>
 						<Hero />
 						{showData ? (
 							<>
 								<Winning />
-								<Change />
+								<Change
+									asOf={status.delayed ? (status.asOf ?? undefined) : undefined}
+								/>
 								<Enter />
 								<Efficiency />
 							</>
 						) : state === "loading" ? (
 							<WinningSkeleton />
 						) : null}
-						<Methodology status={status} />
+						<Methodology />
 					</main>
 					<Footer />
 				</div>

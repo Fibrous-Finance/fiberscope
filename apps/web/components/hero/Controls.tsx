@@ -46,7 +46,7 @@ function Segmented<T extends string>({
 		<div
 			role="group"
 			aria-label={label}
-			className="relative grid h-10 flex-[1_1_100%] rounded-[9px] border border-ln2 p-0.5 wide:h-8 wide:flex-none"
+			className="relative grid h-11 flex-[1_1_100%] rounded-[9px] border border-ln2 p-0.5 wide:h-8 wide:flex-none"
 			style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` }}
 		>
 			<span

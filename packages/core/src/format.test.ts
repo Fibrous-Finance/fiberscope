@@ -12,6 +12,9 @@ describe("format", () => {
 		assert.equal(f.usd(52_998), "$53.0K");
 		assert.equal(f.usd(3_559), "$3.56K");
 		assert.equal(f.usd(56.4), "$56");
+		assert.equal(f.usd(0.19), "<$1");
+		assert.equal(f.usd(0.6), "<$1");
+		assert.equal(f.usd(0), "$0");
 		assert.equal(f.usd(null), "—");
 	});
 
@@ -35,6 +38,29 @@ describe("format", () => {
 		assert.equal(f.dayTime(t), "13 Sep 22:10");
 		assert.equal(f.clock(t), "22:10:05");
 		assert.equal(f.date(t), "13 Sep 2026");
+	});
+
+	it("says how old the data is in minutes, then rounded hours, then days", () => {
+		const minute = 60_000;
+		assert.equal(f.ago(20_000), "1 minute ago");
+		assert.equal(f.ago(47 * minute), "47 minutes ago");
+		assert.equal(f.ago(59 * minute + 29_000), "59 minutes ago");
+		assert.equal(f.ago(59 * minute + 31_000), "1 hour ago");
+		assert.equal(f.ago(472 * minute), "8 hours ago");
+		assert.equal(f.ago(35 * 60 * minute), "35 hours ago");
+		// From 36 hours on, days: 36 hours rounds to 2 days.
+		assert.equal(f.ago(36 * 60 * minute), "2 days ago");
+		assert.equal(f.ago(3_060 * minute), "2 days ago");
+	});
+
+	it("dates the as-of time only when it is another UTC day, with no-break spaces", () => {
+		const data = Date.UTC(2026, 9, 3, 9, 49, 53);
+		assert.equal(f.asOf(data, Date.UTC(2026, 9, 3, 17, 41)), "09:49\u00a0UTC");
+		assert.equal(f.asOf(data, Date.UTC(2026, 9, 5, 0, 0)), "3\u00a0Oct, 09:49\u00a0UTC");
+		// Midnight in UTC, not in the reader's time zone, starts the next day.
+		const late = Date.UTC(2026, 9, 2, 23, 55);
+		assert.equal(f.asOf(late, Date.UTC(2026, 9, 2, 23, 59)), "23:55\u00a0UTC");
+		assert.equal(f.asOf(late, Date.UTC(2026, 9, 3, 0, 10)), "2\u00a0Oct, 23:55\u00a0UTC");
 	});
 
 	it("follows the locale for other languages", () => {

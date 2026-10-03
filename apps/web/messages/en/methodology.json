@@ -21,9 +21,17 @@
 			"term": "Gas/trade",
 			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost."
 		},
+		"swaps": {
+			"term": "DEX swaps",
+			"text": "Interactions in a settlement other than token approvals and WETH unwraps. Per trade: a solver’s swaps divided by the trades it filled."
+		},
+		"batchValue": {
+			"term": "Batch value",
+			"text": "Volume divided by batches. Trades per batch is trades divided by batches."
+		},
 		"networkAverage": {
 			"term": "Network avg",
-			"text": "Gas per trade across all solvers, weighted by trades."
+			"text": "Gas per trade and DEX swaps per trade across all solvers, weighted by trades."
 		},
 		"entered": {
 			"term": "Entered",
@@ -39,20 +47,29 @@
 		},
 		"sources": {
 			"term": "Sources",
-			"text": "Settlement events and receipts on Base, CoW Protocol’s solver-competition API and Chainlink’s ETH/USD feed."
+			"text": "Settlement events and receipts on Base, CoW Protocol’s solver-competition API, CoW’s solver registry and Chainlink’s ETH/USD feed."
 		},
 		"attribution": {
 			"term": "Attribution",
 			"text": "Settlements sent through CoW’s flash-loan router are credited to the solver that won the auction."
 		},
+		"registry": {
+			"term": "Registry",
+			"text": "Status and submission addresses as CoW’s solver registry lists them for Base. A retired address is one the solver no longer submits from."
+		},
 		"freshness": {
 			"term": "Freshness",
-			"text": "Refreshed every {minutes, plural, one {minute} other {# minutes}}. Last run {date}, {time} UTC, to block {block}.",
-			"unknown": "Refreshed every {minutes, plural, one {minute} other {# minutes}}."
+			"text": "Updated every {minutes, plural, one {minute} other {# minutes}}. The figures run to block {block}, mined {date} at {time}\u00a0UTC.",
+			"noData": "Updated every {minutes, plural, one {minute} other {# minutes}}."
 		},
 		"windows": {
 			"term": "Windows",
-			"text": "Rolling, ending at the last indexed block. Longer windows add up daily windows; rates are averaged per auction."
+			"text": "Rolling, ending at the newest block in the data. Longer windows add up daily windows; rates are averaged per auction."
+		},
+		"coverage": {
+			"term": "Coverage",
+			"text": "Settlement history goes back {chain, plural, one {# day} other {# days}} and auction history {auction, plural, one {# day} other {# days}}. Volume, Entered and Win rate need auction data, so in a longer window they cover only the days that have it, and a note says so.",
+			"noData": "Volume, Entered and Win rate need auction data, so in a longer window they cover only the days that have it, and a note says so."
 		},
 		"names": {
 			"term": "Names",

@@ -40,7 +40,6 @@
 	"copy": "Copy",
 	"copied": "Copied ✓",
 	"coverage": {
-		"auction": "Volume, Entered and Win rate cover the last {covered} of {days, plural, one {# day} other {# days}}.",
 		"chain": "Batches, trades and gas cover the last {covered} of {days, plural, one {# day} other {# days}}."
 	}
 }

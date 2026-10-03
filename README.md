@@ -76,6 +76,30 @@ CoW solver registry + on-chain allow-list                 ─┘      (SQLite)
 The full definitions are in the page's Methodology section
 (`apps/web/messages/en/methodology.json`).
 
+## Validation
+
+**Against CoW's Dune dashboard.** For blocks 50,409,187–51,705,186 (the 30 days to September 23,
+2026, 21:42 UTC), the Base figures read from CoW's
+[Solver Info](https://dune.com/cowprotocol/solver-info) dashboard on that window and Fiberscope's
+figures for the same blocks differ by about 0.1%:
+
+| Measure       | Dune    | Fiberscope | Difference |
+| ------------- | ------- | ---------- | ---------- |
+| Batches       | 76,873  | 76,954     | +0.11%     |
+| Trades        | 80,808  | 80,892     | +0.10%     |
+| DEX swaps     | 116,034 | 116,166    | +0.11%     |
+| Gas per trade | 730.6K  | 730.7K     | +0.01%     |
+
+A recount from the Base RPC for five solvers matched the database exactly.
+
+**Attribution against CoW's competition data.** For blocks 51,811,228–52,115,823 (September 26,
+2026, 08:36 UTC to October 3, 2026, 09:49 UTC), all 24,534 batches had a winning solution for
+their transaction in CoW's competition data, and every batch was credited to that solution's
+solver address: 24,534 of 24,534. Of these, 1,230 went through the flash-loan router: 397 were
+credited to the transaction's recipient and 833 to its sender, and all 1,230 match the winner.
+None of them fell back to CoW's winner, so this check does not depend on the competition data
+it is compared with.
+
 ## Running it locally
 
 Requires Node 24 and pnpm 10.
@@ -165,7 +189,7 @@ live indexer runs from this image on [Railway](https://railway.com), with a volu
 
 - [x] Data feasibility check against Base mainnet
 - [x] Design
-- [x] Indexer for Base
+- [x] Indexer for Base, cross-checked against Dune (see [Validation](#validation))
 - [x] Web app
 - [x] Site on Cloudflare Workers, data in R2
 - [ ] Always-on hosting for the indexer

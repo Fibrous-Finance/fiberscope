@@ -2,7 +2,7 @@
 	"title": "Trader surplus",
 	"scope": "Basis points of volume",
 	"sentence": "In {span}, trades beat the limit prices their users signed by {total}. The {unusualTrades} of trades with limits far from the market account for {unusualShare} of that. Leave those out and typical trades beat their limits by {typicalBps}\u00a0bps of volume, {typicalPerTrade} a trade.",
-	"sentenceNoUnusual": "In {span}, trades beat the limit prices their users signed by {total}: {bps}\u00a0bps of volume, {perTrade} a trade. None had a limit far from the market.",
+	"sentenceNoUnusual": "In {span}, trades beat the limit prices their users signed by {total}: {bps}\u00a0bps of volume, {perTrade} a trade. None had unusual surplus.",
 	"empty": "No surplus data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet. Surplus needs auction data and each order’s signed terms.",
 	"legend": {
 		"typical": "Typical trades",

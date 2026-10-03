@@ -27,10 +27,10 @@ Every figure comes from public data on Base and from CoW Protocol's public servi
   together, not averaged over days.
 - **Newest block.** The data stops 20 blocks (40 seconds) short of the chain head, as a margin
   against reorganizations.
-- **Coverage.** Only complete days count. Settlement history (batches, trades, gas, transaction cost, DEX
-  swaps) reaches furthest back. Volume, Entered and Win rate also need auction data, and surplus
-  also needs the terms each order was signed with. In a window longer than the history behind a
-  figure, the figure covers only the days that have it, and a note says so instead of
+- **Coverage.** Only complete days count. Settlement history (batches, trades, gas, transaction
+  cost, DEX swaps) reaches furthest back. Volume, Entered and Win rate also need auction data, and
+  surplus also needs the terms each order was signed with. In a window longer than the history
+  behind a figure, the figure covers only the days that have it, and a note says so instead of
   extrapolating.
 - **Earlier window.** Rank changes (▲, ▼, NEW) and share changes compare the window with the window
   of the same length just before it, once the history covers both.
@@ -70,7 +70,7 @@ Gas units used by a solver's batches divided by the trades they filled: units of
 transaction that holds several batches splits its gas evenly between them.
 
 The overview's **Lowest gas/trade** considers only solvers with at least 100 batches per day of
-the window, or every solver when none has that many.
+settlement data in the window, or every solver when none has that many.
 
 ### Transaction cost
 
@@ -129,9 +129,9 @@ value across all solvers: all volume divided by all batches, over the days with 
 
 The share of the window's auctions in which the solver submitted at least one solution, counting
 solutions CoW filtered out. Only auctions that ended in a settlement count, and an auction counts
-on the day it started. **Average solver** is the mean Entered share among the table's solvers that entered at
-least one auction. A solver with batches but no recorded entry shows no Entered or Win rate rather
-than 0%: its auction data is missing.
+on the day it started. **Average solver** is the mean Entered share among the table's solvers that
+entered at least one auction. A solver with batches but no recorded entry shows no Entered or Win
+rate rather than 0%: its auction data is missing.
 
 ### Win rate
 
@@ -172,6 +172,7 @@ Names, statuses and submission addresses come from CoW's solver registry for Bas
 every indexer run; the last copy is kept for when the registry is unavailable. A solver groups its
 prod and barn addresses. An override adds an address the registry does not list as active that
 settles on Base and is on the settlement contract's on-chain allow-list; it is shown as active.
+Today there is one: Rizzolver's `0x8f5835e9d756c9bd934bce527157a4b0ef3c5cb7`.
 
 A retired address is one the registry marks inactive. A solver without a public name is shown by
 its address. The solver registry under the table lists every solver in CoW's registry for Base,
@@ -179,9 +180,9 @@ including inactive solvers and solvers without settlements.
 
 ## Validation
 
-**Against CoW's Dune dashboard.** For blocks 50,409,187–51,705,186 (the 30 days to 23 Sep 2026 at 21:42 UTC), the Base figures read from CoW's
-[Solver Info](https://dune.com/cowprotocol/solver-info) dashboard for that window and Fiberscope's
-figures for the same blocks differ by about 0.1%:
+**Against CoW's Dune dashboard.** For blocks 50,409,187–51,705,186 (the 30 days to 23 Sep 2026 at
+21:42 UTC), the Base figures read from CoW's [Solver Info](https://dune.com/cowprotocol/solver-info)
+dashboard for that window and Fiberscope's figures for the same blocks differ by about 0.1%:
 
 | Measure   | Dune    | Fiberscope | Difference |
 | --------- | ------- | ---------- | ---------- |
@@ -192,18 +193,19 @@ figures for the same blocks differ by about 0.1%:
 
 A recount from the Base RPC for five solvers matched the database exactly.
 
-**Attribution against CoW's competition data.** For blocks 51,811,228–52,115,823 (26 Sep 2026 at 08:36 UTC to 3 Oct 2026 at 09:49 UTC), all 24,534 batches had a winning solution for
-their transaction in CoW's competition data, and every batch was credited to that solution's
-solver address: 24,534 of 24,534. Of these, 1,230 went through the flash-loan router: 397 were
-credited to the transaction's recipient and 833 to its sender, and all 1,230 match the winner.
-None of them fell back to CoW's winner, so this check does not depend on the competition data
-it is compared with.
+**Attribution against CoW's competition data.** For blocks 51,811,228–52,115,823 (26 Sep 2026 at
+08:36 UTC to 3 Oct 2026 at 09:49 UTC), all 24,534 batches had a winning solution for their
+transaction in CoW's competition data, and every batch was credited to that solution's solver
+address: 24,534 of 24,534. Of these, 1,230 went through the flash-loan router: 397 were credited
+to the transaction's recipient and 833 to its sender, and all 1,230 match the winner. None of them
+fell back to CoW's winner, so this check does not depend on the competition data it is compared
+with.
 
-**Order terms against the trades and CoW's order book.** Surplus is calculated from the limits decoded from
-`settle()` calldata. A sample of 407 trades covered every way that calldata reaches the settlement
-contract: a direct call, the flash-loan router, and solver contracts that pass the call on. Every
-decoded trade reproduced its `Trade` event exactly, and the limits, order kinds and fees of 80 of
-80 orders checked agree with CoW's order API (`api.cow.fi/base/api/v1/orders/{uid}`).
+**Order terms against the trades and CoW's order book.** Surplus is calculated from the limits
+decoded from `settle()` calldata. A sample of 407 trades covered every way that calldata reaches the
+settlement contract: a direct call, the flash-loan router, and solver contracts that pass the call
+on. Every decoded trade reproduced its `Trade` event exactly, and the limits, order kinds and fees
+of 80 of 80 orders checked agree with CoW's order API (`api.cow.fi/base/api/v1/orders/{uid}`).
 
 To check a block range yourself, `node src/cli.ts window --from <block> --to <block>` in
 `apps/indexer` prints its totals and per-solver table from the database (see

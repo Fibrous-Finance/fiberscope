@@ -50,7 +50,7 @@ export function Methodology() {
 		if (key === "freshness") {
 			const minutes = status.refreshMinutes;
 			if (!data) return t("terms.freshness.noData", { minutes });
-			// While delayed, the promise to update every few minutes is not being kept (C9).
+			// While delayed, the promise to update every few minutes is not being kept.
 			return t(
 				status.state === "delayed" ? "terms.freshness.delayed" : "terms.freshness.text",
 				{

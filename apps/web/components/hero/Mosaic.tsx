@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 
 import { useFormatter, useTranslations } from "next-intl";
 
-import { mosaic, MOSAIC_COMPACT, MOSAIC_WIDE, PERIODS } from "@fiberscope/core";
+import { mosaic, MOSAIC_COMPACT, MOSAIC_WIDE, PERIODS, windowTotal } from "@fiberscope/core";
 import type { Row, View } from "@fiberscope/core";
 
 import { OTHERS, useDashboard, useHover } from "@/components/dashboard/context";
@@ -186,19 +186,36 @@ export function MosaicSkeleton() {
 	);
 }
 
-/** Nothing settled in the window: the faint empty field and a button for the next longer window. */
+/**
+ * Nothing in the window for the measure: the faint empty field and one button for the next longer
+ * period. For volume it offers that period only when its window has volume data, and otherwise
+ * the batches measure.
+ */
 export function EmptyMosaic() {
 	const t = useTranslations("Hero.empty");
 	const tc = useTranslations("Common");
-	const { period, setPeriod } = useDashboard();
+	const { snapshot, period, measure, setPeriod, setMeasure } = useDashboard();
 	const longer = PERIODS[PERIODS.indexOf(period) + 1];
+	const action =
+		longer !== undefined &&
+		(measure !== "volume" || (snapshot !== null && windowTotal(snapshot, longer, "volume") > 0))
+			? {
+					label: t("action", { period: tc(`period.${longer}`) }),
+					run: () => setPeriod(longer),
+				}
+			: measure === "volume"
+				? {
+						label: t("actionMeasure", { measure: tc("measure.batches") }),
+						run: () => setMeasure("batches"),
+					}
+				: null;
 	return (
 		<div className="mt-[clamp(36px,5vw,60px)]">
 			<div aria-hidden="true" className={`${GRID} bg-fg/4`} />
-			{longer ? (
+			{action ? (
 				<div className="mt-5 flex">
-					<button type="button" onClick={() => setPeriod(longer)} className="btn-teal">
-						{t("action", { period: tc(`period.${longer}`) })}
+					<button type="button" onClick={action.run} className="btn-teal">
+						{action.label}
 					</button>
 				</div>
 			) : null}

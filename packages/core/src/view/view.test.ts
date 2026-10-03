@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { Snapshot, SnapshotSolver } from "../snapshot.ts";
-import { buildView, DAY_MS, fractionOf, sortRows, tapeCell } from "./view.ts";
+import {
+	buildView,
+	DAY_MS,
+	fractionOf,
+	MEASURES,
+	PERIODS,
+	sortRows,
+	tapeCell,
+	windowTotal,
+} from "./view.ts";
 
 const END = Date.UTC(2026, 9, 2, 10, 35);
 
@@ -285,9 +294,45 @@ describe("fractionOf", () => {
 		assert.deepEqual(fractionOf(1), { key: "all" });
 		assert.deepEqual(fractionOf(0.999), { key: "moreThanHalf" });
 		assert.deepEqual(fractionOf(0.55), { key: "moreThanHalf" });
-		assert.deepEqual(fractionOf(0.469), { key: "nearlyHalf" });
+		assert.deepEqual(fractionOf(0.549), { key: "half" });
+		assert.deepEqual(fractionOf(0.5), { key: "half" });
+		assert.deepEqual(fractionOf(0.499), { key: "nearlyHalf" });
+		assert.deepEqual(fractionOf(0.44), { key: "nearlyHalf" });
+		assert.deepEqual(fractionOf(0.439), { key: "twoInFive" });
+		assert.deepEqual(fractionOf(0.36), { key: "twoInFive" });
+		assert.deepEqual(fractionOf(0.359), { key: "aThird" });
+		assert.deepEqual(fractionOf(0.3), { key: "aThird" });
+		assert.deepEqual(fractionOf(0.299), { key: "overAQuarter" });
+		assert.deepEqual(fractionOf(0.27), { key: "overAQuarter" });
+		assert.deepEqual(fractionOf(0.269), { key: "aQuarter" });
+		assert.deepEqual(fractionOf(0.23), { key: "aQuarter" });
+		assert.deepEqual(fractionOf(0.229), { key: "oneInFive" });
 		assert.deepEqual(fractionOf(0.18), { key: "oneInFive" });
+		// Under a fifth: one in n for counts, an nth for volume (the copy picks the words).
+		assert.deepEqual(fractionOf(0.179), { key: "oneIn", n: 6 });
 		assert.deepEqual(fractionOf(0.13), { key: "oneIn", n: 8 });
+		assert.deepEqual(fractionOf(0.1), { key: "oneIn", n: 10 });
+		assert.deepEqual(fractionOf(0.09), { key: "oneIn", n: 11 });
+	});
+});
+
+describe("windowTotal", () => {
+	it("adds up the measure over the days its data covers, as the view's total", () => {
+		// Two weeks of batches; auction data for two days, the newest without a priced trade.
+		const days = (value: number) => Array.from({ length: 14 }, () => value);
+		const s = snapshot(14, 2, [
+			solver("a", "A", { batches: days(3), trades: days(4), volume: [0, 50] }),
+			solver("b", "B", { batches: days(1), trades: days(1), volume: [0, 25] }),
+		]);
+		for (const period of PERIODS) {
+			for (const measure of MEASURES) {
+				assert.equal(windowTotal(s, period, measure), buildView(s, period, measure).total);
+			}
+		}
+		assert.equal(windowTotal(s, "24h", "volume"), 0);
+		assert.equal(windowTotal(s, "7d", "volume"), 75);
+		assert.equal(windowTotal(s, "7d", "batches"), 28);
+		assert.equal(windowTotal(snapshot(14, 0, s.solvers), "180d", "volume"), 0);
 	});
 });
 

@@ -11,11 +11,11 @@
 		"volume": "Volume"
 	},
 	"period": {
-		"24h": "24 hours",
-		"7d": "7 days",
-		"30d": "30 days",
-		"90d": "90 days",
-		"180d": "180 days"
+		"24h": "24\u00a0hours",
+		"7d": "7\u00a0days",
+		"30d": "30\u00a0days",
+		"90d": "90\u00a0days",
+		"180d": "180\u00a0days"
 	},
 	"periodLabel": {
 		"24h": "24h",
@@ -25,11 +25,11 @@
 		"180d": "180d"
 	},
 	"previousPeriod": {
-		"24h": "the previous 24 hours",
-		"7d": "the previous 7 days",
-		"30d": "the previous 30 days",
-		"90d": "the previous 90 days",
-		"180d": "the previous 180 days"
+		"24h": "the previous 24\u00a0hours",
+		"7d": "the previous 7\u00a0days",
+		"30d": "the previous 30\u00a0days",
+		"90d": "the previous 90\u00a0days",
+		"180d": "the previous 180\u00a0days"
 	},
 	"utc": "{time}\u00a0UTC",
 	"points": "{value}\u00a0pp",
@@ -40,6 +40,6 @@
 	"copy": "Copy",
 	"copied": "Copied ✓",
 	"coverage": {
-		"chain": "Batches, trades and gas cover the last {covered} of {days, plural, one {# day} other {# days}}."
+		"chain": "Batches, trades and gas cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}."
 	}
 }

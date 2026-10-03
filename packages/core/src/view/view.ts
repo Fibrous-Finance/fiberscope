@@ -258,6 +258,16 @@ function sum(series: readonly number[], from: number, to: number): number {
 	return total;
 }
 
+/**
+ * The measure's total over a period's window, as `View.total` counts it: 0 when nothing in the
+ * window counts toward it (no batches; for volume, no priced trade on the days with auction data).
+ */
+export function windowTotal(snapshot: Snapshot, period: Period, measure: Measure): number {
+	const { chainDays, auctionDays } = snapshot.coverage;
+	const days = Math.min(PERIOD_DAYS[period], measure === "volume" ? auctionDays : chainDays);
+	return snapshot.solvers.reduce((total, s) => total + sum(s[measure], 0, days), 0);
+}
+
 /** 1-based ranks by `value`, descending; ties keep the given order. Zero values get no rank. */
 function rankBy<T>(items: readonly T[], value: (item: T) => number): Map<T, number> {
 	const ranked = items.filter((item) => value(item) > 0).sort((a, b) => value(b) - value(a));

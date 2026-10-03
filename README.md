@@ -1,4 +1,4 @@
-# Fiberscope
+# <img src="docs/images/mark.svg" width="28" height="28" alt=""> Fiberscope
 
 Open-source analytics for [CoW Protocol](https://cow.fi) solvers on Base: who wins the batch
 auctions, by how much, whether that is changing, and how efficiently each solver settles.
@@ -78,9 +78,9 @@ Cloudflare Worker, reads the snapshot from R2 and derives every window, share an
 ## Accuracy
 
 Over 30 days of Base blocks, batches, trades, DEX swaps and gas per trade agree with CoW's own Dune
-dashboard to within about 0.1%, and over a week every batch was credited to the solver that CoW's
-competition data names as its winner. The figures are in
-[Validation](docs/methodology.md#validation); every definition is in
+dashboard to within about 0.1%. Over a week, every batch was credited to the solver that CoW's
+competition data names as its winner, and the order terms behind surplus match CoW's order book.
+The figures are in [Validation](docs/methodology.md#validation); every definition is in
 [docs/methodology.md](docs/methodology.md).
 
 ## Run it locally

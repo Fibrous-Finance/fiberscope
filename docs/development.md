@@ -220,11 +220,10 @@ Measured on the live deployment on 3 October 2026.
   [R2's free tier](https://developers.cloudflare.com/r2/pricing/#free-tier): 10 GB-month of
   storage, 1 million writes and 10 million reads a month.
 - **Indexer.** The database takes 0.83 GB of the Railway volume at 180 days of settlements and 64
-  days of auctions. Memory peaks at about 2.8 GB per run, when the snapshot step loads every
-  auction solution in the window, so give any host at least 4 GB of RAM. During a backfill each
-  run lasts its whole 10-minute budget and memory stays high; once caught up, a run takes well
-  under a minute every 10 minutes. Railway meters actual use: $10 per GB of memory and $20 per
-  vCPU per month, and $0.15 per GB of volume per month
+  days of auctions. Memory peaks at about 2.8 GB during a run, so give any host at least 4 GB of
+  RAM. During a backfill each run lasts its whole 10-minute budget and memory stays high; once
+  caught up, a run takes well under a minute every 10 minutes. Railway meters actual use: $10 per
+  GB of memory and $20 per vCPU per month, and $0.15 per GB of volume per month
   ([pricing](https://docs.railway.com/pricing/plans#resource-usage-pricing)).
 - **Data.** The indexer reads public endpoints without API keys: Base's RPC, CoW's API and CoW's
   solver registry.

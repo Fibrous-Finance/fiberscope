@@ -202,6 +202,12 @@ credited to the transaction's recipient and 833 to its sender, and all 1,230 mat
 None of them fell back to CoW's winner, so this check does not depend on the competition data
 it is compared with.
 
+**Order terms against the trades and CoW's order book.** Surplus rests on the limits decoded from
+`settle()` calldata. A sample of 407 trades covered every way that calldata reaches the settlement
+contract: a direct call, the flash-loan router, and solver contracts that pass the call on. Every
+decoded trade reproduced its `Trade` event exactly, and the limits, order kinds and fees of 80 of
+80 orders checked agree with CoW's order API (`api.cow.fi/base/api/v1/orders/{uid}`).
+
 To check a block range yourself, `node src/cli.ts window --from <block> --to <block>` in
 `apps/indexer` prints its totals and per-solver table from the database (see
 [Development](development.md#the-indexer)).

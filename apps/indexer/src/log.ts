@@ -1,6 +1,6 @@
-/** Writes one progress line to stderr, prefixed with the UTC time. */
+/** Writes one progress line to stdout, prefixed with the UTC time. Errors go to stderr. */
 export function log(message: string): void {
-	process.stderr.write(`${new Date().toISOString().slice(11, 19)} ${message}\n`);
+	process.stdout.write(`${new Date().toISOString().slice(11, 19)} ${message}\n`);
 }
 
 /** Returns a logger that prints at most once per `intervalMs`, for long loops. */

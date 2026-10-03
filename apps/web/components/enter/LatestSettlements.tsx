@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { useTranslations } from "next-intl";
+import { flushSync } from "react-dom";
 
 import { latestSettlements, NETWORKS } from "@fiberscope/core";
 
@@ -202,7 +203,18 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 				<button
 					type="button"
 					aria-expanded={expanded}
-					onClick={() => setExpanded(!expanded)}
+					onClick={(event) => {
+						const button = event.currentTarget;
+						const top = button.getBoundingClientRect().top;
+						flushSync(() => setExpanded(!expanded));
+						// Show fewer removes the rows above the button: scroll back so it stays where
+						// it was, under the pointer, rather than far above the viewport.
+						if (expanded)
+							window.scrollBy({
+								top: button.getBoundingClientRect().top - top,
+								behavior: "instant",
+							});
+					}}
 					className="flex h-[52px] w-full items-center gap-2.5 border-b border-ln text-left font-mono text-[12px] leading-[normal] font-medium text-mu transition-colors duration-200 hover:text-fg wide:h-11"
 				>
 					{expanded ? t("fewer") : t("more", { count: more })}

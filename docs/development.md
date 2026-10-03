@@ -43,9 +43,10 @@ build.
 
 ## The indexer
 
-`apps/indexer` reads Base and CoW's API into a SQLite database (`apps/indexer/.data/base.db`) and
-writes the snapshot from it. Node 24 runs its TypeScript directly; it has no build step and no
-third-party dependencies (SQLite is `node:sqlite`).
+`apps/indexer` reads data from Base and CoW's API into a SQLite database
+(`apps/indexer/.data/base.db`) and writes the snapshot from it. Node 24 runs the indexer's
+TypeScript directly. The indexer has no build step or third-party dependencies; it uses
+`node:sqlite` for SQLite.
 
 ### Commands
 
@@ -68,9 +69,9 @@ same options) also read `apps/indexer/.env` when it exists.
 2. Catches up: settlements, receipts and calldata up to 20 blocks below the chain head, then the
    auctions behind the new settlements.
 3. Marks the data current and, with `--snapshot`, writes the snapshot.
-4. Backfills, newest first, until the requested depth or the budget: settlements, with the auction
-   lookups trailing them, and the order terms of trades stored without them. Settlement history
-   is kept at least as deep as auction history.
+4. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
+   settlements, followed by their auction lookups, and missing order terms for stored trades.
+   Settlement history is kept at least as deep as auction history.
 5. Writes the snapshot again if the history grew.
 
 On an empty database there is nothing to catch up: the backfill starts at the chain head and the
@@ -98,19 +99,19 @@ downloads the database with `seed`.
 
 ## Configuration
 
-| Variable                                                            | Used by | Purpose                                                                                                                                                                                    |
-| ------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `BASE_RPC_URL`                                                      | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                                                                                                                                     |
-| `DB_PATH`                                                           | indexer | The SQLite database (default `apps/indexer/.data/base.db`); `--db` overrides it                                                                                                            |
-| `BASE_RPC_RPS`, `COW_API_RPS`                                       | indexer | Request rates per second for the RPC and CoW's API (defaults 15 and 3)                                                                                                                     |
-| `REFRESH_MINUTES`                                                   | indexer | `loop.sh`'s interval and, through the snapshot, the live page's refetch interval (default 10). At any interval, the page shows Delayed once its data is more than 30 minutes old           |
-| `SEED_DB_URL`                                                       | indexer | With `loop.sh`, download the database from this URL when `DB_PATH` does not exist                                                                                                          |
-| `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                                                                                               |
-| `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | indexer | The account, and the S3 credentials of an R2 API token with Object Read & Write on that bucket only                                                                                        |
-| `SNAPSHOT_R2_KEY`                                                   | both    | The snapshot's object key: where the indexer uploads it (default `base/snapshot.json`) and what the site reads through its `SNAPSHOTS` binding. Unset in the site, it reads the local file |
-| `SNAPSHOT_PATH`                                                     | web     | The local snapshot file when `SNAPSHOT_R2_KEY` is unset (default `apps/web/data/snapshot.json`)                                                                                            |
-| `SITE_URL`                                                          | web     | The site's origin (default `http://localhost:3000`): absolute link-preview URLs, the canonical link, the sitemap, and the one host search engines may index                                |
-| `ALLOW_INDEXING`                                                    | web     | `true` lets search engines index requests to `SITE_URL`'s host; other hosts, pull-request previews included, stay `noindex`. Without it, every page is `noindex`                           |
+| Variable                                                            | Used by | Purpose                                                                                                                                                                                                      |
+| ------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BASE_RPC_URL`                                                      | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                                                                                                                                                       |
+| `DB_PATH`                                                           | indexer | The SQLite database (default `apps/indexer/.data/base.db`); `--db` overrides it                                                                                                                              |
+| `BASE_RPC_RPS`, `COW_API_RPS`                                       | indexer | Request rates per second for the RPC and CoW's API (defaults 15 and 3)                                                                                                                                       |
+| `REFRESH_MINUTES`                                                   | indexer | `loop.sh`'s interval and, through the snapshot, the live page's refetch interval (default 10). At any interval, the page shows Delayed once its data is more than 30 minutes old                             |
+| `SEED_DB_URL`                                                       | indexer | With `loop.sh`, download the database from this URL when `DB_PATH` does not exist                                                                                                                            |
+| `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                                                                                                                 |
+| `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | indexer | The account, and the S3 credentials of an R2 API token with Object Read & Write on that bucket only                                                                                                          |
+| `SNAPSHOT_R2_KEY`                                                   | both    | The snapshot's object key: where the indexer uploads it (default `base/snapshot.json`) and what the site reads through its `SNAPSHOTS` binding. If `SNAPSHOT_R2_KEY` is unset, the site reads the local file |
+| `SNAPSHOT_PATH`                                                     | web     | The local snapshot file when `SNAPSHOT_R2_KEY` is unset (default `apps/web/data/snapshot.json`)                                                                                                              |
+| `SITE_URL`                                                          | web     | The site's origin (default `http://localhost:3000`): absolute link-preview URLs, the canonical link, the sitemap, and the one host search engines may index                                                  |
+| `ALLOW_INDEXING`                                                    | web     | `true` lets search engines index requests to `SITE_URL`'s host; other hosts, pull-request previews included, stay `noindex`. Without it, every page is `noindex`                                             |
 
 On Cloudflare, the site's variables come from `vars` in `apps/web/wrangler.jsonc`.
 
@@ -123,7 +124,7 @@ site; the indexer writes it and the site derives every view from it with the vie
 - Time is cut into rolling days that end at the newest block (`end`). Daily series are newest first
   and zero-filled, so index `d` is always the day `d` days back.
 - `coverage` says how many days hold complete data: `chainDays` for batches, trades, DEX swaps,
-  gas and cost; `auctionDays` for volume, entries and wins; `surplusDays` for surplus.
+  gas and transaction cost; `auctionDays` for volume, entries and wins; `surplusDays` for surplus.
 - `solvers` holds each solver's identity, addresses and daily series, and its latest settlements;
   `auctions`, `latestAuctions`, `latestSettlements` and `registry` hold the rest of the page.
 - `schema` is `1`. Additive changes keep it; a breaking change bumps it, and the site refuses a
@@ -210,7 +211,7 @@ without indexing again.
 
 ## Running costs
 
-Measured on the live deployment on 3 October 2026.
+Measured on the live deployment on 3 Oct 2026.
 
 - **Site.** The Worker is 5.47 MB, 1.14 MB gzipped, within the Workers Free plan's
   [size limit](https://developers.cloudflare.com/workers/platform/limits/#worker-size). Requests and

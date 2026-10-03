@@ -10,7 +10,7 @@ auctions, by how much, whether that is changing, and how efficiently each solver
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp">
 <source media="(prefers-color-scheme: light)" srcset="docs/images/hero-light.webp">
-<img src="docs/images/hero-light.webp" alt="Fiberscope's overview: the headline “Two in five of all Base batches went to one solver in the last 24 hours.”, the day's totals, the period and measure controls, a mosaic of the day's batches by solver, and four facts: the leader's share, its lead over the runner-up, the day its run began and the lowest gas per trade.">
+<img src="docs/images/hero-light.webp" alt="Fiberscope's overview shows the headline “Two in five of all Base batches went to one solver in the last 24 hours.” It also shows the day's totals, period and measure controls, a mosaic of batches by solver, and four facts: the leader's share, its lead over the runner-up, the day its run began and the lowest gas per trade.">
 </picture>
 </a>
 
@@ -23,7 +23,7 @@ minutes.
 <tr>
 <td width="50%" valign="top">
 <img src="docs/images/who-is-winning.webp" alt="Who is winning over 7 days: the solver table ranked by share of batches, with the leader's detail open: its daily share, its figures against the network average, its latest auctions, its submission addresses and its latest settlements.">
-<p><b>Who is winning.</b> Each solver's share of batches, trades or volume over 24 hours, 7, 30, 90 or 180 days, with rank changes, entry and win rates. A row opens the solver's detail.</p>
+<p><b>Who is winning.</b> Each solver's share of batches, trades or volume over 24 hours or 7, 30, 90 or 180 days, with rank changes, the share of auctions entered, and win rates. A row opens the solver's detail view.</p>
 </td>
 <td width="50%" valign="top">
 <img src="docs/images/is-it-changing.webp" alt="Is it changing: daily batches across all solvers over 30 days, the last 7 days in bolder bars, and small charts of the top eight solvers' daily share.">
@@ -52,8 +52,8 @@ minutes.
 </tr>
 </table>
 
-Every view is a link (`?period=7d&measure=volume&solver=<id>`), the solver table copies as
-Markdown or downloads as CSV, and the page's Methodology defines every figure.
+Every view has a shareable URL (`?period=7d&measure=volume&solver=<id>`). The solver table can be
+copied as Markdown or downloaded as CSV, and the page's Methodology defines every figure.
 
 ## How it works
 
@@ -95,7 +95,7 @@ cd ../..
 pnpm dev   # http://localhost:3000
 ```
 
-The `sync` indexes the last day of Base, which takes about 20 minutes from scratch.
+The `sync` command indexes the last day of Base and takes about 20 minutes from scratch.
 [docs/development.md](docs/development.md) covers longer histories, keeping the data live,
 configuration, checks and deployment.
 
@@ -120,5 +120,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately, as
 
 ---
 
-Fiberscope is an independent project, not affiliated with CoW DAO. It is built by
-[Fibrous](https://fibrous.finance), which also runs a solver on CoW Protocol.
+Fiberscope is an independent project, not affiliated with CoW DAO.
+
+Built by [Fibrous](https://fibrous.finance), which also runs a solver.

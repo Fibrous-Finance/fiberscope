@@ -3,7 +3,7 @@
 	"scope": "Basis points of volume",
 	"sentence": "In {span}, trades beat the limit prices their users signed by {total}. The {unusualTrades} of trades with limits far from the market account for {unusualShare} of that. Leave those out and typical trades beat their limits by {typicalBps}\u00a0bps of volume, {typicalPerTrade} a trade.",
 	"sentenceNoUnusual": "In {span}, trades beat the limit prices their users signed by {total}: {bps}\u00a0bps of volume, {perTrade} a trade. None had a limit far from the market.",
-	"empty": "No surplus data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet. Surplus needs auction data and the terms each order was signed with.",
+	"empty": "No surplus data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet. Surplus needs auction data and each order’s signed terms.",
 	"legend": {
 		"typical": "Typical trades",
 		"all": "All trades",
@@ -14,12 +14,12 @@
 		"track": "Typical surplus · average {average}",
 		"partial": "{label}†",
 		"typical": "Typical",
-		"typicalShort": "Bps",
+		"typicalShort": "bps",
 		"all": "All trades",
 		"unusual": "Unusual"
 	},
-	"row": "{solver}: typical trades {typical}\u00a0bps, all trades {all}\u00a0bps, {unusual} of its surplus unusual, over {trades, plural, one {#\u00a0trade} other {#\u00a0trades}}",
-	"note": "Unusual: surplus above a tenth of the trade’s value, CoW’s cutoff. All-trades figures beyond the axis sit at its end, marked ›. Sorted by volume.",
+	"row": "{solver}: typical trades {typical}\u00a0bps, all trades {all}\u00a0bps, {unusual} of its surplus is unusual, over {trades, plural, one {#\u00a0trade} other {#\u00a0trades}}",
+	"note": "Unusual: surplus above a tenth of the trade’s value, CoW’s cutoff. All-trades figures beyond the axis range sit at its end, marked ›. Sorted by volume.",
 	"noteCompact": "Unusual: surplus above a tenth of the trade’s value. Sorted by volume.",
 	"source": "Source: CoW Protocol API · {network} settlement calldata",
 	"footnote": "† Surplus covers the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}."

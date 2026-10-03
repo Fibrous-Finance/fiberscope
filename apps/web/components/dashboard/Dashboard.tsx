@@ -33,8 +33,9 @@ import type { SnapshotResult } from "@/lib/snapshot";
 import { dataStatus } from "@/lib/status";
 
 const COMPACT_QUERY = "(max-width: 759.98px)";
-/** Before the page measures itself: the content width at 1280px. */
+/** Before the page measures itself: the content width at 1280px, or at 390px on a phone. */
 const DEFAULT_CONTENT_WIDTH = 1184;
+const PHONE_CONTENT_WIDTH = 350;
 /** The mosaic starts fading in this long after mount. */
 const INTRO_DELAY_MS = 120;
 
@@ -44,7 +45,16 @@ function subscribeCompact(onChange: () => void) {
 	return () => media.removeEventListener("change", onChange);
 }
 
-export function Dashboard({ result, selection }: { result: SnapshotResult; selection: Selection }) {
+export function Dashboard({
+	result,
+	selection,
+	phone,
+}: {
+	result: SnapshotResult;
+	selection: Selection;
+	/** The request most likely comes from a phone: render the compact layout before measuring. */
+	phone: boolean;
+}) {
 	const router = useRouter();
 	const f = useFormat();
 	const snapshot = result.ok ? result.snapshot : null;
@@ -56,13 +66,17 @@ export function Dashboard({ result, selection }: { result: SnapshotResult; selec
 	// Starts at the server's load time so the first client render matches it, then ticks.
 	const [clock, setClock] = useState(result.at);
 	const now = Math.max(clock, result.at);
-	const [contentWidth, setContentWidth] = useState(DEFAULT_CONTENT_WIDTH);
+	const [contentWidth, setContentWidth] = useState(
+		phone ? PHONE_CONTENT_WIDTH : DEFAULT_CONTENT_WIDTH
+	);
 	const [intro, setIntro] = useState(false);
 	const [retrying, startRetry] = useTransition();
+	// The server cannot measure the window: it guesses from the request, and the client corrects
+	// the guess right after hydration if the window says otherwise.
 	const compact = useSyncExternalStore(
 		subscribeCompact,
 		() => window.matchMedia(COMPACT_QUERY).matches,
-		() => false
+		() => phone
 	);
 	const mainRef = useRef<HTMLElement>(null);
 

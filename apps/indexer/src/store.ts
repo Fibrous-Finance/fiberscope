@@ -393,8 +393,8 @@ export class Store {
 	}
 
 	/**
-	 * Flash-loan router batches whose sender and recipient are not allow-listed, never looked up
-	 * in the API.
+	 * Flash-loan router batch transactions never looked up in the API whose sender is not
+	 * allow-listed and whose recipient is the router or not allow-listed.
 	 */
 	unresolvedRouterTxs(
 		router: string

@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 
+import { MIN_BATCHES_PER_DAY } from "@fiberscope/core";
+
 import { useDashboard } from "@/components/dashboard/context";
 import { Section } from "@/components/ui/Section";
 
@@ -61,9 +63,10 @@ export function Methodology() {
 					})
 				: t("terms.coverage.noData");
 		}
+		if (key === "gas") return t("terms.gas.text", { minBatches: MIN_BATCHES_PER_DAY });
 		return t(`terms.${key}.text`);
 	};
-	// Compact: one column, each term 14px above its definition.
+	// Compact: one column, 14px above each term.
 	const list = (keys: readonly Term[]) => (
 		<dl className="grid grid-cols-1 content-start text-[14px] leading-[1.55] wide:grid-cols-[max-content_minmax(0,1fr)] wide:gap-x-6 wide:gap-y-3">
 			{keys.map((key) => (

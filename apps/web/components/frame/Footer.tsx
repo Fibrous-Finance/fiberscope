@@ -1,6 +1,7 @@
 import { useTranslations } from "next-intl";
 
 import { Logo } from "@/components/frame/Logo";
+import { arrow } from "@/components/ui/Section";
 
 const SOURCE_URL = "https://github.com/Fibrous-Finance/fiberscope";
 
@@ -35,7 +36,7 @@ export function Footer({ away }: { /** On pages other than the overview. */ away
 						rel="noopener"
 						className="flex min-h-11 items-center quiet wide:min-h-8"
 					>
-						{t("source")}
+						{t.rich("source", { arrow })}
 					</a>
 				</nav>
 			</div>

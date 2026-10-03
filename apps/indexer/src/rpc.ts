@@ -32,12 +32,16 @@ const TIMEOUT_MS = 30_000;
 /** HTTP requests one `batch()` keeps in flight. */
 const LANES = 3;
 /**
- * `eth_call` is limited far more tightly than other methods: the public Base RPC sustains about
- * 15 calls/s overall but only 0.5 `eth_call`/s, so it gets a pacer of its own at 1/30 the rate.
+ * `eth_call` is limited far more tightly than other methods on the public Base RPC: measured at
+ * about 15 calls/s overall but only about 0.5 `eth_call`/s (it publishes no limits). So it gets a
+ * pacer of its own at 1/30 of BASE_RPC_RPS, which is 0.5/s at the default 15.
  */
 const ETH_CALL_SHARE = 1 / 30;
 
-/** A rate-limited JSON-RPC client that retries rate limits, server errors and timeouts. */
+/**
+ * A rate-limited JSON-RPC client that retries rate limits, failed HTTP requests, timeouts and
+ * transient node errors.
+ */
 export class Rpc {
 	readonly url: string;
 	readonly stats = { calls: 0, requests: 0, retries: 0 };

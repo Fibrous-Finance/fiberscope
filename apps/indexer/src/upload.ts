@@ -6,8 +6,7 @@ const TIMEOUT_MS = 60_000;
 
 /**
  * Uploads the snapshot JSON to R2 through its S3 API, replacing the previous one. S3 requests are
- * what a bucket-scoped R2 API token can sign; Cloudflare's own object API accepts only tokens with
- * write access to every bucket in the account.
+ * signed with the S3 credentials of an R2 API token, which can be scoped to this one bucket.
  */
 export async function uploadSnapshot(target: R2Target, json: string): Promise<void> {
 	const body = Buffer.from(json);

@@ -13,7 +13,7 @@ import { useFormat } from "@/lib/format";
 
 /**
  * Who won the window, in one sentence, then the totals, the period and measure controls, the
- * batch mosaic and four key facts. The hero also carries the loading, empty, error and delayed
+ * mosaic and four key facts. The hero also carries the loading, empty, error and delayed
  * states.
  */
 export function Hero() {
@@ -84,10 +84,16 @@ export function Hero() {
 		<Frame>
 			<h1 className="mt-[18px] max-w-[19ch] headline">
 				{empty
-					? t("empty.headline", { network, span })
+					? // Batches can settle without volume data (no auction data yet): say which.
+						t(view.totals.batches > 0 ? "empty.noVolume" : "empty.headline", {
+							network,
+							span,
+						})
 					: t("headline", {
 							fraction: fraction.key,
 							n: fraction.key === "oneIn" ? fraction.n : 0,
+							// "Two in five" counts things; volume takes "two-fifths".
+							kind: view.measure,
 							network,
 							measure: tc(`measure.${view.measure}`),
 							span,

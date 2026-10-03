@@ -6,8 +6,8 @@ import { BASE, sortRows } from "@fiberscope/core";
 import type { Row } from "@fiberscope/core";
 
 import { useDashboard, useView } from "@/components/dashboard/context";
-import { FootLine, Section } from "@/components/ui/Section";
-import { cellText, COLUMNS, useColumnLabels } from "@/components/winning/columns";
+import { arrow, FootLine, Section } from "@/components/ui/Section";
+import { cellText, COLUMNS, useHeaderLabels } from "@/components/winning/columns";
 import { List, Table } from "@/components/winning/Leaderboard";
 import { Registry } from "@/components/winning/Registry";
 import { useCopy } from "@/components/winning/useCopy";
@@ -35,7 +35,8 @@ export function Winning() {
 	const t = useTranslations("Winning");
 	const tc = useTranslations("Common");
 	const f = useFormat();
-	const labels = useColumnLabels();
+	const partial = view.coverage.auction < view.days;
+	const labels = useHeaderLabels(partial);
 	const [copied, copy] = useCopy(COPIED_MS);
 
 	const rows = sortRows(view.rows, sort);
@@ -44,6 +45,13 @@ export function Winning() {
 	const runnerUp = view.rows.at(1);
 	const rival = runnerUp && runnerUp.share > 0 ? runnerUp : null;
 	const volumeLeader = view.volumeLeader;
+	// The coverage notes under the table; Copy as Markdown carries them too.
+	const notes = [
+		view.coverage.chain < view.days
+			? tc("coverage.chain", { covered: view.coverage.chain, days: view.days })
+			: null,
+		partial ? t("auctionCoverage", { covered: view.coverage.auction, days: view.days }) : null,
+	].filter((note) => note !== null);
 
 	const copyMarkdown = () => {
 		const [head, ...body] = [
@@ -54,8 +62,20 @@ export function Winning() {
 				...COLUMNS.map((key) => cellText(row, key, f)),
 			]),
 		].map((cells) => `| ${cells.join(" | ")} |`);
-		const source = t("markdownSource", { network: tc("network"), window: span });
-		copy([head, MARKDOWN_ALIGN, ...body, "", source].join("\n"));
+		// Pasted elsewhere, "Share" needs its measure.
+		const source = t("markdownSource", {
+			network: tc("network"),
+			measure: tc(`measure.${view.measure}`),
+			window: span,
+		});
+		copy(
+			[
+				head,
+				MARKDOWN_ALIGN,
+				...body,
+				...[...notes, source].flatMap((line) => ["", line]),
+			].join("\n")
+		);
 	};
 
 	return (
@@ -65,15 +85,17 @@ export function Winning() {
 					<h2 className="section-title">{t("title")}</h2>
 					<p className="mt-3 answer">
 						{t("answer", {
+							lead: !rival ? "alone" : rival.share === leader.share ? "tie" : "rival",
 							leader: leader.label,
 							share: f.percent(leader.share, 1),
 							measure: tc(`measure.${view.measure}`),
-							rival: rival ? "yes" : "no",
 							ratio: rival ? f.times(leader.share / rival.share) : "",
 							runnerUp: rival?.label ?? "",
-							byVolume: volumeLeader ? "yes" : "no",
+							// Volume needs auction data: name its span when that is shorter.
+							byVolume: volumeLeader ? (partial ? "partial" : "yes") : "no",
 							volumeLeader: volumeLeader?.label ?? "",
 							volumeShare: f.percent(volumeLeader?.shares.volume ?? null),
+							volumeDays: view.coverage.auction,
 						})}
 					</p>
 				</div>
@@ -98,22 +120,18 @@ export function Winning() {
 			<Table rows={rows} />
 			<List rows={rows} />
 			<FootLine source={t("source", { network: tc("network") })}>
-				{t("note", {
+				{t.rich("note", {
 					earlier: view.hasEarlierWindow ? "yes" : "no",
 					previous: tc(`previousPeriod.${view.period}`),
 					window: span,
+					arrow,
 				})}
 			</FootLine>
-			{view.coverage.chain < view.days ? (
-				<div className="mt-1.5 foot-line">
-					{tc("coverage.chain", { covered: view.coverage.chain, days: view.days })}
+			{notes.map((note) => (
+				<div key={note} className="mt-1.5 foot-line">
+					{note}
 				</div>
-			) : null}
-			{view.coverage.auction < view.days ? (
-				<div className="mt-1.5 foot-line">
-					{t("auctionCoverage", { covered: view.coverage.auction, days: view.days })}
-				</div>
-			) : null}
+			))}
 			<Registry />
 		</Section>
 	);

@@ -1,4 +1,4 @@
-/** Writes one progress line to stdout, prefixed with the UTC time. Errors go to stderr. */
+/** Writes one progress line to stdout, prefixed with the UTC time of day. */
 export function log(message: string): void {
 	process.stdout.write(`${new Date().toISOString().slice(11, 19)} ${message}\n`);
 }
@@ -21,7 +21,7 @@ export function fmt(value: number, digits = 0): string {
 	});
 }
 
-/** An address shortened for display, as in 0x588e…5e30. */
+/** An address shortened for display, as in 0x1234…cdef. */
 export function shortAddress(address: string): string {
 	return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }

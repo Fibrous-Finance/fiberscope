@@ -6,7 +6,7 @@ import { createFormat } from "./format.ts";
 const f = createFormat("en");
 
 describe("format", () => {
-	it("abbreviates dollars by the design's thresholds", () => {
+	it("abbreviates dollars with fewer decimals as amounts grow", () => {
 		assert.equal(f.usd(4_870_000), "$4.87M");
 		assert.equal(f.usd(285_674), "$286K");
 		assert.equal(f.usd(52_998), "$53.0K");
@@ -16,6 +16,17 @@ describe("format", () => {
 		assert.equal(f.usd(0.6), "<$1");
 		assert.equal(f.usd(0), "$0");
 		assert.equal(f.usd(null), "—");
+	});
+
+	it("moves dollars up a tier where rounding would reach the next one", () => {
+		assert.equal(f.usd(999.4), "$999");
+		assert.equal(f.usd(999.6), "$1.00K");
+		assert.equal(f.usd(9_994), "$9.99K");
+		assert.equal(f.usd(9_996), "$10.0K");
+		assert.equal(f.usd(99_949), "$99.9K");
+		assert.equal(f.usd(99_960), "$100K");
+		assert.equal(f.usd(999_499), "$999K");
+		assert.equal(f.usd(999_600), "$1.00M");
 	});
 
 	it("switches gas to millions before thousands would round to 1000K", () => {
@@ -30,6 +41,18 @@ describe("format", () => {
 		assert.equal(f.points(-0.31), "−0.3");
 		assert.equal(f.points(0.04), "±0.0");
 		assert.equal(f.points(-0.04), "±0.0");
+	});
+
+	it("shows a share that is neither 0 nor 1 as neither 0% nor 100%", () => {
+		assert.equal(f.percent(0), "0%");
+		assert.equal(f.percent(0.004), "<1%");
+		assert.equal(f.percent(0.005), "1%");
+		assert.equal(f.percent(0.0004, 1), "<0.1%");
+		assert.equal(f.percent(0.469, 1), "46.9%");
+		assert.equal(f.percent(0.994), "99%");
+		assert.equal(f.percent(0.996), ">99%");
+		assert.equal(f.percent(0.9996, 1), ">99.9%");
+		assert.equal(f.percent(1), "100%");
 	});
 
 	it("writes English dates day first with three-letter months, in UTC", () => {

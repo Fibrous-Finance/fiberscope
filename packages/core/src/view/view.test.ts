@@ -146,6 +146,33 @@ describe("buildView", () => {
 		assert.equal(all.leaderRun?.previous, null);
 	});
 
+	it("gives a tied day no leader, so a tie neither tops nor extends a run", () => {
+		// Today A and B tie: no one topped it.
+		const today = buildView(
+			snapshot(2, 0, [
+				solver("a", "A", { batches: [7, 9] }),
+				solver("b", "B", { batches: [7, 1] }),
+			]),
+			"24h",
+			"batches"
+		);
+		assert.equal(today.leaderRun, null);
+
+		// B leads today and yesterday; the day before, A and B tied, so B took over from no one.
+		const earlier = buildView(
+			snapshot(4, 0, [
+				solver("a", "A", { batches: [1, 1, 5, 9] }),
+				solver("b", "B", { batches: [6, 6, 5, 1] }),
+			]),
+			"24h",
+			"batches"
+		);
+		assert.equal(earlier.leaderRun?.solver.id, "b");
+		assert.equal(earlier.leaderRun?.days, 2);
+		assert.equal(earlier.leaderRun?.atLeast, false);
+		assert.equal(earlier.leaderRun?.previous, null);
+	});
+
 	it("aligns daily shares with the history dates, oldest first", () => {
 		const s = snapshot(3, 0, [
 			solver("a", "A", { batches: [1, 3, 0] }),
@@ -202,13 +229,13 @@ describe("buildView", () => {
 
 	it("labels unnamed solvers by their shortened prod address", () => {
 		const s = snapshot(1, 0, [
-			solver("0x588ef3de14875ff9c4fc74c9e2c308767d665e30", null, {
-				addresses: [{ env: "prod", address: "0x588ef3de14875ff9c4fc74c9e2c308767d665e30" }],
+			solver("0x0123456789abcdef0123456789abcdef01234567", null, {
+				addresses: [{ env: "prod", address: "0x0123456789abcdef0123456789abcdef01234567" }],
 				batches: [1],
 			}),
 		]);
 		const [r] = buildView(s, "24h", "batches").rows;
-		assert.equal(r?.label, "0x588e…5e30");
+		assert.equal(r?.label, "0x0123…4567");
 		assert.equal(r?.unnamed, true);
 	});
 });
@@ -231,7 +258,9 @@ describe("tapeCell", () => {
 });
 
 describe("fractionOf", () => {
-	it("uses the design's thresholds", () => {
+	it("maps shares to the headline's fractions, all only when one solver has everything", () => {
+		assert.deepEqual(fractionOf(1), { key: "all" });
+		assert.deepEqual(fractionOf(0.999), { key: "moreThanHalf" });
 		assert.deepEqual(fractionOf(0.55), { key: "moreThanHalf" });
 		assert.deepEqual(fractionOf(0.469), { key: "nearlyHalf" });
 		assert.deepEqual(fractionOf(0.18), { key: "oneInFive" });

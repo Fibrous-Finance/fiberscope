@@ -89,7 +89,7 @@ export interface NetworkBars {
 }
 
 /**
- * One bar per day with data, centred in its day and 70% as wide; the highest day reaches 96% of
+ * One bar per day with data, centered in its day and 70% as wide; the highest day reaches 96% of
  * the height. Days without data get no bar.
  */
 export function networkBars(

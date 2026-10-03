@@ -1,6 +1,9 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
-/** Exponential backoff with jitter: about 0.5 s on the first retry, doubling up to `capMs`. */
+/**
+ * Exponential backoff with jitter: a random delay between half and all of 500 ms × 2^attempt,
+ * capped at `capMs`.
+ */
 export function backoff(attempt: number, capMs = 30_000): number {
 	const ceiling = Math.min(capMs, 500 * 2 ** attempt);
 	return ceiling / 2 + (Math.random() * ceiling) / 2;

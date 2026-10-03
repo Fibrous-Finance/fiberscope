@@ -33,9 +33,15 @@ export interface AuctionStats {
 
 /** Concurrent lookups. */
 const LANES = 4;
-/** An auction's settlements land between its start and its deadline, 6–8 blocks later. */
+/**
+ * Blocks within which one auction's settlements land: between its start and its deadline,
+ * observed at 6–8 blocks after the start on Base.
+ */
 const SAME_AUCTION_BLOCKS = 10;
-/** The API links a settlement within seconds; a miss checked this long after it is final. */
+/**
+ * Seconds after a settlement's block after which an API miss is final; the API normally links a
+ * settlement much sooner.
+ */
 const MISS_IS_FINAL_AFTER = 600;
 
 /** Whether a batch transaction still needs a competition lookup. */
@@ -201,9 +207,9 @@ export async function catchUpAuctions(
 }
 
 /**
- * Looks up the competitions of flash-loan router settlements whose recipient and sender are
- * neither registered nor allow-listed, wherever they are: their attribution falls back to the
- * API's winner.
+ * Looks up the competitions of flash-loan router settlements anywhere in the chain data, not only
+ * in the auction range, whose recipient and sender are neither registered nor allow-listed: their
+ * attribution falls back to the API's winner.
  */
 export async function resolveRouterSenders(
 	store: Store,

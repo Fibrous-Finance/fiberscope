@@ -1,6 +1,8 @@
 {
 	"name": "@fiberscope/indexer",
+	"description": "Indexes CoW Protocol settlements and auctions on Base into SQLite and writes the page's snapshot",
 	"private": true,
+	"license": "MIT",
 	"version": "0.1.0",
 	"type": "module",
 	"engines": {

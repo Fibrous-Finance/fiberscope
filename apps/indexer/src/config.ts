@@ -11,10 +11,13 @@ export const BLOCKS_PER_DAY = 86_400 / NETWORK.blockTime;
 /** Blocks left between the indexed end and the chain head, as a margin against reorgs. */
 export const CONFIRMATIONS = 20;
 
-/** Widest block range the public Base RPC accepts for `eth_getLogs`. */
+/**
+ * Blocks per `eth_getLogs` request, and the step of the auction backfill and catch-up. Base's docs
+ * recommend ranges under 2,000 blocks; a range the node refuses is split (see `getLogs`).
+ */
 export const LOG_RANGE = 2_000;
 
-/** Most calls one JSON-RPC batch may carry on the public Base RPC. */
+/** Calls per JSON-RPC batch request, kept small for the public Base RPC. */
 export const RPC_BATCH_SIZE = 10;
 
 /** Wrapped ether on Base. Buys of native ETH are priced with it. */
@@ -46,6 +49,10 @@ export interface Env {
 	rpcRps: number;
 	/** Most CoW API requests per second. */
 	cowApiRps: number;
+	/**
+	 * REFRESH_MINUTES: written into the snapshot as the page's refetch interval. `loop.sh` reads
+	 * the same variable, in whole minutes, from its own environment for its schedule.
+	 */
 	refreshMinutes: number;
 	/** Where snapshots are uploaded besides the local file; null without SNAPSHOT_R2_BUCKET. */
 	upload: R2Target | null;

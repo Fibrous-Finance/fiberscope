@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { mosaic, MOSAIC_COMPACT, MOSAIC_UNITS, MOSAIC_WIDE } from "./charts.ts";
 
 describe("mosaic", () => {
-	it("matches the design at 1280px: one square per batch, 35 rows", () => {
+	it("fits 3,652 batches in a 1184px-wide mosaic: one square per batch, 35 rows", () => {
 		const m = mosaic([1711, 474, 317, 1150], 1184, MOSAIC_WIDE);
 		assert.equal(m.unit, 1);
 		assert.equal(m.squares, 3652);

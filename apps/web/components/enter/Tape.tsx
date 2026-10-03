@@ -9,6 +9,7 @@ import type { TapeCell, TapeRow as TapeRowData, View } from "@fiberscope/core";
 
 import { useHover } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
+import { arrow } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
 
@@ -17,8 +18,8 @@ const WIDE_COLUMNS = 48;
 const COMPACT_COLUMNS = 24;
 
 /**
- * The name column: as wide as the bars' names on wide pages, 112px on compact ones so
- * "Sector Finance" fits.
+ * The name column: as wide as the bars' names on wide pages, 112px on compact ones, room for a
+ * typical two-word solver name.
  */
 const NAME_COLUMN = "flex-[0_0_112px] pr-3 wide:flex-[0_0_clamp(96px,16vw,190px)]";
 /** Where the cells start, past the name column. */
@@ -33,9 +34,9 @@ const MARKS: Record<TapeCell["state"], string> = {
 
 /**
  * The latest auctions, one column each and one row per solver. The tape is a single tab stop:
- * ← → Home End move the selected auction, Enter opens it in CoW Explorer. On wide pages hovering
- * a column selects it and each cell links to its settlement, kept out of the tab order; on compact
- * pages a tap only selects, and the readout's link opens the auction.
+ * ← → Home End move the selected auction, Enter opens its settlement in CoW Explorer. On wide pages
+ * hovering a column selects it and each cell links to its settlement, kept out of the tab order;
+ * on compact pages a tap only selects, and the readout's link opens the settlement.
  */
 export function Tape({
 	tape,
@@ -112,7 +113,7 @@ export function Tape({
 							rel="noopener"
 							className="whitespace-nowrap quiet max-wide:inline-flex max-wide:min-h-11 max-wide:items-center"
 						>
-							{tc("cowExplorer")}
+							{tc.rich("cowExplorer", { arrow })}
 						</a>
 					) : null}
 				</span>

@@ -11,7 +11,7 @@ import type { BlockRange } from "./rules.ts";
 import { Store } from "./store.ts";
 
 const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
-const SOLVER = "0x588ef3de14875ff9c4fc74c9e2c308767d665e30";
+const SOLVER = "0x5050505050505050505050505050505050505050";
 
 interface Settled {
 	tx: string;

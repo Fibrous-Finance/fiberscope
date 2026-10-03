@@ -1,6 +1,8 @@
 {
 	"name": "@fiberscope/core",
+	"description": "The snapshot contract, view model, formatting and chart geometry shared by the indexer and the site",
 	"private": true,
+	"license": "MIT",
 	"version": "0.1.0",
 	"type": "module",
 	"exports": {

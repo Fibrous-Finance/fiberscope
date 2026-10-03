@@ -14,6 +14,7 @@ import {
 import type { LinePath, Row, TapeCell } from "@fiberscope/core";
 
 import { useDashboard, useView } from "@/components/dashboard/context";
+import { arrow } from "@/components/ui/Section";
 import { cellText, useColumnLabels } from "@/components/winning/columns";
 import { useCopy } from "@/components/winning/useCopy";
 
@@ -21,7 +22,10 @@ import { useFormat } from "@/lib/format";
 
 /** The detail under an open row: two blocks on desktop, one stack in the compact list. */
 
-/** Below this visible table width, Block A moves its third column underneath and Block B stacks. */
+/**
+ * Below this visible table width, the first block moves its third column underneath and the
+ * second stacks.
+ */
 const NARROW_TABLE = 1120;
 /** The share chart's y-range spans at least 4 percentage points. */
 const MIN_SPAN = 0.04;
@@ -42,7 +46,7 @@ const RETIRED = "text-[10.5px] tracking-[.06em] text-fa uppercase";
 const SETTLEMENT_GRID =
 	"grid grid-cols-[96px_46px_46px_minmax(0,1fr)_76px_56px_200px] items-center gap-3";
 
-/** A won auction is a square, an entered one a dot, a missed one a faint speck. */
+/** A won auction is a square, an entered one a dot, one it did not enter a faint speck. */
 const DOT: Record<TapeCell["state"], string> = {
 	won: "size-2 rounded-[2px] bg-fg",
 	entered: "size-1 rounded-full bg-[color-mix(in_oklab,var(--fg)_45%,transparent)]",
@@ -113,7 +117,12 @@ function useDetail(row: Row) {
 	const registration = registrationOf(snapshot?.registry ?? [], row);
 
 	return {
-		title: t("detail.shareOf", { measure, days: view.history.length }),
+		// The big value is the window's share, so the label names the window (the chart's own
+		// span is under it): the days its measure has data for.
+		title: t("detail.shareOf", {
+			measure,
+			days: view.measure === "volume" ? view.coverage.auction : view.coverage.chain,
+		}),
 		share: f.percent(row.share, 1),
 		trend: t("detail.trend", {
 			points: tc("points", { value: f.points((last - first) * 100) }),
@@ -173,7 +182,7 @@ function useDetail(row: Row) {
 						? DASH
 						: t("detail.stats.gas", {
 								percent: f.percent(Math.abs(gasDiff)),
-								direction: gasDiff < 0 ? "below" : "above",
+								direction: gasDiff < 0 ? "below" : gasDiff > 0 ? "above" : "same",
 							}),
 			},
 			{
@@ -227,11 +236,11 @@ function useDetail(row: Row) {
 				average: f.gas(gasAverage),
 			}),
 		},
-		/** "Active in CoW's registry"; null for a solver the registry does not list. */
+		/** "Active" or "Inactive"; null for a solver the registry does not list. */
 		registry:
 			registration.active === null
 				? null
-				: t("detail.registry", { status: registration.active ? "active" : "inactive" }),
+				: t("registry.status", { status: registration.active ? "active" : "inactive" }),
 		addresses: registration.addresses.map((a) => ({
 			key: `${a.env}:${a.address}`,
 			label: t(`detail.env.${a.env}`),
@@ -394,7 +403,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 												rel="noopener"
 												className="whitespace-nowrap quiet"
 											>
-												{tc("basescan")}
+												{tc.rich("basescan", { arrow })}
 											</a>
 										</>
 									)}
@@ -434,7 +443,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 									rel="noopener"
 									className="whitespace-nowrap quiet"
 								>
-									{tc("cowExplorer")}
+									{tc.rich("cowExplorer", { arrow })}
 								</a>
 								<a
 									href={s.scan}
@@ -442,7 +451,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 									rel="noopener"
 									className="whitespace-nowrap quiet"
 								>
-									{tc("basescan")}
+									{tc.rich("basescan", { arrow })}
 								</a>
 							</span>
 						</div>
@@ -539,7 +548,7 @@ export function DetailCompact({ row }: { row: Row }) {
 										rel="noopener"
 										className="-my-[15px] py-[15px] whitespace-nowrap quiet"
 									>
-										{tc("basescan")}
+										{tc.rich("basescan", { arrow })}
 									</a>
 								</>
 							)}
@@ -565,7 +574,7 @@ export function DetailCompact({ row }: { row: Row }) {
 									rel="noopener"
 									className="flex min-h-11 items-center whitespace-nowrap quiet"
 								>
-									{tc("explorer")}
+									{tc.rich("explorer", { arrow })}
 								</a>
 								<a
 									href={s.scan}
@@ -573,7 +582,7 @@ export function DetailCompact({ row }: { row: Row }) {
 									rel="noopener"
 									className="flex min-h-11 items-center whitespace-nowrap quiet"
 								>
-									{tc("basescan")}
+									{tc.rich("basescan", { arrow })}
 								</a>
 							</span>
 						</div>

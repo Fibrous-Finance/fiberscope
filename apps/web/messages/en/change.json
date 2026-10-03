@@ -3,7 +3,8 @@
 	"leader": {
 		"after": "{solver} has topped daily {measure} for {days, plural, one {# day} other {# straight days}}, taking over from {previous}.",
 		"atLeast": "{solver} has topped daily {measure} for at least {days, plural, one {# day} other {# straight days}}.",
-		"alone": "{solver} has topped daily {measure} for {days, plural, one {# day} other {# straight days}}."
+		"alone": "{solver} has topped daily {measure} for {days, plural, one {# day} other {# straight days}}.",
+		"none": "No single solver topped daily {measure} {span}."
 	},
 	"gain": "Biggest gain against {previousPeriod}: {solver}, {points}.",
 	"leaderGain": "It also gained the most share against {previousPeriod}: {points}.",
@@ -26,7 +27,8 @@
 		"spanTo": "{days, plural, =1 {in the 24 hours to {asOf}} other {a day, # days to {asOf}}}",
 		"caption": "{unit} {span} · {change}% on {previousPeriod}",
 		"captionFirst": "{unit} {span} · no earlier window to compare yet",
-		"darker": "Darker: the last {days, plural, =1 {24 hours} other {# days}}",
+		"window": "{days, plural, =1 {Bolder: the last 24\u00a0hours} other {Bolder: the last #\u00a0days}}",
+		"windowTo": "{days, plural, =1 {Bolder: the 24\u00a0hours to {asOf}} other {Bolder: the #\u00a0days to {asOf}}}",
 		"starts": "{measure, select, volume {Volume data starts {date}} other {Data starts {date}}}",
 		"chart": "Daily {noun} across all solvers, {start} to {end}: between {min} and {max} a day."
 	},

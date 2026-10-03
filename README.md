@@ -83,12 +83,13 @@ cd ../..
 pnpm dev   # http://localhost:3000
 ```
 
-To keep the data live, rerun `sync` on a schedule with `--budget-minutes` below the interval, so
-long backfills never hold up fresh data. `apps/indexer/loop.sh` does this: it runs `sync` with its
-arguments every `REFRESH_MINUTES` (whole minutes, default 10, counted from the start of each run).
+To keep the data live, rerun `sync` on a schedule with `--budget-minutes` set to the interval: the
+backfill stops when the next run is due, so long backfills never hold up fresh data and no time
+between runs is idle. `apps/indexer/loop.sh` does this: it runs `sync` with its arguments every
+`REFRESH_MINUTES` (whole minutes, default 10, counted from the start of each run).
 
 ```sh
-REFRESH_MINUTES=10 sh apps/indexer/loop.sh --budget-minutes 8 --snapshot ../web/data/snapshot.json
+REFRESH_MINUTES=10 sh apps/indexer/loop.sh --budget-minutes 10 --snapshot ../web/data/snapshot.json
 ```
 
 The indexer's `sync` and `snapshot` scripts, and each `sync` that `loop.sh` starts, read

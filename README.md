@@ -83,15 +83,29 @@ cd ../..
 pnpm dev   # http://localhost:3000
 ```
 
-To keep the data live, rerun `sync` on a schedule, e.g. every 10 minutes with
-`--budget-minutes 8` so long backfills never hold up fresh data. The indexer's `sync` and
-`snapshot` scripts read `apps/indexer/.env` when it exists.
+To keep the data live, rerun `sync` on a schedule with `--budget-minutes` below the interval, so
+long backfills never hold up fresh data. `apps/indexer/loop.sh` does this: it runs `sync` with its
+arguments every `REFRESH_MINUTES` (whole minutes, default 10, counted from the start of each run).
+
+```sh
+REFRESH_MINUTES=10 sh apps/indexer/loop.sh --budget-minutes 8 --snapshot ../web/data/snapshot.json
+```
+
+The indexer's `sync` and `snapshot` scripts, and each `sync` that `loop.sh` starts, read
+`apps/indexer/.env` when it exists.
+
+`node src/cli.ts seed --url <url>` downloads the database from a URL, e.g. a presigned R2 link,
+when there is none yet, so a new host does not index again. It never overwrites a database and
+checks the download's integrity before using it. `loop.sh` runs it first when `SEED_DB_URL` is set
+and `DB_PATH` does not exist; both must be set in the environment, not in `.env`.
 
 | Variable                      | Used by | Purpose                                                                                                                |
 | ----------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `BASE_RPC_URL`                | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                                                                 |
+| `DB_PATH`                     | indexer | The SQLite database (default `apps/indexer/.data/base.db`); `--db` overrides it                                        |
 | `BASE_RPC_RPS`, `COW_API_RPS` | indexer | Request rates for the RPC and CoW's API                                                                                |
-| `REFRESH_MINUTES`             | indexer | The schedule the page expects; data older than three runs shows as delayed                                             |
+| `REFRESH_MINUTES`             | indexer | The schedule the page expects, and `loop.sh`'s interval; data older than three runs shows as delayed                   |
+| `SEED_DB_URL`                 | indexer | With `loop.sh`, download the database from this URL when `DB_PATH` does not exist                                      |
 | `SNAPSHOT_R2_BUCKET`          | indexer | Also upload every snapshot to this R2 bucket; needs `CLOUDFLARE_ACCOUNT_ID` and a `CLOUDFLARE_API_TOKEN` with R2 write |
 | `SNAPSHOT_R2_KEY`             | both    | The snapshot's object key (default `base/snapshot.json`); the Worker reads it through its `SNAPSHOTS` binding          |
 | `SNAPSHOT_PATH`               | web     | The local snapshot file when `SNAPSHOT_R2_KEY` is unset (default `data/snapshot.json`)                                 |
@@ -120,7 +134,17 @@ serves the Workers build locally, with `apps/web/.dev.vars` overriding variables
 
 The indexer runs anywhere Node 24 runs. It needs a persistent disk for its database and
 `SNAPSHOT_R2_BUCKET`, with a token that can write to the bucket, so every snapshot reaches the
-site.
+site. `apps/indexer/Dockerfile` builds an image that runs `loop.sh`, from the repository root:
+
+```sh
+docker build -f apps/indexer/Dockerfile -t fiberscope-indexer .
+docker run -v fiberscope-data:/data --env-file apps/indexer/.env fiberscope-indexer
+```
+
+The database (`DB_PATH=/data/base.db`) and the local snapshot live on the volume at `/data`. Until
+its permanent server is decided, the indexer runs from this image on
+[Railway](https://railway.com), with a volume at `/data`. `SEED_DB_URL` moves it to a new host
+with the existing database.
 
 ## Status
 

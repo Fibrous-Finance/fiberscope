@@ -99,18 +99,19 @@ when there is none yet, so a new host does not index again. It never overwrites 
 checks the download's integrity before using it. `loop.sh` runs it first when `SEED_DB_URL` is set
 and `DB_PATH` does not exist; both must be set in the environment, not in `.env`.
 
-| Variable                      | Used by | Purpose                                                                                                                |
-| ----------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `BASE_RPC_URL`                | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                                                                 |
-| `DB_PATH`                     | indexer | The SQLite database (default `apps/indexer/.data/base.db`); `--db` overrides it                                        |
-| `BASE_RPC_RPS`, `COW_API_RPS` | indexer | Request rates for the RPC and CoW's API                                                                                |
-| `REFRESH_MINUTES`             | indexer | The schedule the page expects, and `loop.sh`'s interval; data older than three runs shows as delayed                   |
-| `SEED_DB_URL`                 | indexer | With `loop.sh`, download the database from this URL when `DB_PATH` does not exist                                      |
-| `SNAPSHOT_R2_BUCKET`          | indexer | Also upload every snapshot to this R2 bucket; needs `CLOUDFLARE_ACCOUNT_ID` and a `CLOUDFLARE_API_TOKEN` with R2 write |
-| `SNAPSHOT_R2_KEY`             | both    | The snapshot's object key (default `base/snapshot.json`); the Worker reads it through its `SNAPSHOTS` binding          |
-| `SNAPSHOT_PATH`               | web     | The local snapshot file when `SNAPSHOT_R2_KEY` is unset (default `data/snapshot.json`)                                 |
-| `SITE_URL`                    | web     | The site's origin, for absolute link-preview URLs                                                                      |
-| `ALLOW_INDEXING`              | web     | `true` lets search engines index the site; otherwise every page is `noindex`                                           |
+| Variable                                                            | Used by | Purpose                                                                                                       |
+| ------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `BASE_RPC_URL`                                                      | indexer | Base RPC endpoint (default `https://mainnet.base.org`)                                                        |
+| `DB_PATH`                                                           | indexer | The SQLite database (default `apps/indexer/.data/base.db`); `--db` overrides it                               |
+| `BASE_RPC_RPS`, `COW_API_RPS`                                       | indexer | Request rates for the RPC and CoW's API                                                                       |
+| `REFRESH_MINUTES`                                                   | indexer | The schedule the page expects, and `loop.sh`'s interval; data older than three runs shows as delayed          |
+| `SEED_DB_URL`                                                       | indexer | With `loop.sh`, download the database from this URL when `DB_PATH` does not exist                             |
+| `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                  |
+| `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | indexer | The account, and the S3 credentials of an R2 API token with Object Read & Write on that bucket only           |
+| `SNAPSHOT_R2_KEY`                                                   | both    | The snapshot's object key (default `base/snapshot.json`); the Worker reads it through its `SNAPSHOTS` binding |
+| `SNAPSHOT_PATH`                                                     | web     | The local snapshot file when `SNAPSHOT_R2_KEY` is unset (default `data/snapshot.json`)                        |
+| `SITE_URL`                                                          | web     | The site's origin, for absolute link-preview URLs                                                             |
+| `ALLOW_INDEXING`                                                    | web     | `true` lets search engines index the site; otherwise every page is `noindex`                                  |
 
 ## Checks
 
@@ -133,8 +134,10 @@ serves the Workers build locally, with `apps/web/.dev.vars` overriding variables
 `CLOUDFLARE_WORKERS_SUBDOMAIN` variable are set.
 
 The indexer runs anywhere Node 24 runs. It needs a persistent disk for its database and
-`SNAPSHOT_R2_BUCKET`, with a token that can write to the bucket, so every snapshot reaches the
-site. `apps/indexer/Dockerfile` builds an image that runs `loop.sh`, from the repository root:
+`SNAPSHOT_R2_BUCKET`, so every snapshot reaches the site. Its key is an R2 API token limited to
+Object Read & Write on that one bucket (R2 → Manage API tokens); the indexer signs S3 requests
+with the token's S3 credentials, so it can write nowhere else in the account.
+`apps/indexer/Dockerfile` builds an image that runs `loop.sh`, from the repository root:
 
 ```sh
 docker build -f apps/indexer/Dockerfile -t fiberscope-indexer .

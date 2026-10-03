@@ -85,7 +85,7 @@ Interactions in a settlement other than token approvals (ERC-20 `approve`) and W
 
 ### Batch value
 
-Volume divided by batches. Trades per batch is trades divided by batches, and the average trade is
+Volume divided by batches. Trades per batch is trades divided by batches, and volume per trade is
 volume divided by trades. Ratios with volume use only the days with auction data.
 
 ### Surplus

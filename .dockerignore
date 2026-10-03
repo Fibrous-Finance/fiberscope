@@ -5,7 +5,10 @@
 **/.env
 **/.env.*
 **/*.db
+**/*.db-shm
+**/*.db-wal
 **/*.log
+**/.DS_Store
 .git
 .github
 design

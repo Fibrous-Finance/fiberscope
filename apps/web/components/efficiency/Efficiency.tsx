@@ -7,6 +7,7 @@ import { costAxis, DASH, FEW_TRADES, sortRows, surplusAndCost, swapsAxis } from 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
 import { Surplus } from "@/components/surplus/Surplus";
+import { compactTickClass } from "@/components/ui/axis";
 import { FootLine, Section } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
@@ -299,10 +300,10 @@ function Ticks({
 }) {
 	return (
 		<span className={`relative h-3.5 ${className}`}>
-			{ticks.map(({ value, label, x }) => (
+			{ticks.map(({ value, label, x }, index) => (
 				<span
 					key={value}
-					className={`absolute ${x === 0 ? "" : x === 1 ? "-translate-x-full" : "-translate-x-1/2"}`}
+					className={`absolute ${x === 0 ? "" : x === 1 ? "-translate-x-full" : "-translate-x-1/2"} ${compactTickClass(index, ticks.length)}`}
 					style={{ left: `${x * 100}%` }}
 				>
 					{label}

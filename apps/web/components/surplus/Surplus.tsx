@@ -6,6 +6,7 @@ import { FEW_TRADES, surplusAndCost, surplusAxis, surplusRows } from "@fiberscop
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
+import { compactTickClass } from "@/components/ui/axis";
 import { FootLine } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
@@ -224,12 +225,12 @@ export function Surplus() {
 						>
 							<span />
 							<span className="relative h-3.5">
-								{axis.ticks.map((tick) => {
+								{axis.ticks.map((tick, index) => {
 									const x = tick / axis.max;
 									return (
 										<span
 											key={tick}
-											className={`absolute ${x === 0 ? "" : x === 1 ? "-translate-x-full" : "-translate-x-1/2"}`}
+											className={`absolute ${x === 0 ? "" : x === 1 ? "-translate-x-full" : "-translate-x-1/2"} ${compactTickClass(index, axis.ticks.length)}`}
 											style={{ left: `${x * 100}%` }}
 										>
 											{f.bps(tick)}

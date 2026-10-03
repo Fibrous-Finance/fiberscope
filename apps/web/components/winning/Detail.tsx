@@ -2,8 +2,16 @@
 
 import { useTranslations } from "next-intl";
 
-import { autoRange, BASE, DASH, linePath, mediumAddress, tapeCell } from "@fiberscope/core";
-import type { LinePath, Row, SortKey, TapeCell } from "@fiberscope/core";
+import {
+	autoRange,
+	BASE,
+	DASH,
+	linePath,
+	mediumAddress,
+	registrationOf,
+	tapeCell,
+} from "@fiberscope/core";
+import type { LinePath, Row, TapeCell } from "@fiberscope/core";
 
 import { useDashboard, useView } from "@/components/dashboard/context";
 import { cellText, useColumnLabels } from "@/components/winning/columns";
@@ -28,18 +36,11 @@ const COW_TX = `https://explorer.cow.fi/${BASE.explorerSlug}/tx/`;
 /** Compact labels: Geist Mono 10.5px, uppercase. */
 const SMALL_LABEL =
 	"font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-mu uppercase";
-/** Time, trades, pair, volume, gas and links; the header and every settlement share it. */
+/** "Retired" in place of an address's actions. */
+const RETIRED = "text-[10.5px] tracking-[.06em] text-fa uppercase";
+/** Time, trades, swaps, pair, volume, gas and links; the header and every settlement share it. */
 const SETTLEMENT_GRID =
-	"grid grid-cols-[96px_46px_minmax(0,1fr)_76px_56px_200px] items-center gap-3";
-/** The six stats, in a 2 × 3 grid; each has its table column's label and value. */
-const STATS = [
-	"batches",
-	"trades",
-	"volume",
-	"gas",
-	"participation",
-	"winRate",
-] as const satisfies readonly SortKey[];
+	"grid grid-cols-[96px_46px_46px_minmax(0,1fr)_76px_56px_200px] items-center gap-3";
 
 /** A won auction is a square, an entered one a dot, a missed one a faint speck. */
 const DOT: Record<TapeCell["state"], string> = {
@@ -80,28 +81,16 @@ function useDetail(row: Row) {
 	const entrants = view.rows.filter((r) => r.entered);
 	const participation =
 		entrants.reduce((a, r) => a + (r.participation ?? 0), 0) / (entrants.length || 1);
-	const notes: Record<(typeof STATS)[number], string> = {
-		batches: t("detail.stats.batches", { share: f.percent(row.shares.batches, 1) }),
-		trades: t("detail.stats.trades", { count: f.fixed(row.trades / row.batches, 2) }),
-		volume:
-			row.averageTrade === null
-				? noData
-				: t("detail.stats.volume", { value: f.usd(row.averageTrade) }),
-		gas:
-			gasDiff === null
-				? DASH
-				: t("detail.stats.gas", {
-						percent: f.percent(Math.abs(gasDiff)),
-						direction: gasDiff < 0 ? "below" : "above",
-					}),
-		participation: row.entered
-			? t("detail.stats.participation", { percent: f.percent(participation) })
-			: noData,
-		winRate:
-			row.entered && row.wonShare !== null
-				? t("detail.stats.winRate", { percent: f.percent(row.wonShare, 1) })
-				: noData,
-	};
+	// The network's batch value: all volume over all batches of the days with auction data.
+	const pricedBatches = (snapshot?.solvers ?? []).reduce(
+		(total, s) => total + s.batches.slice(0, view.coverage.auction).reduce((a, b) => a + b, 0),
+		0
+	);
+	const batchValue =
+		view.totals.volume !== null && pricedBatches > 0
+			? view.totals.volume / pricedBatches
+			: null;
+	const swaps = view.swaps.average;
 
 	const cells: AuctionCell[] = (snapshot?.latestAuctions ?? [])
 		.slice(-LATEST_AUCTIONS)
@@ -121,6 +110,7 @@ function useDetail(row: Row) {
 		});
 	const rank = (value: number | null) =>
 		value === null ? DASH : t("detail.rank", { rank: value });
+	const registration = registrationOf(snapshot?.registry ?? [], row);
 
 	return {
 		title: t("detail.shareOf", { measure, days: view.history.length }),
@@ -139,12 +129,78 @@ function useDetail(row: Row) {
 		}),
 		start,
 		end,
-		stats: STATS.map((key) => ({
-			key,
-			label: labels[key],
-			value: cellText(row, key, f),
-			note: notes[key],
-		})),
+		/** Eight stats, two to a row. */
+		stats: [
+			{
+				key: "batches",
+				label: labels.batches,
+				value: cellText(row, "batches", f),
+				note: t("detail.stats.batches", { share: f.percent(row.shares.batches, 1) }),
+			},
+			{
+				key: "trades",
+				label: labels.trades,
+				value: cellText(row, "trades", f),
+				note:
+					row.tradesPerBatch === null
+						? DASH
+						: t("detail.stats.trades", { count: f.fixed(row.tradesPerBatch, 2) }),
+			},
+			{
+				key: "volume",
+				label: labels.volume,
+				value: cellText(row, "volume", f),
+				note:
+					row.averageTrade === null
+						? noData
+						: t("detail.stats.volume", { value: f.usd(row.averageTrade) }),
+			},
+			{
+				key: "batchValue",
+				label: t("detail.labels.batchValue"),
+				value: f.usd(row.batchValue),
+				note:
+					batchValue === null
+						? noData
+						: t("detail.stats.average", { value: f.usd(batchValue) }),
+			},
+			{
+				key: "gas",
+				label: labels.gas,
+				value: cellText(row, "gas", f),
+				note:
+					gasDiff === null
+						? DASH
+						: t("detail.stats.gas", {
+								percent: f.percent(Math.abs(gasDiff)),
+								direction: gasDiff < 0 ? "below" : "above",
+							}),
+			},
+			{
+				key: "swaps",
+				label: t("detail.labels.swaps"),
+				value: row.swapsPerTrade === null ? DASH : f.fixed(row.swapsPerTrade, 2),
+				note:
+					swaps === null ? DASH : t("detail.stats.average", { value: f.fixed(swaps, 2) }),
+			},
+			{
+				key: "participation",
+				label: labels.participation,
+				value: cellText(row, "participation", f),
+				note: row.entered
+					? t("detail.stats.participation", { percent: f.percent(participation) })
+					: noData,
+			},
+			{
+				key: "winRate",
+				label: labels.winRate,
+				value: cellText(row, "winRate", f),
+				note:
+					row.entered && row.wonShare !== null
+						? t("detail.stats.winRate", { percent: f.percent(row.wonShare, 1) })
+						: noData,
+			},
+		],
 		auctions: {
 			title: t("detail.auctions", { count: cells.length }),
 			note:
@@ -171,11 +227,17 @@ function useDetail(row: Row) {
 				average: f.gas(gasAverage),
 			}),
 		},
-		addresses: row.addresses.map((a) => ({
-			env: a.env,
+		/** "Active in CoW's registry"; null for a solver the registry does not list. */
+		registry:
+			registration.active === null
+				? null
+				: t("detail.registry", { status: registration.active ? "active" : "inactive" }),
+		addresses: registration.addresses.map((a) => ({
+			key: `${a.env}:${a.address}`,
 			label: t(`detail.env.${a.env}`),
 			address: a.address,
 			medium: mediumAddress(a.address),
+			retired: !a.active,
 			href: `${BASE.scan}/address/${a.address}`,
 		})),
 		settlements: row.latestSettlements.map((s) => {
@@ -185,10 +247,16 @@ function useDetail(row: Row) {
 				tx: s.tx,
 				time: view.end.time - s.time < RECENT_MS ? f.clock(s.time) : f.dayTime(s.time),
 				trades: f.int(s.trades),
+				swaps: f.int(s.swaps),
 				pair: t("detail.pair", { sell: s.pair.sell, buy: s.pair.buy, more: s.trades - 1 }),
 				volume,
 				gas,
-				summary: t("detail.settlementLine", { trades: s.trades, volume, gas }),
+				summary: t("detail.settlementLine", {
+					trades: s.trades,
+					swaps: s.swaps,
+					volume,
+					gas,
+				}),
 				cow: COW_TX + s.tx,
 				scan: `${BASE.scan}/tx/${s.tx}`,
 			};
@@ -202,7 +270,7 @@ function useDetail(row: Row) {
  */
 export function DetailWide({ row, width }: { row: Row; width: number }) {
 	const d = useDetail(row);
-	const t = useTranslations("Winning.detail");
+	const t = useTranslations("Winning");
 	const tc = useTranslations("Common");
 	const [copied, copy] = useCopy(COPIED_MS);
 	const narrow = width > 0 && width < NARROW_TABLE;
@@ -252,13 +320,13 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 						<div className="mt-1.5 text-[12.5px] text-mu">{d.auctions.note}</div>
 					</div>
 					<div>
-						<div className="label">{t("ranks")}</div>
+						<div className="label">{t("detail.ranks")}</div>
 						<div className="mt-1.5 font-mono text-[13px] leading-[normal] font-medium">
 							{d.ranks}
 						</div>
 					</div>
 					<div>
-						<div className="label">{t("gasVsNetwork")}</div>
+						<div className="label">{t("detail.gasVsNetwork")}</div>
 						<div role="img" aria-label={d.gas.label} className="relative mt-2 h-5">
 							<div className="absolute inset-x-0 top-1/2 h-px bg-ln2" />
 							{d.gas.average === null ? null : (
@@ -275,9 +343,9 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 							)}
 						</div>
 						<div className="mt-1 flex justify-between font-mono text-[11px] leading-[normal] font-medium text-fa">
-							<span>{t("lower")}</span>
-							<span>{t("networkAverage")}</span>
-							<span>{t("higher")}</span>
+							<span>{t("detail.lower")}</span>
+							<span>{t("detail.networkAverage")}</span>
+							<span>{t("detail.higher")}</span>
 						</div>
 					</div>
 				</div>
@@ -287,52 +355,66 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 				className={`sticky left-0 z-3 grid cursor-default border-b border-ln bg-bg pt-1 pb-[30px] pl-[52px] ${narrow ? "grid-cols-1 gap-7" : "grid-cols-[minmax(0,1fr)_minmax(0,1.75fr)] gap-9"}`}
 			>
 				<div className="min-w-0">
-					<div className="label">{t("addresses")}</div>
+					<div className="flex items-baseline justify-between gap-3">
+						<span className="label">{t("detail.addresses")}</span>
+						{d.registry === null ? null : (
+							<span className="font-mono text-[11px] leading-[normal] font-medium whitespace-nowrap text-fa">
+								{d.registry}
+							</span>
+						)}
+					</div>
 					<div className="mt-2">
 						{d.addresses.map((a) => (
 							<div
-								key={a.env}
+								key={a.key}
 								className="box-content grid h-10 grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 border-b border-ln"
 							>
 								<span className="label">{a.label}</span>
 								<span
 									title={a.address}
-									className="truncate font-mono text-[12.5px] leading-[normal] font-medium"
+									className={`truncate font-mono text-[12.5px] leading-[normal] font-medium ${a.retired ? "text-fa" : ""}`}
 								>
 									{a.address}
 								</span>
 								<span className="flex gap-3.5 font-mono text-[12px] leading-[normal] font-medium">
-									<button
-										type="button"
-										onClick={() => copy(a.address)}
-										className="whitespace-nowrap quiet"
-									>
-										{copied === a.address ? tc("copied") : tc("copy")}
-									</button>
-									<a
-										href={a.href}
-										target="_blank"
-										rel="noopener"
-										className="whitespace-nowrap quiet"
-									>
-										{tc("basescan")}
-									</a>
+									{a.retired ? (
+										<span className={RETIRED}>{t("retired")}</span>
+									) : (
+										<>
+											<button
+												type="button"
+												onClick={() => copy(a.address)}
+												className="whitespace-nowrap quiet"
+											>
+												{copied === a.address ? tc("copied") : tc("copy")}
+											</button>
+											<a
+												href={a.href}
+												target="_blank"
+												rel="noopener"
+												className="whitespace-nowrap quiet"
+											>
+												{tc("basescan")}
+											</a>
+										</>
+									)}
 								</span>
 							</div>
 						))}
 					</div>
 				</div>
 				<div className="min-w-0">
-					<div className="label">{t("settlements")}</div>
+					<div className="label">{t("detail.settlements")}</div>
 					<div
 						className={`${SETTLEMENT_GRID} mt-1 box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-fa uppercase`}
 					>
-						<span>{t("settlementColumns.time")}</span>
-						<span className="text-right">{t("settlementColumns.trades")}</span>
-						<span>{t("settlementColumns.pair")}</span>
-						<span className="text-right">{t("settlementColumns.volume")}</span>
-						<span className="text-right">{t("settlementColumns.gas")}</span>
-						<span className="text-right">{t("settlementColumns.links")}</span>
+						<span>{t("detail.settlementColumns.time")}</span>
+						<span className="text-right">{t("detail.settlementColumns.trades")}</span>
+						<span className="text-right">{t("detail.settlementColumns.swaps")}</span>
+						<span className="pl-1.5">{t("detail.settlementColumns.pair")}</span>
+						<span className="text-right">{t("detail.settlementColumns.volume")}</span>
+						<span className="text-right">{t("detail.settlementColumns.gas")}</span>
+						<span className="text-right">{t("detail.settlementColumns.links")}</span>
 					</div>
 					{d.settlements.map((s) => (
 						<div
@@ -341,7 +423,8 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 						>
 							<span>{s.time}</span>
 							<span className="text-right">{s.trades}</span>
-							<span className="truncate font-sans text-[13px]">{s.pair}</span>
+							<span className="text-right">{s.swaps}</span>
+							<span className="truncate pl-1.5 font-sans text-[13px]">{s.pair}</span>
 							<span className="text-right">{s.volume}</span>
 							<span className="text-right">{s.gas}</span>
 							<span className="flex justify-end gap-3.5 text-[12px]">
@@ -370,15 +453,18 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 	);
 }
 
-/** The compact detail: one stack, shortened addresses and two-line settlements. */
+/**
+ * The compact detail: one stack, the auction strip as a picture only, shortened addresses and
+ * two-line settlements. Every link and button is a 44px target.
+ */
 export function DetailCompact({ row }: { row: Row }) {
 	const d = useDetail(row);
-	const t = useTranslations("Winning.detail");
+	const t = useTranslations("Winning");
 	const tc = useTranslations("Common");
 	const [copied, copy] = useCopy(COPIED_MS);
 
 	return (
-		<div className="flex flex-col gap-5 border-b border-ln pt-4 pb-[22px] pl-[34px]">
+		<div className="flex flex-col gap-[22px] border-b border-ln pt-4 pb-[22px] pl-[34px]">
 			<div>
 				<div className="flex items-baseline gap-2.5">
 					<span className="font-mono text-[24px] leading-none font-medium tracking-[-0.04em]">
@@ -403,61 +489,81 @@ export function DetailCompact({ row }: { row: Row }) {
 			</div>
 			<div>
 				<div className={SMALL_LABEL}>{d.auctions.title}</div>
-				<AuctionStrip cells={d.auctions.cells} className="mt-2" />
+				<div aria-hidden="true" className="mt-2 flex h-4">
+					{d.auctions.cells.map((cell) => (
+						<span key={cell.id} className="grid h-full flex-1 place-items-center">
+							<span className={DOT[cell.state]} />
+						</span>
+					))}
+				</div>
 				<div className="mt-1.5 text-[12px] text-mu">
-					{t("auctionsAndRanks", { auctions: d.auctions.note, ranks: d.ranks })}
+					{t("detail.auctionsAndRanks", { auctions: d.auctions.note, ranks: d.ranks })}
 				</div>
 			</div>
 			<div>
-				<div className={SMALL_LABEL}>{t("addresses")}</div>
+				<div className="flex items-baseline justify-between gap-2.5">
+					<span className={SMALL_LABEL}>{t("detail.addresses")}</span>
+					{d.registry === null ? null : (
+						<span className="font-mono text-[10.5px] leading-[normal] font-medium text-fa">
+							{d.registry}
+						</span>
+					)}
+				</div>
 				{d.addresses.map((a) => (
 					<div
-						key={a.env}
-						className="box-content grid h-10 grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-ln"
+						key={a.key}
+						className="box-content grid min-h-11 grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-ln"
 					>
 						<span className={SMALL_LABEL}>{a.label}</span>
 						<span
 							title={a.address}
-							className="truncate font-mono text-[12px] leading-[normal] font-medium"
+							className={`truncate font-mono text-[12px] leading-[normal] font-medium ${a.retired ? "text-fa" : ""}`}
 						>
 							{a.medium}
 						</span>
-						<span className="flex gap-3.5 font-mono text-[11.5px] leading-[normal] font-medium">
-							<button
-								type="button"
-								onClick={() => copy(a.address)}
-								className="-my-3 py-3 whitespace-nowrap quiet"
-							>
-								{copied === a.address ? tc("copied") : tc("copy")}
-							</button>
-							<a
-								href={a.href}
-								target="_blank"
-								rel="noopener"
-								className="-my-3 py-3 whitespace-nowrap quiet"
-							>
-								{tc("basescan")}
-							</a>
+						<span className="flex gap-4 font-mono text-[11.5px] leading-[normal] font-medium">
+							{a.retired ? (
+								<span className={RETIRED}>{t("retired")}</span>
+							) : (
+								<>
+									<button
+										type="button"
+										onClick={() => copy(a.address)}
+										className="-my-[15px] py-[15px] whitespace-nowrap quiet"
+									>
+										{copied === a.address ? tc("copied") : tc("copy")}
+									</button>
+									<a
+										href={a.href}
+										target="_blank"
+										rel="noopener"
+										className="-my-[15px] py-[15px] whitespace-nowrap quiet"
+									>
+										{tc("basescan")}
+									</a>
+								</>
+							)}
 						</span>
 					</div>
 				))}
 			</div>
 			<div>
-				<div className={SMALL_LABEL}>{t("settlements")}</div>
+				<div className={SMALL_LABEL}>{t("detail.settlements")}</div>
 				{d.settlements.map((s) => (
-					<div key={s.tx} className="border-b border-ln py-2.5">
+					<div key={s.tx} className="border-b border-ln pt-2.5 pb-1">
 						<div className="flex justify-between gap-2.5 font-mono text-[12.5px] leading-[normal] font-medium">
 							<span>{s.time}</span>
 							<span className="truncate font-sans text-[13px]">{s.pair}</span>
 						</div>
-						<div className="mt-1 flex justify-between gap-2.5 font-mono text-[11.5px] leading-[normal] font-medium text-mu">
-							<span>{s.summary}</span>
-							<span className="flex gap-3.5">
+						{/* The links share the figures' line when they fit, else take their own. */}
+						<div className="flex flex-wrap items-center justify-between gap-x-4 font-mono text-[11.5px] leading-[normal] font-medium text-mu">
+							<span className="max-w-full truncate py-1.5">{s.summary}</span>
+							<span className="ml-auto flex gap-[18px]">
 								<a
 									href={s.cow}
 									target="_blank"
 									rel="noopener"
-									className="-my-2.5 py-2.5 whitespace-nowrap quiet"
+									className="flex min-h-11 items-center whitespace-nowrap quiet"
 								>
 									{tc("explorer")}
 								</a>
@@ -465,7 +571,7 @@ export function DetailCompact({ row }: { row: Row }) {
 									href={s.scan}
 									target="_blank"
 									rel="noopener"
-									className="-my-2.5 py-2.5 whitespace-nowrap quiet"
+									className="flex min-h-11 items-center whitespace-nowrap quiet"
 								>
 									{tc("basescan")}
 								</a>

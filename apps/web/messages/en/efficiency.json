@@ -9,13 +9,17 @@
 		"size": "Dot size: trades"
 	},
 	"header": {
-		"gas": "Gas per trade · avg {average}",
-		"swaps": "DEX swaps/trade · avg {average}",
-		"swapsShort": "Swaps"
+		"gas": "Gas per trade · average {average}",
+		"swaps": "DEX swaps/trade · average {average}",
+		"swapsShort": "Swaps",
+		"cost": "Cost per trade · average {average}",
+		"costShort": "Cost"
 	},
 	"dot": "{gas} gas per trade over {trades, plural, one {# trade} other {# trades}}",
 	"swapsDot": "{swaps} DEX swaps per trade over {trades, plural, one {# trade} other {# trades}}",
-	"note": "Swaps beyond the axis sit at its end, marked ›.",
-	"noteCompact": "Swaps: DEX swaps per trade.",
-	"source": "Source: Base settlement transactions"
+	"note": "Values beyond an axis sit at its end, marked ›.",
+	"noteCompact": "Cost: transaction cost per trade. Swaps: DEX swaps per trade.",
+	"source": "Source: Base settlement transactions · Chainlink ETH/USD",
+	"sentenceCost": "Settling one costs {cost}, L1 data fee included.",
+	"costDot": "{cost} per trade over {trades, plural, one {# trade} other {# trades}}"
 }

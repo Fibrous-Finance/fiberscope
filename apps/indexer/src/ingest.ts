@@ -62,7 +62,7 @@ class AllowList {
 			const data = SELECTOR.isSolver + address.slice(2).padStart(64, "0");
 			const call = ethCall(NETWORK.contracts.allowList, data, block);
 			const verdict = BigInt(await this.#rpc.call<string>(call.method, call.params)) === 1n;
-			this.#store.saveAllowListVerdict(address, verdict, block);
+			this.#store.saveAllowListVerdict(address, verdict);
 			return verdict;
 		} finally {
 			this.#checks.delete(address);
@@ -120,8 +120,10 @@ async function fetchChunk(
 			sender: receipt.from.toLowerCase(),
 			recipient: receipt.to?.toLowerCase() ?? null,
 			gasUsed: Number(receipt.gasUsed),
-			gasPrice: BigInt(receipt.effectiveGasPrice).toString(),
-			l1Fee: BigInt(receipt.l1Fee ?? 0).toString(),
+			fee: (
+				BigInt(receipt.gasUsed) * BigInt(receipt.effectiveGasPrice) +
+				BigInt(receipt.l1Fee ?? 0)
+			).toString(),
 		};
 	});
 	addTerms(trades, inputs);

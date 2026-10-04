@@ -5,10 +5,8 @@ import { backoff, describeError, Pacer, retryAfterMs } from "./pacer.ts";
 interface Solution {
 	/** Submission address, lowercase. */
 	solver: string;
-	score: string;
 	ranking: number;
 	winner: boolean;
-	filteredOut: boolean;
 	/** The settlement this solution produced; winners only, null when it never settled. */
 	tx: string | null;
 }
@@ -16,7 +14,6 @@ interface Solution {
 export interface Competition {
 	auctionId: number;
 	startBlock: number;
-	deadlineBlock: number;
 	/** Settlement transactions of this auction, lowercase. */
 	txHashes: string[];
 	/** Native prices by lowercase token address, in wei per token atom scaled by 1e18. */
@@ -85,15 +82,12 @@ export class CowApi {
 interface RawCompetition {
 	auctionId: number;
 	auctionStartBlock: number;
-	auctionDeadlineBlock: number;
 	transactionHashes?: string[];
 	auction?: { prices?: Record<string, string> };
 	solutions?: {
 		solverAddress: string;
-		score: string;
 		ranking: number;
 		isWinner: boolean;
-		filteredOut?: boolean;
 		txHash?: string | null;
 	}[];
 }
@@ -107,7 +101,6 @@ function parseCompetition(json: unknown): Competition {
 	return {
 		auctionId: raw.auctionId,
 		startBlock: raw.auctionStartBlock,
-		deadlineBlock: raw.auctionDeadlineBlock,
 		txHashes: (raw.transactionHashes ?? []).map((tx) => tx.toLowerCase()),
 		prices: new Map(
 			Object.entries(raw.auction?.prices ?? {}).map(([token, price]) => [
@@ -117,10 +110,8 @@ function parseCompetition(json: unknown): Competition {
 		),
 		solutions: (raw.solutions ?? []).map((solution) => ({
 			solver: solution.solverAddress.toLowerCase(),
-			score: solution.score,
 			ranking: solution.ranking,
 			winner: solution.isWinner,
-			filteredOut: solution.filteredOut === true,
 			tx: solution.txHash ? solution.txHash.toLowerCase() : null,
 		})),
 	};

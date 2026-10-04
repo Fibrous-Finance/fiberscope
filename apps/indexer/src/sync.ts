@@ -21,6 +21,8 @@ export interface SyncOptions {
 	auctionDays: number;
 	/** Minutes after the start of the sync at which the backfill stops; null for no limit. */
 	budgetMinutes: number | null;
+	/** Delete the data older than the requested depths once the head is caught up. */
+	prune: boolean;
 	/**
 	 * Writes the snapshot, once the data is current and again when the backfill adds history (on an
 	 * empty database, only after the backfill).
@@ -74,6 +76,13 @@ export async function sync(
 			if ((await safeHead(rpc)) - store.chainRange()!.to <= CATCH_UP_SLACK) break;
 		}
 		await resolveRouterSenders(store, cow, registry, stats.auctions);
+		if (options.prune && chainDays > 0) {
+			const end = store.chainRange()!.to;
+			store.prune(
+				windowStart(end, chainDays),
+				options.auctionDays > 0 ? windowStart(end, options.auctionDays) : null
+			);
+		}
 		store.setLastRunAt(Date.now());
 		await writeSnapshot?.();
 	}

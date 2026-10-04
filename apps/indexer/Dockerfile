@@ -15,5 +15,6 @@ COPY apps/indexer apps/indexer
 RUN pnpm install --frozen-lockfile --prod --filter @fiberscope/indexer...
 
 ENV DB_PATH=/data/base.db
-# --budget-minutes matches loop.sh's default REFRESH_MINUTES (10); change them together.
-CMD ["sh", "apps/indexer/loop.sh", "--snapshot", "/data/snapshot.json", "--chain-days", "180", "--auction-days", "90", "--budget-minutes", "10"]
+# --budget-minutes matches loop.sh's default REFRESH_MINUTES (10); change them together. --prune
+# keeps the database at the depths the page shows.
+CMD ["sh", "apps/indexer/loop.sh", "--snapshot", "/data/snapshot.json", "--chain-days", "180", "--auction-days", "90", "--budget-minutes", "10", "--prune"]

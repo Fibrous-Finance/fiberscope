@@ -155,7 +155,7 @@ describe("trade surplus", () => {
 
 describe("batch cost", () => {
 	// 400K gas at 0.01 gwei plus 0.0000001 ETH of L1 data fee: 0.0000041 ETH.
-	const tx = { gasUsed: 400_000, gasPrice: "10000000", l1Fee: "100000000000", txBatches: 1 };
+	const tx = { fee: "4100000000000", txBatches: 1 };
 
 	test("is the transaction's fee in ETH at the ETH/USD rate", () => {
 		assert.ok(Math.abs(batchCostUsd(tx, 2_500) - 0.01025) < 1e-12);

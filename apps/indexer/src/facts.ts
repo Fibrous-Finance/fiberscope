@@ -31,9 +31,14 @@ export interface Batch {
 	cost: number | null;
 }
 
-export function loadBatches(store: Store, registry: Registry, range: BlockRange): Batch[] {
+/** The batches of a block range in block order, credited and costed, read one at a time. */
+export function* creditedBatches(
+	store: Store,
+	registry: Registry,
+	range: BlockRange
+): Generator<Batch> {
 	const points = store.ethUsdPoints();
-	return store.batchRows(range).map((row) => {
+	for (const row of store.batchRows(range)) {
 		const address = creditedAddress(
 			{
 				solver: row.solver,
@@ -46,7 +51,7 @@ export function loadBatches(store: Store, registry: Registry, range: BlockRange)
 			() => store.apiWinner(row.tx)
 		);
 		const ethUsd = ethUsdAt(points, row.block);
-		return {
+		yield {
 			tx: row.tx,
 			logIndex: row.logIndex,
 			block: row.block,
@@ -58,7 +63,7 @@ export function loadBatches(store: Store, registry: Registry, range: BlockRange)
 			gas: row.gasUsed / row.txBatches,
 			cost: ethUsd === null ? null : batchCostUsd(row, ethUsd),
 		};
-	});
+	}
 }
 
 export interface TradeValue {
@@ -120,12 +125,18 @@ export interface AuctionOutcome {
 	winners: { solver: string; tx: string | null }[];
 }
 
-/** Groups solution rows (sorted by auction, then ranking) into auctions keyed by solver id. */
-export function auctionOutcomes(rows: SolutionRow[], registry: Registry): AuctionOutcome[] {
-	const outcomes: AuctionOutcome[] = [];
+/**
+ * Groups solution rows (sorted by auction, then ranking) into auctions keyed by solver id, and
+ * yields each auction once its rows are read.
+ */
+export function* auctionOutcomes(
+	rows: Iterable<SolutionRow>,
+	registry: Registry
+): Generator<AuctionOutcome> {
 	let current: AuctionOutcome | null = null;
 	for (const row of rows) {
 		if (current === null || current.id !== row.auctionId) {
+			if (current !== null) yield current;
 			current = {
 				id: row.auctionId,
 				startBlock: row.startBlock,
@@ -133,7 +144,6 @@ export function auctionOutcomes(rows: SolutionRow[], registry: Registry): Auctio
 				entrants: new Map(),
 				winners: [],
 			};
-			outcomes.push(current);
 		}
 		const identity = registry.identify(row.solver);
 		current.solutions++;
@@ -144,5 +154,5 @@ export function auctionOutcomes(rows: SolutionRow[], registry: Registry): Auctio
 			current.winners.push({ solver: identity.id, tx: row.tx });
 		}
 	}
-	return outcomes;
+	if (current !== null) yield current;
 }

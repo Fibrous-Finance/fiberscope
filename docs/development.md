@@ -47,9 +47,10 @@ build.
 (`apps/indexer/.data/base.db`) and writes the snapshot from it. Node 24 runs the indexer's
 TypeScript directly. The indexer has no build step or third-party dependencies; it uses
 `node:sqlite` for SQLite. Settlements and trades are stored by block, addresses by id and hashes
-as bytes (`apps/indexer/src/store.ts`). The database records its schema version; a database from
-the previous version is converted when the indexer opens it, after a copy is kept next to it as
-`base.db.v1`.
+as bytes (`apps/indexer/src/store.ts`). The database records its schema version, and the indexer
+refuses a database written by an older version: delete it to index again, or `seed` a current
+copy. The snapshot is built while the rows are read, one at a time, so the indexer's memory does
+not grow with the depth of the history.
 
 ### Commands
 

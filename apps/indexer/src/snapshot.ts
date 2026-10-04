@@ -8,8 +8,9 @@ import type {
 	SolverAddress,
 } from "@fiberscope/core";
 
+import { ROUTER } from "./chain.ts";
 import { NETWORK, timeOf } from "./config.ts";
-import { auctionOutcomes, loadBatches, TradeValuer } from "./facts.ts";
+import { auctionOutcomes, creditedBatches, TradeValuer } from "./facts.ts";
 import type { Batch } from "./facts.ts";
 import { shortAddress } from "./log.ts";
 import type { Registry, RegistryEntry, SolverIdentity } from "./registry.ts";
@@ -121,11 +122,13 @@ export async function buildSnapshot(
 		uncosted: 0,
 	};
 
-	const creditedTo = new Map<string, Tally>();
+	// Trades follow their batch's credit: a router batch's by its block and log index, any other
+	// to the solver that settled it.
+	const routed = new Map<string, Tally>();
 	// The latest batches of all solvers together, oldest first.
 	const networkLatest: Batch[] = [];
 	if (chainDays > 0) {
-		for (const batch of loadBatches(store, registry, {
+		for (const batch of creditedBatches(store, registry, {
 			from: windowStart(end, chainDays),
 			to: end,
 		})) {
@@ -142,7 +145,7 @@ export async function buildSnapshot(
 			if (entry.latest.length > LATEST_SETTLEMENTS) entry.latest.shift();
 			networkLatest.push(batch);
 			if (networkLatest.length > LATEST_NETWORK_SETTLEMENTS) networkLatest.shift();
-			creditedTo.set(`${batch.tx}:${batch.logIndex}`, entry);
+			if (batch.viaRouter) routed.set(`${batch.block}:${batch.logIndex}`, entry);
 		}
 	}
 
@@ -157,7 +160,10 @@ export async function buildSnapshot(
 			if (usd === null) stats.unpriced++;
 			else if (pricedSides === 1) stats.oneSided++;
 			const d = bucketOf(end, trade.block);
-			const entry = creditedTo.get(`${trade.tx}:${trade.settlementLogIndex}`);
+			const entry =
+				trade.solver === ROUTER
+					? routed.get(`${trade.block}:${trade.settlementLogIndex}`)
+					: tallies.get(registry.identify(trade.solver).id);
 			if (usd === null || !entry) continue;
 			entry.volume[d] += usd;
 			if (d >= surplusDays) continue;
@@ -279,10 +285,12 @@ export async function buildSnapshot(
 				a.id.localeCompare(b.id)
 		);
 
-	const latestAuctions: AuctionSummary[] = auctionOutcomes(
-		auctionRange ? store.latestSolutions(auctionRange, LATEST_AUCTIONS) : [],
-		registry
-	).map((auction) => ({
+	const latestAuctions: AuctionSummary[] = [
+		...auctionOutcomes(
+			auctionRange ? store.latestSolutions(auctionRange, LATEST_AUCTIONS) : [],
+			registry
+		),
+	].map((auction) => ({
 		id: auction.id,
 		time: timeOf(auction.startBlock) * 1000,
 		entered: [...auction.entrants.keys()],

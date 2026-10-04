@@ -113,8 +113,8 @@ function terms(limitBuy = "400000000000000000") {
 	return { limitSellAmount: "1000000000", limitBuyAmount: limitBuy, feeAmount: "0" };
 }
 
-/** Builds the snapshot; `unread` transactions keep their calldata unread for order terms. */
-async function build(unread: string[] = []): Promise<Snapshot> {
+/** Builds the snapshot of SETTLED. */
+async function build(): Promise<Snapshot> {
 	const store = new Store(":memory:");
 	const range = { from: 1, to: END };
 	store.commitChunk(
@@ -155,8 +155,6 @@ async function build(unread: string[] = []): Promise<Snapshot> {
 		},
 		range
 	);
-	for (const tx of unread)
-		store.db.prepare("UPDATE txs SET terms_read = NULL WHERE tx = ?").run(tx);
 	// The auction of 0xwon and 0xpair priced USDC at $1 and WETH at $2,000.
 	store.saveCompetition(
 		{
@@ -266,10 +264,10 @@ describe("snapshot", () => {
 		);
 	});
 
-	test("surplus covers the auction days whose calldata is read", async () => {
-		const read = await build();
-		assert.deepEqual(read.coverage, { chainDays: 3, auctionDays: 3, surplusDays: 3 });
-		const arc = read.solvers.find((solver) => solver.id === "arc");
+	test("surplus is priced like volume, over the trades with order terms", async () => {
+		const { coverage, solvers, latestSettlements } = await build();
+		assert.deepEqual(coverage, { chainDays: 3, auctionDays: 3, surplusDays: 3 });
+		const arc = solvers.find((solver) => solver.id === "arc");
 		// Only the auction of 0xwon and 0xpair is priced: three trades of $1,000. 0xwon got 0.1
 		// WETH over the 0.4 asked of 0.5, a surplus of $200; each 0xpair trade about $100.
 		assert.deepEqual(arc?.volume, [3_000, 0, 0]);
@@ -277,16 +275,11 @@ describe("snapshot", () => {
 		assert.deepEqual(arc?.surplusTrades, [3, 0, 0]);
 		assert.deepEqual(arc?.surplusVolume, [3_000, 0, 0]);
 		assert.deepEqual(
-			read.latestSettlements
+			latestSettlements
 				.filter(({ tx }) => tx === "0xwon")
 				.map(({ volume, surplus }) => ({ volume, surplus })),
 			[{ volume: 1_000, surplus: 200 }]
 		);
-
-		// 0xold, two days back, is still unread: surplus stops at the day after it.
-		const unread = await build(["0xold"]);
-		assert.deepEqual(unread.coverage, { chainDays: 3, auctionDays: 3, surplusDays: 2 });
-		assert.deepEqual(unread.solvers.find((solver) => solver.id === "arc")?.surplus, [400, 0]);
 	});
 
 	test("surplus of more than a tenth of the trade's value counts as unusual", async () => {

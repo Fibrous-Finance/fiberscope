@@ -31,8 +31,8 @@ export interface Snapshot {
 	 * - `auctionDays`: volume, entered, won and the auction totals. Volume is priced with each
 	 *   auction's native prices, so it needs the auction data too.
 	 * - `surplusDays`: surplus. It is priced like volume and needs each trade's signed order
-	 *   terms, read from its settlement's calldata, so it covers the auction days whose calldata
-	 *   has been read: never more than `auctionDays`, and as many once that reading is done.
+	 *   terms, read from its settlement's calldata, so it is never more than `auctionDays`. The
+	 *   indexer reads the calldata as it stores each settlement, so it covers the same days.
 	 */
 	coverage: { chainDays: number; auctionDays: number; surplusDays: number };
 	/** Auction totals per bucket; length `coverage.auctionDays`. */

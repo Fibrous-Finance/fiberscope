@@ -19,11 +19,10 @@ import { windowReport } from "./window.ts";
 const USAGE = `Usage:
   node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--snapshot <path>]
       Catch up with the chain head, then backfill at least N days of chain data and M days of
-      auction data, and read the order terms of trades stored without them. Resumable and
-      idempotent: a re-run fetches only what is missing. With --budget-minutes the backfill stops
-      B minutes after the start and the next run resumes it. With --snapshot the snapshot is
-      written once the head is caught up, and again if the backfill added history (on an empty
-      database, only after the backfill).
+      auction data. Resumable and idempotent: a re-run fetches only what is missing. With
+      --budget-minutes the backfill stops B minutes after the start and the next run resumes it.
+      With --snapshot the snapshot is written once the head is caught up, and again if the
+      backfill added history (on an empty database, only after the backfill).
   node src/cli.ts snapshot [--out <path>]
       Write the snapshot JSON (default ${relative(process.cwd(), DEFAULT_SNAPSHOT_PATH)}).
   node src/cli.ts window --from <block> --to <block>
@@ -106,14 +105,6 @@ async function main(): Promise<void> {
 					`(${rate(lookups, auctionSeconds)}/s), ${fmt(cow.stats.bytes / 1e6)} MB uncompressed, ` +
 					`${fmt(cow.stats.retries)} retries`
 			);
-			const terms = stats.terms;
-			if (terms.txs > 0) {
-				log(
-					`  order terms: ${fmt(terms.txs)} txs read in ${duration(terms.seconds)} ` +
-						`(${rate(terms.txs, terms.seconds)}/s), ${fmt(terms.read)} of ` +
-						`${fmt(terms.trades)} trades reproduced`
-				);
-			}
 			store.checkpoint();
 			log(`  database ${dbPath}: ${fmt(statSync(dbPath).size / 1e6, 1)} MB`);
 		} else if (command === "snapshot") {

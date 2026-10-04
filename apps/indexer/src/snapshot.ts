@@ -78,11 +78,8 @@ export async function buildSnapshot(
 	const chainDays = completeBuckets(end, chain);
 	const auctionRange = store.auctionRange();
 	const auctionDays = Math.min(chainDays, completeBuckets(end, auctionRange));
-	// Surplus also needs order terms, which the terms backfill reads newest first: it covers the
-	// days after the newest transaction still unread.
-	const unread = store.newestTxWithoutTerms();
-	const surplusDays =
-		unread === null ? auctionDays : Math.min(auctionDays, bucketOf(end, unread));
+	// Surplus also needs order terms, read from each trade's calldata as it is stored.
+	const surplusDays = auctionDays;
 	const lastRunAt = store.lastRunAt();
 	if (lastRunAt === null) throw new Error("No sync has completed yet");
 

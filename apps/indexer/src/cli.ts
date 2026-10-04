@@ -22,8 +22,9 @@ const USAGE = `Usage:
       Catch up with the chain head, then backfill at least N days of chain data and M days of
       auction data. Resumable and idempotent: a re-run fetches only what is missing. With
       --budget-minutes the backfill stops B minutes after the start and the next run resumes it.
-      With --prune, data older than N days of chain data and M days of auction data is deleted
-      once the head is caught up (a depth of 0 deletes nothing). With --snapshot the snapshot is
+      With --prune, once the head is caught up, chain data older than N days (at least M, as for
+      the backfill) is deleted with its auction data, and so is the auction data of settlements
+      older than M days; with both at 0 nothing is deleted. With --snapshot the snapshot is
       written once the head is caught up, and again if the backfill added history (on an empty
       database, only after the backfill).
   node src/cli.ts snapshot [--out <path>]

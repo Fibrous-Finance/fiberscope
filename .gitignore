@@ -22,6 +22,8 @@ next-env.d.ts
 *.db
 *.db-shm
 *.db-wal
+*.db.v1
+*.db.v1.partial*
 
 # Local design reference files, never committed
 /design/

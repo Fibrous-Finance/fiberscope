@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, renameSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { SQLInputValue, StatementSync } from "node:sqlite";
@@ -280,15 +280,23 @@ export class Store {
 	}
 
 	/**
-	 * Converts a version 1 database in place, after copying it to `<path>.v1`. Every converted row
-	 * is compared with its source before the old tables are dropped, all in one transaction, so a
-	 * conversion that fails leaves the database as it was. VACUUM then returns the space.
+	 * Converts a version 1 database in place, after copying it to `<path>.v1`. The copy is written
+	 * under a temporary name and renamed once it is complete, so a copy cut short is never taken
+	 * for a backup. Every converted row is compared with its source before the old tables are
+	 * dropped, all in one transaction, so a conversion that fails leaves the database as it was.
+	 * VACUUM then returns the space.
 	 */
 	#convert(path: string): void {
 		const started = performance.now();
 		const backup = `${path}.v1`;
 		if (path !== ":memory:" && !existsSync(backup)) {
-			this.db.exec(`VACUUM INTO '${backup.replaceAll("'", "''")}'`);
+			const partial = `${backup}.partial`;
+			for (const file of [partial, `${partial}-journal`]) rmSync(file, { force: true });
+			this.db.exec(`VACUUM INTO '${partial.replaceAll("'", "''")}'`);
+			const fd = openSync(partial, "r+");
+			fsyncSync(fd);
+			closeSync(fd);
+			renameSync(partial, backup);
 			log(`schema: copied the version 1 database to ${backup}`);
 		}
 		this.#transaction(() => {
@@ -951,6 +959,8 @@ const CONVERSION_CHECKS: [what: string, sql: string][] = [
 				OR CASE WHEN v.trades > 0
 					THEN t.tx IS NULL OR se.address IS NOT t.sender OR re.address IS NOT t.to_address
 						OR v.gas_used IS NOT t.gas_used OR typeof(v.fee) != 'integer'
+						OR CAST(CAST(t.gas_price AS INTEGER) AS TEXT) IS NOT t.gas_price
+						OR CAST(CAST(t.l1_fee AS INTEGER) AS TEXT) IS NOT t.l1_fee
 						OR v.tx_batches IS NOT
 							(SELECT count(*) FROM v1_settlements x WHERE x.tx = s.tx AND x.trades > 0)
 					ELSE v.sender IS NOT NULL OR v.recipient IS NOT NULL OR v.gas_used IS NOT NULL

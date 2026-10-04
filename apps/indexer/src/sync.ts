@@ -39,7 +39,7 @@ export interface SyncStats {
 const CATCH_UP_SLACK = 150;
 
 /**
- * Brings the database up to date. Chain and auction data catch up with the chain head, which
+ * Brings the database up to date. Chain and auction data catch up with Base's safe block, which
  * makes the data current (the last run time) and is when the snapshot is written. Then chain and
  * auction history are backfilled to the requested depths, within the budget if there is one; the
  * snapshot is written again if history grew. Every step resumes where an interrupted or stopped

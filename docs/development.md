@@ -199,8 +199,8 @@ but no preview.
 
 ### The indexer
 
-The indexer runs anywhere Node 24 runs. It needs a persistent disk for its database, at least 4 GB
-of memory (see [Running costs](#running-costs)), and `SNAPSHOT_R2_BUCKET`, so every snapshot
+The indexer runs anywhere Node 24 runs. It needs a persistent disk for its database, 1 GB of
+memory (see [Running costs](#running-costs)), and `SNAPSHOT_R2_BUCKET`, so every snapshot
 reaches the site. Its key is an R2 API token limited to Object Read & Write on that one bucket (R2 →
 Manage API tokens); the indexer signs S3 requests with the token's S3 credentials, so it can write
 nowhere else in the account.
@@ -231,13 +231,13 @@ Measured on the live deployment on 3–4 Oct 2026.
   [R2's free tier](https://developers.cloudflare.com/r2/pricing/#free-tier): 10 GB-month of
   storage, 1 million writes and 10 million reads a month.
 - **Indexer.** The database takes about 175 MB at 180 days of settlements and 90 days of auctions,
-  and `--prune` keeps it there. While
-  history is being filled, each run lasts its whole 10-minute budget and memory peaks at about
-  2.8 GB. Once caught up, a run takes well under a minute every 10 minutes; memory averages about
-  0.7 GB and peaks at about 1.8 GB. Give any host at least 4 GB of RAM. Railway meters actual use:
-  $10 per GB of memory and $20 per vCPU per month, and $0.15 per GB of volume per month
-  ([pricing](https://docs.railway.com/pricing/plans#resource-usage-pricing)). Caught up, that
-  comes to about $8 a month.
+  and `--prune` keeps it there. Caught up, a run takes about 10 seconds every 10 minutes, most of
+  it building the snapshot. Memory, as the container's cgroup counts it: about 0.17 GB between
+  runs, which is the database file in the system's page cache, and a peak of about 0.57 GB during
+  a run (before the changes: 0.71 GB and 2.8 GB). Give any host 1 GB of RAM. Railway meters actual
+  use, page cache included: $10 per GB of memory and $20 per vCPU per month, and $0.15 per GB of
+  volume per month ([pricing](https://docs.railway.com/pricing/plans#resource-usage-pricing)).
+  Caught up, that comes to about $2 a month (before: about $8).
 - **Data.** The indexer reads public endpoints without API keys: Base's RPC, CoW's API and CoW's
   solver registry.
 

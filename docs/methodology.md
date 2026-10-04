@@ -25,8 +25,9 @@ Every figure comes from public data on Base and from CoW Protocol's public servi
 - **Windows.** The periods (24 hours, 7, 30, 90 and 180 days) add up whole days and end at the
   newest block. Rates such as Entered and Win rate are taken over all the window's auctions
   together, not averaged over days.
-- **Newest block.** The data stops 20 blocks (40 seconds) short of the chain head, as a margin
-  against reorganizations.
+- **Newest block.** The data stops at Base's safe block: the newest block whose transactions Base
+  has posted to Ethereum, usually a minute or two behind the chain head. Such a block changes only
+  if Ethereum reorganizes the blocks that hold its data.
 - **Coverage.** Only complete days count. Settlement history (batches, trades, gas, transaction
   cost, DEX swaps) reaches furthest back. Volume, Entered and Win rate also need auction data, and
   surplus also needs the terms each order was signed with. In a window longer than the history

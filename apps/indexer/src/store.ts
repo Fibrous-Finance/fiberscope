@@ -227,14 +227,20 @@ export class Store {
 		this.db = new DatabaseSync(path, { timeout: 10_000 });
 		this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
 		const version = this.#get<{ user_version: number }>("PRAGMA user_version")!.user_version;
-		const populated = this.#get("SELECT 1 FROM sqlite_schema WHERE name = 'settlements'");
-		if (populated && version !== SCHEMA_VERSION) {
+		if (version > SCHEMA_VERSION) {
 			throw new Error(
-				`${path} has schema version ${version}; this indexer reads version ${SCHEMA_VERSION}. ` +
-					"Delete it to index from scratch, or seed a current copy"
+				`${path} has schema version ${version}; this indexer reads version ${SCHEMA_VERSION}`
 			);
 		}
-
+		if (
+			version < SCHEMA_VERSION &&
+			this.#get("SELECT 1 FROM sqlite_schema WHERE name = 'settlements'")
+		) {
+			throw new Error(
+				`${path} was written by an older indexer (schema version ${version}): delete it to ` +
+					"index from scratch, or seed a current copy"
+			);
+		}
 		this.#transaction(() => {
 			this.db.exec(SCHEMA);
 			this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

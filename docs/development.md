@@ -46,19 +46,22 @@ build.
 `apps/indexer` reads data from Base and CoW's API into a SQLite database
 (`apps/indexer/.data/base.db`) and writes the snapshot from it. Node 24 runs the indexer's
 TypeScript directly. The indexer has no build step or third-party dependencies; it uses
-`node:sqlite` for SQLite.
+`node:sqlite` for SQLite. Settlements and trades are stored by block, addresses by id and hashes
+as bytes (`apps/indexer/src/store.ts`). The database records its schema version; a database from
+the previous version is converted when the indexer opens it, after a copy is kept next to it as
+`base.db.v1`.
 
 ### Commands
 
 Run them from `apps/indexer`. Every command takes `--db <path>`; `node src/cli.ts --help` prints
 the same summary.
 
-| Command                                                                                             | What it does                                                                                                                                                                                                                                                                                                          |
-| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--snapshot <path>]` | Catches up with the chain head, then backfills at least N days of settlements and M days of auctions. With `--snapshot`, writes the snapshot once the head is caught up, and again if the backfill added history. With `--budget-minutes`, the backfill stops B minutes after the start, and the next run resumes it. |
-| `node src/cli.ts snapshot [--out <path>]`                                                           | Writes the snapshot from the database (default `apps/web/data/snapshot.json`).                                                                                                                                                                                                                                        |
-| `node src/cli.ts window --from <block> --to <block>`                                                | Prints totals and the per-solver table for a block range, from the database.                                                                                                                                                                                                                                          |
-| `node src/cli.ts seed --url <url>`                                                                  | Downloads a database from `<url>` when there is none yet, so a new host does not index again. It never overwrites a database and runs SQLite's integrity check on the download before using it.                                                                                                                       |
+| Command                                                                                                       | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune] [--snapshot <path>]` | Catches up with the chain head, then backfills at least N days of settlements and M days of auctions. With `--snapshot`, writes the snapshot once the head is caught up, and again if the backfill added history. With `--budget-minutes`, the backfill stops B minutes after the start, and the next run resumes it. With `--prune`, deletes the data older than those depths once the head is caught up (see below); with both at 0 it deletes nothing. |
+| `node src/cli.ts snapshot [--out <path>]`                                                                     | Writes the snapshot from the database (default `apps/web/data/snapshot.json`).                                                                                                                                                                                                                                                                                                                                                                            |
+| `node src/cli.ts window --from <block> --to <block>`                                                          | Prints totals and the per-solver table for a block range, from the database.                                                                                                                                                                                                                                                                                                                                                                              |
+| `node src/cli.ts seed --url <url>`                                                                            | Downloads a database from `<url>` when there is none yet, so a new host does not index again. It never overwrites a database and runs SQLite's integrity check on the download before using it.                                                                                                                                                                                                                                                           |
 
 The package's `sync` and `snapshot` scripts (`pnpm --filter @fiberscope/indexer snapshot`, with the
 same options) also read `apps/indexer/.env` when it exists.
@@ -68,11 +71,15 @@ same options) also read `apps/indexer/.env` when it exists.
 1. Refreshes CoW's solver registry; if the registry is unavailable, it uses the last copy.
 2. Catches up: settlements, receipts and calldata up to 20 blocks below the chain head, then the
    auctions behind the new settlements.
-3. Marks the data current and, with `--snapshot`, writes the snapshot.
-4. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
+3. With `--prune`, deletes settlements older than N days (at least M, as for the backfill) with
+   their auction data, and the auction data of settlements older than M days. A flash-loan router
+   settlement keeps its auction while it is in the chain data, since its attribution may need the
+   auction's winner.
+4. Marks the data current and, with `--snapshot`, writes the snapshot.
+5. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
    settlements, followed by their auction lookups. Settlement history is kept at least as deep as
    auction history.
-5. Writes the snapshot again if the history grew.
+6. Writes the snapshot again if the history grew.
 
 On an empty database there is nothing to catch up: the backfill starts at the chain head and the
 snapshot is written once it ends. Every step commits as it goes, so an interrupted run loses
@@ -198,7 +205,7 @@ Manage API tokens); the indexer signs S3 requests with the token's S3 credential
 nowhere else in the account.
 
 `apps/indexer/Dockerfile` builds an image that runs `loop.sh` with 180 days of settlements, 90 days
-of auctions and a 10-minute budget. Build it from the repository root:
+of auctions, a 10-minute budget and `--prune`. Build it from the repository root:
 
 ```sh
 docker build -f apps/indexer/Dockerfile -t fiberscope-indexer .
@@ -222,8 +229,8 @@ Measured on the live deployment on 3–4 Oct 2026.
   and read once per page view and once per update of an open page. That is well within
   [R2's free tier](https://developers.cloudflare.com/r2/pricing/#free-tier): 10 GB-month of
   storage, 1 million writes and 10 million reads a month.
-- **Indexer.** The database takes 0.89 GB of the Railway volume at 180 days of settlements and 90
-  days of auctions. Nothing in it is pruned, so it keeps growing by roughly 7–10 MB a day. While
+- **Indexer.** The database takes about 175 MB at 180 days of settlements and 90 days of auctions,
+  and `--prune` keeps it there. While
   history is being filled, each run lasts its whole 10-minute budget and memory peaks at about
   2.8 GB. Once caught up, a run takes well under a minute every 10 minutes; memory averages about
   0.7 GB and peaks at about 1.8 GB. Give any host at least 4 GB of RAM. Railway meters actual use:

@@ -41,6 +41,11 @@ const OVERRIDES: RegistryEntry[] = [
 	{ address: RIZZOLVER, env: "prod", active: true, solverId: "rizzolver", name: "Rizzolver" },
 ];
 
+/** A transaction hash spelled from a readable label. */
+function hash(label: string): string {
+	return `0x${Buffer.from(label).toString("hex").padStart(64, "0")}`;
+}
+
 interface Settled {
 	tx: string;
 	block: number;
@@ -59,29 +64,29 @@ interface Settled {
 
 /** Oldest first. Sector and Curve never settle; the stranger is not in the registry. */
 const SETTLED: Settled[] = [
-	{ tx: "0xold", block: 100, solver: ARC, swaps: 4 },
+	{ tx: hash("old"), block: 100, solver: ARC, swaps: 4 },
 	{
-		tx: "0xrouted-old",
+		tx: hash("routed-old"),
 		block: 50_000,
 		solver: ROUTER,
 		sender: HELPER,
 		recipient: RIZZOLVER,
 		swaps: 5,
 	},
-	// 52 batches of Arc in bucket 0; the newest, 0xarc0, at END − 1,000.
+	// 52 batches of Arc in bucket 0; the newest, arc0, at END − 1,000.
 	...Array.from({ length: 52 }, (_, i) => ({
-		tx: `0xarc${i}`,
+		tx: hash(`arc${i}`),
 		block: END - 1_000 - i,
 		solver: ARC,
 		swaps: 1,
 	})).reverse(),
-	{ tx: "0xstranger", block: END - 30, solver: STRANGER, swaps: 1 },
+	{ tx: hash("stranger"), block: END - 30, solver: STRANGER, swaps: 1 },
 	// A buffer settlement: no trade, so no batch.
-	{ tx: "0xbuffer", block: END - 20, solver: ARC, trades: 0, swaps: 7 },
+	{ tx: hash("buffer"), block: END - 20, solver: ARC, trades: 0, swaps: 7 },
 	// Two batches in one transaction. Each fills 1,000 USDC for 0.5 WETH: the first against a
 	// limit of 0.45 WETH, a surplus of exactly a tenth of its value; the second one atom lower.
 	{
-		tx: "0xpair",
+		tx: hash("pair"),
 		block: END - 15,
 		logIndex: 3,
 		solver: ARC,
@@ -89,7 +94,7 @@ const SETTLED: Settled[] = [
 		limitBuy: "450000000000000000",
 	},
 	{
-		tx: "0xpair",
+		tx: hash("pair"),
 		block: END - 15,
 		logIndex: 7,
 		solver: ARC,
@@ -97,9 +102,16 @@ const SETTLED: Settled[] = [
 		limitBuy: "449999999999999999",
 	},
 	// Neither sender nor recipient is a solver: the auction's winning solution (Arc's) decides.
-	{ tx: "0xwon", block: END - 10, solver: ROUTER, sender: HELPER, recipient: ROUTER, swaps: 3 },
 	{
-		tx: "0xrouted",
+		tx: hash("won"),
+		block: END - 10,
+		solver: ROUTER,
+		sender: HELPER,
+		recipient: ROUTER,
+		swaps: 3,
+	},
+	{
+		tx: hash("routed"),
 		block: END - 5,
 		solver: ROUTER,
 		sender: HELPER,
@@ -148,39 +160,28 @@ async function build(): Promise<Snapshot> {
 				sender: s.sender ?? s.solver,
 				recipient: s.recipient ?? SETTLEMENT,
 				gasUsed: 400_000,
-				gasPrice: "10000000",
-				l1Fee: "100000000000",
+				fee: "4100000000000",
 			})),
 			prices: [{ block: 1, answer: 2_000e8 }],
 		},
 		range
 	);
-	// The auction of 0xwon and 0xpair priced USDC at $1 and WETH at $2,000.
+	// The auction of won and pair priced USDC at $1 and WETH at $2,000.
 	store.saveCompetition(
 		{
 			auctionId: 1,
 			startBlock: END - 14,
-			deadlineBlock: END - 11,
-			txHashes: ["0xwon", "0xpair"],
+			txHashes: [hash("won"), hash("pair")],
 			prices: new Map(),
-			solutions: [
-				{
-					solver: ARC,
-					score: "1",
-					ranking: 1,
-					winner: true,
-					filteredOut: false,
-					tx: "0xwon",
-				},
-			],
+			solutions: [{ solver: ARC, ranking: 1, winner: true, tx: hash("won") }],
 		},
 		[
 			[USDC, "500000000000000000000000000"],
 			[WETH, "1000000000000000000"],
 		],
 		[
-			{ tx: "0xwon", priced: true },
-			{ tx: "0xpair", priced: true },
+			{ tx: hash("won"), priced: true },
+			{ tx: hash("pair"), priced: true },
 		],
 		0
 	);
@@ -218,7 +219,7 @@ describe("snapshot", () => {
 		const { latestSettlements } = await build();
 		assert.equal(latestSettlements.length, 50);
 		assert.deepEqual(latestSettlements[0], {
-			tx: "0xrouted",
+			tx: hash("routed"),
 			block: END - 5,
 			time: timeOf(END - 5) * 1000,
 			trades: 1,
@@ -233,24 +234,24 @@ describe("snapshot", () => {
 		assert.deepEqual(
 			latestSettlements.slice(0, 5).map(({ tx, solver, swaps }) => ({ tx, solver, swaps })),
 			[
-				{ tx: "0xrouted", solver: "rizzolver", swaps: 2 },
-				{ tx: "0xwon", solver: "arc", swaps: 3 },
+				{ tx: hash("routed"), solver: "rizzolver", swaps: 2 },
+				{ tx: hash("won"), solver: "arc", swaps: 3 },
 				// The later Settlement event of the transaction first.
-				{ tx: "0xpair", solver: "arc", swaps: 6 },
-				{ tx: "0xpair", solver: "arc", swaps: 1 },
-				{ tx: "0xstranger", solver: STRANGER, swaps: 1 },
+				{ tx: hash("pair"), solver: "arc", swaps: 6 },
+				{ tx: hash("pair"), solver: "arc", swaps: 1 },
+				{ tx: hash("stranger"), solver: STRANGER, swaps: 1 },
 			]
 		);
 		assert.deepEqual(
 			latestSettlements.slice(5).map((settlement) => settlement.tx),
-			Array.from({ length: 45 }, (_, i) => `0xarc${i}`)
+			Array.from({ length: 45 }, (_, i) => hash(`arc${i}`))
 		);
 	});
 
 	test("a batch costs its tx's fee at ETH/USD, split between the tx's batches", async () => {
 		const { solvers, latestSettlements } = await build();
 		const arc = solvers.find((solver) => solver.id === "arc");
-		// Bucket 0: 52 one-batch txs, 0xwon, and the two batches of 0xpair at $0.0041 each.
+		// Bucket 0: 52 one-batch txs, won, and the two batches of pair at $0.0041 each.
 		assert.deepEqual(
 			arc?.cost,
 			[54 * 0.0082, 0, 0.0082].map((usd) => +usd.toFixed(4))
@@ -258,8 +259,8 @@ describe("snapshot", () => {
 		assert.deepEqual(
 			latestSettlements.slice(2, 4).map(({ tx, gas, cost }) => ({ tx, gas, cost })),
 			[
-				{ tx: "0xpair", gas: 200_000, cost: 0.0041 },
-				{ tx: "0xpair", gas: 200_000, cost: 0.0041 },
+				{ tx: hash("pair"), gas: 200_000, cost: 0.0041 },
+				{ tx: hash("pair"), gas: 200_000, cost: 0.0041 },
 			]
 		);
 	});
@@ -268,15 +269,15 @@ describe("snapshot", () => {
 		const { coverage, solvers, latestSettlements } = await build();
 		assert.deepEqual(coverage, { chainDays: 3, auctionDays: 3, surplusDays: 3 });
 		const arc = solvers.find((solver) => solver.id === "arc");
-		// Only the auction of 0xwon and 0xpair is priced: three trades of $1,000. 0xwon got 0.1
-		// WETH over the 0.4 asked of 0.5, a surplus of $200; each 0xpair trade about $100.
+		// Only the auction of won and pair is priced: three trades of $1,000. won got 0.1 WETH
+		// over the 0.4 asked of 0.5, a surplus of $200; each pair trade about $100.
 		assert.deepEqual(arc?.volume, [3_000, 0, 0]);
 		assert.deepEqual(arc?.surplus, [400, 0, 0]);
 		assert.deepEqual(arc?.surplusTrades, [3, 0, 0]);
 		assert.deepEqual(arc?.surplusVolume, [3_000, 0, 0]);
 		assert.deepEqual(
 			latestSettlements
-				.filter(({ tx }) => tx === "0xwon")
+				.filter(({ tx }) => tx === hash("won"))
 				.map(({ volume, surplus }) => ({ volume, surplus })),
 			[{ volume: 1_000, surplus: 200 }]
 		);
@@ -284,8 +285,8 @@ describe("snapshot", () => {
 
 	test("surplus of more than a tenth of the trade's value counts as unusual", async () => {
 		const arc = (await build()).solvers.find((solver) => solver.id === "arc");
-		// 0xwon (a fifth) and the second 0xpair trade (a tenth and a hair) are unusual; the first
-		// 0xpair trade, at exactly a tenth, is not.
+		// won (a fifth) and the second pair trade (a tenth and a hair) are unusual; the first pair
+		// trade, at exactly a tenth, is not.
 		assert.deepEqual(arc?.unusualTrades, [2, 0, 0]);
 		assert.deepEqual(arc?.unusualSurplus, [300, 0, 0]);
 		assert.deepEqual(arc?.unusualVolume, [2_000, 0, 0]);
@@ -303,7 +304,11 @@ describe("snapshot", () => {
 					{ env: "prod", address: RIZZOLVER, active: true },
 					{ env: "prod", address: RIZZOLVER_RETIRED, active: false },
 				],
-				lastSettlement: { tx: "0xrouted", block: END - 5, time: timeOf(END - 5) * 1000 },
+				lastSettlement: {
+					tx: hash("routed"),
+					block: END - 5,
+					time: timeOf(END - 5) * 1000,
+				},
 				batches: 2,
 			},
 			{
@@ -311,7 +316,7 @@ describe("snapshot", () => {
 				name: "Arc",
 				active: true,
 				addresses: [{ env: "prod", address: ARC, active: true }],
-				lastSettlement: { tx: "0xwon", block: END - 10, time: timeOf(END - 10) * 1000 },
+				lastSettlement: { tx: hash("won"), block: END - 10, time: timeOf(END - 10) * 1000 },
 				batches: 56,
 			},
 			{

@@ -146,10 +146,6 @@ export function tradeSurplus(usd: number | null, trade: SurplusFacts): TradeSurp
  * the L1 data fee (wei), in ETH at the ETH/USD rate of its block, split evenly between the
  * batches the transaction holds, as its gas is.
  */
-export function batchCostUsd(
-	tx: { gasUsed: number; gasPrice: string; l1Fee: string; txBatches: number },
-	ethUsd: number
-): number {
-	const wei = BigInt(tx.gasUsed) * BigInt(tx.gasPrice) + BigInt(tx.l1Fee);
-	return (Number(wei) / 1e18 / tx.txBatches) * ethUsd;
+export function batchCostUsd(tx: { fee: string; txBatches: number }, ethUsd: number): number {
+	return (Number(BigInt(tx.fee)) / 1e18 / tx.txBatches) * ethUsd;
 }

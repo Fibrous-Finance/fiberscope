@@ -17,12 +17,16 @@ import { uploadSnapshot } from "./upload.ts";
 import { windowReport } from "./window.ts";
 
 const USAGE = `Usage:
-  node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--snapshot <path>]
+  node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune]
+                       [--snapshot <path>]
       Catch up with the chain head, then backfill at least N days of chain data and M days of
       auction data. Resumable and idempotent: a re-run fetches only what is missing. With
       --budget-minutes the backfill stops B minutes after the start and the next run resumes it.
-      With --snapshot the snapshot is written once the head is caught up, and again if the
-      backfill added history (on an empty database, only after the backfill).
+      With --prune, once the head is caught up, chain data older than N days (at least M, as for
+      the backfill) is deleted with its auction data, and so is the auction data of settlements
+      older than M days; with both at 0 nothing is deleted. With --snapshot the snapshot is
+      written once the head is caught up, and again if the backfill added history (on an empty
+      database, only after the backfill).
   node src/cli.ts snapshot [--out <path>]
       Write the snapshot JSON (default ${relative(process.cwd(), DEFAULT_SNAPSHOT_PATH)}).
   node src/cli.ts window --from <block> --to <block>
@@ -44,6 +48,7 @@ async function main(): Promise<void> {
 			"chain-days": { type: "string" },
 			"auction-days": { type: "string" },
 			"budget-minutes": { type: "string" },
+			prune: { type: "boolean" },
 			snapshot: { type: "string" },
 			out: { type: "string" },
 			from: { type: "string" },
@@ -82,6 +87,7 @@ async function main(): Promise<void> {
 				auctionDays: wholeNumber(values["auction-days"], "auction-days", 0),
 				budgetMinutes:
 					budget === undefined ? null : wholeNumber(budget, "budget-minutes", null),
+				prune: values.prune === true,
 				writeSnapshot:
 					snapshotPath === undefined
 						? null

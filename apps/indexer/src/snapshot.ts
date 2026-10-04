@@ -195,7 +195,7 @@ export async function buildSnapshot(
 	const tradesOf = new Map<Batch, TradeValueRow[]>();
 	for (const batch of listed) {
 		if (!tradesOf.has(batch)) {
-			tradesOf.set(batch, store.settlementTrades(batch.tx, batch.logIndex));
+			tradesOf.set(batch, store.settlementTrades(batch.block, batch.logIndex));
 		}
 	}
 	const symbols = await options.symbols(

@@ -212,22 +212,24 @@ without indexing again.
 
 ## Running costs
 
-Measured on the live deployment on 3 Oct 2026.
+Measured on the live deployment on 3–4 Oct 2026.
 
 - **Site.** The Worker is 5.47 MB, 1.14 MB gzipped, within the Workers Free plan's
   [size limit](https://developers.cloudflare.com/workers/platform/limits/#worker-size). Requests and
   CPU time per request depend on the plan: see
   [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/#workers).
-- **Snapshot.** One R2 object of about 255 KB, rewritten on every indexer run, every 10 minutes,
-  and read once per page view. That is well within
+- **Snapshot.** One R2 object of about 280 KB, rewritten on every indexer run, every 10 minutes,
+  and read once per page view and once per update of an open page. That is well within
   [R2's free tier](https://developers.cloudflare.com/r2/pricing/#free-tier): 10 GB-month of
   storage, 1 million writes and 10 million reads a month.
-- **Indexer.** The database takes 0.83 GB of the Railway volume at 180 days of settlements and 64
-  days of auctions. Memory peaks at about 2.8 GB during a run, so give any host at least 4 GB of
-  RAM. During a backfill each run lasts its whole 10-minute budget and memory stays high; once
-  caught up, a run takes well under a minute every 10 minutes. Railway meters actual use: $10 per
-  GB of memory and $20 per vCPU per month, and $0.15 per GB of volume per month
-  ([pricing](https://docs.railway.com/pricing/plans#resource-usage-pricing)).
+- **Indexer.** The database takes 0.89 GB of the Railway volume at 180 days of settlements and 90
+  days of auctions. Nothing in it is pruned, so it keeps growing by roughly 7–10 MB a day. While
+  history is being filled, each run lasts its whole 10-minute budget and memory peaks at about
+  2.8 GB. Once caught up, a run takes well under a minute every 10 minutes; memory averages about
+  0.7 GB and peaks at about 1.8 GB. Give any host at least 4 GB of RAM. Railway meters actual use:
+  $10 per GB of memory and $20 per vCPU per month, and $0.15 per GB of volume per month
+  ([pricing](https://docs.railway.com/pricing/plans#resource-usage-pricing)). Caught up, that
+  comes to about $8 a month.
 - **Data.** The indexer reads public endpoints without API keys: Base's RPC, CoW's API and CoW's
   solver registry.
 

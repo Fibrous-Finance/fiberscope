@@ -1,5 +1,6 @@
+import { ROUTER } from "./chain.ts";
 import { timeOf } from "./config.ts";
-import { auctionOutcomes, loadBatches, TradeValuer } from "./facts.ts";
+import { auctionOutcomes, creditedBatches, TradeValuer } from "./facts.ts";
 import { fmt, shortAddress } from "./log.ts";
 import type { Registry, SolverIdentity } from "./registry.ts";
 import type { BlockRange } from "./rules.ts";
@@ -62,15 +63,28 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		}
 		return entry;
 	};
-	const batches = loadBatches(store, registry, range);
-	const credited = new Map<string, Row>();
-	for (const batch of batches) {
+	let batches = 0;
+	let routed = 0;
+	let uncosted = 0;
+	let gas = 0;
+	let cost = 0;
+	// Trades follow their batch's credit: a router batch's by its block and log index, any other
+	// to the solver that settled it.
+	const routedRows = new Map<string, Row>();
+	for (const batch of creditedBatches(store, registry, range)) {
 		const entry = row(batch.solver);
 		entry.batches++;
 		entry.trades += batch.trades;
 		entry.gas += batch.gas;
 		entry.cost += batch.cost ?? 0;
-		credited.set(`${batch.tx}:${batch.logIndex}`, entry);
+		batches++;
+		gas += batch.gas;
+		cost += batch.cost ?? 0;
+		if (batch.cost === null) uncosted++;
+		if (batch.viaRouter) {
+			routed++;
+			routedRows.set(`${batch.block}:${batch.logIndex}`, entry);
+		}
 	}
 
 	const valuer = new TradeValuer(store);
@@ -92,7 +106,10 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		}
 		if (value.pricedSides === 1) oneSided++;
 		volume += value.usd;
-		const entry = credited.get(`${trade.tx}:${trade.settlementLogIndex}`)!;
+		const entry =
+			trade.solver === ROUTER
+				? routedRows.get(`${trade.block}:${trade.settlementLogIndex}`)!
+				: rows.get(registry.identify(trade.solver).id)!;
 		entry.volume += value.usd;
 		if (value.surplus === null) continue;
 		surplus += value.surplus.usd;
@@ -106,10 +123,11 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		entry.unusualSurplus += value.surplus.usd;
 	}
 
-	const auctions = auctionOutcomes(store.solutionsByStart(range), registry);
+	let auctions = 0;
 	let solutions = 0;
 	let winners = 0;
-	for (const auction of auctions) {
+	for (const auction of auctionOutcomes(store.solutionsByStart(range), registry)) {
+		auctions++;
 		solutions += auction.solutions;
 		winners += auction.winners.length;
 		for (const { identity } of auction.entrants.values()) row(identity).entered++;
@@ -119,14 +137,10 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 	const sorted = [...rows.values()].sort(
 		(a, b) => b.batches - a.batches || b.entered - a.entered
 	);
-	const gas = batches.reduce((total, batch) => total + batch.gas, 0);
-	const cost = batches.reduce((total, batch) => total + (batch.cost ?? 0), 0);
-	const uncosted = batches.filter((batch) => batch.cost === null).length;
-	const routed = batches.filter((batch) => batch.viaRouter).length;
 	const settling = sorted.filter((entry) => entry.batches > 0).length;
 	const bps = surplusVolume > 0 ? ((surplus / surplusVolume) * 10_000).toFixed(2) : "—";
 	out.push(
-		`Batches    ${fmt(batches.length)} (${fmt(routed)} via the flash-loan router; ` +
+		`Batches    ${fmt(batches)} (${fmt(routed)} via the flash-loan router; ` +
 			`${fmt(store.zeroTradeSettlements(range))} zero-trade settlements excluded)`,
 		`Trades     ${fmt(trades)} (${fmt(trades - unpriced - oneSided)} priced on both sides, ` +
 			`${fmt(oneSided)} on one side, ${fmt(unpriced)} unpriced)`,
@@ -139,8 +153,8 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		`Cost       $${fmt(cost)} (${usdPer(cost, trades, 4)} per trade` +
 			`${uncosted > 0 ? `; ${fmt(uncosted)} batches without an ETH/USD rate` : ""})`,
 		`Solvers    ${fmt(settling)} with batches, ${fmt(sorted.length)} with batches or solutions`,
-		`Auctions   ${fmt(auctions.length)} started in the window, ${fmt(solutions)} solutions, ` +
-			`${(winners / Math.max(1, auctions.length)).toFixed(2)} winners per auction`,
+		`Auctions   ${fmt(auctions)} started in the window, ${fmt(solutions)} solutions, ` +
+			`${(winners / Math.max(1, auctions)).toFixed(2)} winners per auction`,
 		""
 	);
 

@@ -107,14 +107,10 @@ describe("prune", () => {
 		assert.equal(store.competitionLink(hash("r"))?.auctionId, 2);
 		assert.equal(store.apiWinner(hash("r")), SOLVER);
 		for (const label of ["a", "b", "d"]) assert.equal(store.competitionLink(hash(label)), null);
-		assert.deepEqual(
-			[
-				...new Set(
-					store.solutionsByStart({ from: 1, to: 1_000 }).map((row) => row.auctionId)
-				),
-			],
-			[2, 3]
+		const auctions = [...store.solutionsByStart({ from: 1, to: 1_000 })].map(
+			(row) => row.auctionId
 		);
+		assert.deepEqual([...new Set(auctions)], [2, 3]);
 		const [trade] = store.tradeRows({ from: 320, to: 320 });
 		assert.equal(new TradeValuer(store).value(trade).pricedSides, 2);
 		// The answer in force at block 150 stays.

@@ -1,4 +1,4 @@
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, renameSync, rmSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { SQLInputValue, StatementSync } from "node:sqlite";
@@ -6,7 +6,6 @@ import type { SQLInputValue, StatementSync } from "node:sqlite";
 import { ROUTER } from "./chain.ts";
 import type { SettlementRow, TradeRow } from "./chain.ts";
 import type { Competition } from "./cow.ts";
-import { duration, log } from "./log.ts";
 import type { PricePoint } from "./prices.ts";
 import type { RegistryEntry } from "./registry.ts";
 import type { BlockRange } from "./rules.ts";
@@ -18,7 +17,7 @@ export interface TxRow {
 	sender: string;
 	/**
 	 * The receipt's `to`. Null in rows stored before it was kept; attribution reads it only for
-	 * flash-loan router transactions, and those all have it (see Store's #checkUnversioned).
+	 * flash-loan router transactions, and those all have it.
 	 */
 	recipient: string | null;
 	gasUsed: number;
@@ -68,6 +67,8 @@ export interface BatchRow {
 
 export interface TradeValueRow {
 	tx: string;
+	/** The address that called `settle` for the trade's settlement. */
+	solver: string;
 	settlementLogIndex: number;
 	block: number;
 	sellToken: string;
@@ -228,97 +229,22 @@ export class Store {
 		const version = this.#get<{ user_version: number }>("PRAGMA user_version")!.user_version;
 		if (version > SCHEMA_VERSION) {
 			throw new Error(
-				`${path} has schema version ${version}; this indexer knows ${SCHEMA_VERSION}`
+				`${path} has schema version ${version}; this indexer reads version ${SCHEMA_VERSION}`
 			);
 		}
-		const populated = this.#get("SELECT 1 FROM sqlite_schema WHERE name = 'settlements'");
-		if (populated && version === 0) this.#checkUnversioned(path);
-		if (populated && version < SCHEMA_VERSION) {
-			this.#convert(path);
-			return;
-		}
-		this.#transaction(() => {
-			this.db.exec(SCHEMA);
-			this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
-		});
-	}
-
-	/**
-	 * A database written before the schema had a version is used only if earlier indexers
-	 * finished filling it in, since this one no longer does: every column exists, the calldata of
-	 * every transaction was read for order terms, and every flash-loan router transaction has its
-	 * recipient.
-	 */
-	#checkUnversioned(path: string): void {
-		const columns = new Set(
-			this.#all<{ name: string }>(
-				`SELECT name FROM pragma_table_info('txs')
-					UNION ALL SELECT name FROM pragma_table_info('trades')`
-			).map(({ name }) => name)
-		);
-		const filled =
-			[
-				"to_address",
-				"terms_read",
-				"limit_sell_amount",
-				"limit_buy_amount",
-				"fee_amount",
-			].every((column) => columns.has(column)) &&
-			!this.#get("SELECT 1 FROM txs WHERE terms_read IS NULL LIMIT 1") &&
-			!this.#get(
-				`SELECT 1 FROM txs t JOIN settlements s ON s.tx = t.tx
-					WHERE t.to_address IS NULL AND s.solver = ? AND s.trades > 0 LIMIT 1`,
-				ROUTER
-			);
-		if (!filled) {
+		if (
+			version < SCHEMA_VERSION &&
+			this.#get("SELECT 1 FROM sqlite_schema WHERE name = 'settlements'")
+		) {
 			throw new Error(
-				`${path} was written by an older indexer and still lacks order terms or router ` +
-					"recipients, which this one no longer fills in: delete it to index from scratch, " +
-					"or seed a current copy"
+				`${path} was written by an older indexer (schema version ${version}): delete it to ` +
+					"index from scratch, or seed a current copy"
 			);
 		}
-	}
-
-	/**
-	 * Converts a version 1 database in place, after copying it to `<path>.v1`. The copy is written
-	 * under a temporary name and renamed once it is complete, so a copy cut short is never taken
-	 * for a backup. Every converted row is compared with its source before the old tables are
-	 * dropped, all in one transaction, so a conversion that fails leaves the database as it was.
-	 * VACUUM then returns the space.
-	 */
-	#convert(path: string): void {
-		const started = performance.now();
-		const backup = `${path}.v1`;
-		if (path !== ":memory:" && !existsSync(backup)) {
-			const partial = `${backup}.partial`;
-			for (const file of [partial, `${partial}-journal`]) rmSync(file, { force: true });
-			this.db.exec(`VACUUM INTO '${partial.replaceAll("'", "''")}'`);
-			const fd = openSync(partial, "r+");
-			fsyncSync(fd);
-			closeSync(fd);
-			renameSync(partial, backup);
-			log(`schema: copied the version 1 database to ${backup}`);
-		}
 		this.#transaction(() => {
-			for (const table of V1_TABLES)
-				this.db.exec(`ALTER TABLE ${table} RENAME TO v1_${table}`);
 			this.db.exec(SCHEMA);
-			this.db.exec(CONVERT_V1);
-			for (const [what, sql] of CONVERSION_CHECKS) {
-				const { n } = this.#get<{ n: number }>(sql)!;
-				if (n !== 0) {
-					throw new Error(
-						`schema: converting to version ${SCHEMA_VERSION} would change ${n} rows of ${what}; ` +
-							"the database is left as it was"
-					);
-				}
-			}
-			for (const table of V1_TABLES) this.db.exec(`DROP TABLE v1_${table}`);
 			this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 		});
-		this.db.exec("VACUUM");
-		const seconds = (performance.now() - started) / 1000;
-		log(`schema: converted to version ${SCHEMA_VERSION} in ${duration(seconds)}`);
 	}
 
 	close(): void {
@@ -530,8 +456,9 @@ export class Store {
 		);
 	}
 
-	batchRows(range: BlockRange): BatchRow[] {
-		return this.#all(
+	/** The batches of a block range in block order, read one at a time. */
+	batchRows(range: BlockRange): IterableIterator<BatchRow> {
+		return this.#iterate(
 			`SELECT ${hexOf("s.tx")} AS tx, s.log_index AS logIndex, s.block, so.address AS solver,
 				s.trades, s.swaps, se.address AS sender, re.address AS recipient,
 				s.gas_used AS gasUsed, CAST(s.fee AS TEXT) AS fee, l.is_solver AS senderIsSolver,
@@ -559,8 +486,8 @@ export class Store {
 	}
 
 	/** Trades in a block range with the competition their transaction belongs to. */
-	tradeRows(range: BlockRange): TradeValueRow[] {
-		return this.#all(
+	tradeRows(range: BlockRange): IterableIterator<TradeValueRow> {
+		return this.#iterate(
 			`${TRADE_ROWS} WHERE tr.block BETWEEN ? AND ? ORDER BY tr.block, tr.log_index`,
 			range.from,
 			range.to
@@ -714,9 +641,12 @@ export class Store {
 		return row?.solver ?? null;
 	}
 
-	/** Solutions of the auctions that started in a block range, by auction then ranking. */
-	solutionsByStart(range: BlockRange): SolutionRow[] {
-		return this.#all(
+	/**
+	 * Solutions of the auctions that started in a block range, by auction then ranking, read one
+	 * at a time.
+	 */
+	solutionsByStart(range: BlockRange): IterableIterator<SolutionRow> {
+		return this.#iterate(
 			`${SOLUTION_ROWS} WHERE a.start_block BETWEEN ? AND ? ORDER BY a.id, s.ranking`,
 			range.from,
 			range.to
@@ -814,6 +744,11 @@ export class Store {
 		return this.#statement(sql).all(...params) as T[];
 	}
 
+	/** Rows read one at a time; the loop over them must not run the same statement again. */
+	#iterate<T>(sql: string, ...params: SQLInputValue[]): IterableIterator<T> {
+		return this.#statement(sql).iterate(...params) as unknown as IterableIterator<T>;
+	}
+
 	#get<T>(sql: string, ...params: SQLInputValue[]): T | undefined {
 		return this.#statement(sql).get(...params) as T | undefined;
 	}
@@ -851,12 +786,14 @@ export class Store {
 	}
 }
 
-const TRADE_ROWS = `SELECT ${hexOf("s.tx")} AS tx, tr.settlement_log_index AS settlementLogIndex,
-	tr.block, st.address AS sellToken, bt.address AS buyToken, tr.sell_amount AS sellAmount,
-	tr.buy_amount AS buyAmount, tr.limit_sell_amount AS limitSellAmount,
-	tr.limit_buy_amount AS limitBuyAmount, tr.fee_amount AS feeAmount, a.auction_id AS auctionId
+const TRADE_ROWS = `SELECT ${hexOf("s.tx")} AS tx, so.address AS solver,
+	tr.settlement_log_index AS settlementLogIndex, tr.block, st.address AS sellToken,
+	bt.address AS buyToken, tr.sell_amount AS sellAmount, tr.buy_amount AS buyAmount,
+	tr.limit_sell_amount AS limitSellAmount, tr.limit_buy_amount AS limitBuyAmount,
+	tr.fee_amount AS feeAmount, a.auction_id AS auctionId
 	FROM trades tr
 	JOIN settlements s ON s.block = tr.block AND s.log_index = tr.settlement_log_index
+	JOIN addresses so ON so.id = s.solver
 	JOIN addresses st ON st.id = tr.sell_token
 	JOIN addresses bt ON bt.id = tr.buy_token
 	LEFT JOIN auction_txs a ON a.tx = s.tx`;
@@ -864,162 +801,3 @@ const TRADE_ROWS = `SELECT ${hexOf("s.tx")} AS tx, tr.settlement_log_index AS se
 const SOLUTION_ROWS = `SELECT a.id AS auctionId, a.start_block AS startBlock, ad.address AS solver,
 	s.winner, CASE WHEN s.tx IS NULL THEN NULL ELSE ${hexOf("s.tx")} END AS tx
 	FROM auctions a JOIN solutions s ON s.auction_id = a.id JOIN addresses ad ON ad.id = s.solver`;
-
-/** Tables whose version 2 has the same name and keeps every row, one for one. */
-const CONVERTED_TABLES = [
-	"settlements",
-	"trades",
-	"allow_list",
-	"auctions",
-	"solutions",
-	"auction_prices",
-	"auction_txs",
-	"tokens",
-];
-
-/** The tables version 2 replaced; the conversion renames them to `v1_<name>` first. */
-const V1_TABLES = [...CONVERTED_TABLES, "txs"];
-
-/** Fills the version 2 tables from the renamed version 1 tables. */
-const CONVERT_V1 = `
-INSERT INTO addresses (address)
-	SELECT solver FROM v1_settlements UNION SELECT sender FROM v1_txs
-	UNION SELECT to_address FROM v1_txs WHERE to_address IS NOT NULL
-	UNION SELECT sell_token FROM v1_trades UNION SELECT buy_token FROM v1_trades
-	UNION SELECT solver FROM v1_solutions UNION SELECT token FROM v1_auction_prices
-	UNION SELECT address FROM v1_allow_list UNION SELECT address FROM v1_tokens
-	ORDER BY 1;
-
-INSERT INTO settlements (block, log_index, tx, solver, trades, swaps, sender, recipient, gas_used,
-	fee, tx_batches)
-	SELECT s.block, s.log_index, unhex(substr(s.tx, 3)),
-		(SELECT id FROM addresses WHERE address = s.solver), s.trades, s.swaps,
-		(SELECT id FROM addresses WHERE address = t.sender),
-		(SELECT id FROM addresses WHERE address = t.to_address),
-		t.gas_used,
-		CAST(t.gas_used AS INTEGER) * CAST(t.gas_price AS INTEGER) + CAST(t.l1_fee AS INTEGER),
-		CASE WHEN s.trades > 0
-			THEN (SELECT count(*) FROM v1_settlements x WHERE x.tx = s.tx AND x.trades > 0) END
-	FROM v1_settlements s LEFT JOIN v1_txs t ON t.tx = s.tx AND s.trades > 0
-	ORDER BY s.block, s.log_index;
-
-INSERT INTO trades (block, log_index, settlement_log_index, sell_token, buy_token, sell_amount,
-	buy_amount, limit_sell_amount, limit_buy_amount, fee_amount)
-	SELECT block, log_index, settlement_log_index,
-		(SELECT id FROM addresses WHERE address = sell_token),
-		(SELECT id FROM addresses WHERE address = buy_token),
-		sell_amount, buy_amount, limit_sell_amount, limit_buy_amount, fee_amount
-	FROM v1_trades ORDER BY block, log_index;
-
-INSERT INTO allow_list (address, is_solver)
-	SELECT (SELECT id FROM addresses WHERE address = l.address), l.is_solver FROM v1_allow_list l;
-
-INSERT INTO auctions (id, start_block) SELECT id, start_block FROM v1_auctions;
-
-INSERT INTO solutions (auction_id, position, solver, ranking, winner, tx)
-	SELECT auction_id, position, (SELECT id FROM addresses WHERE address = solver), ranking, winner,
-		unhex(substr(tx, 3))
-	FROM v1_solutions;
-
-INSERT INTO auction_prices (auction_id, token, price)
-	SELECT auction_id, (SELECT id FROM addresses WHERE address = token), price
-	FROM v1_auction_prices;
-
-INSERT INTO auction_txs (tx, auction_id, priced, checked_at)
-	SELECT unhex(substr(tx, 3)), auction_id, priced, checked_at FROM v1_auction_txs;
-
-INSERT INTO tokens (address, symbol)
-	SELECT (SELECT id FROM addresses WHERE address = t.address), t.symbol FROM v1_tokens t;
-`;
-
-/**
- * What the conversion must not change, each a query whose `n` is 0 when nothing changed: every
- * table keeps its row count, and every converted row matches its source row.
- */
-const CONVERSION_CHECKS: [what: string, sql: string][] = [
-	...CONVERTED_TABLES.map((table): [string, string] => [
-		`${table} (row count)`,
-		`SELECT abs((SELECT count(*) FROM v1_${table}) - (SELECT count(*) FROM ${table})) AS n`,
-	]),
-	[
-		"txs (one batch transaction each)",
-		`SELECT abs((SELECT count(*) FROM v1_txs)
-			- (SELECT count(DISTINCT tx) FROM settlements WHERE trades > 0)) AS n`,
-	],
-	[
-		"settlements",
-		`SELECT count(*) AS n FROM settlements v
-			LEFT JOIN v1_settlements s ON s.tx = ${hexOf("v.tx")} AND s.log_index = v.log_index
-			LEFT JOIN v1_txs t ON t.tx = s.tx
-			LEFT JOIN addresses so ON so.id = v.solver
-			LEFT JOIN addresses se ON se.id = v.sender
-			LEFT JOIN addresses re ON re.id = v.recipient
-			WHERE s.tx IS NULL OR s.block != v.block OR so.address IS NOT s.solver
-				OR s.trades != v.trades OR s.swaps != v.swaps
-				OR CASE WHEN v.trades > 0
-					THEN t.tx IS NULL OR se.address IS NOT t.sender OR re.address IS NOT t.to_address
-						OR v.gas_used IS NOT t.gas_used OR typeof(v.fee) != 'integer'
-						OR CAST(CAST(t.gas_price AS INTEGER) AS TEXT) IS NOT t.gas_price
-						OR CAST(CAST(t.l1_fee AS INTEGER) AS TEXT) IS NOT t.l1_fee
-						OR v.tx_batches IS NOT
-							(SELECT count(*) FROM v1_settlements x WHERE x.tx = s.tx AND x.trades > 0)
-					ELSE v.sender IS NOT NULL OR v.recipient IS NOT NULL OR v.gas_used IS NOT NULL
-						OR v.fee IS NOT NULL OR v.tx_batches IS NOT NULL END`,
-	],
-	[
-		"trades",
-		`SELECT count(*) AS n FROM trades v
-			LEFT JOIN v1_trades t ON t.block = v.block AND t.log_index = v.log_index
-			LEFT JOIN settlements s ON s.block = v.block AND s.log_index = v.settlement_log_index
-			LEFT JOIN addresses st ON st.id = v.sell_token
-			LEFT JOIN addresses bt ON bt.id = v.buy_token
-			WHERE t.tx IS NULL OR s.tx IS NULL OR ${hexOf("s.tx")} != t.tx
-				OR t.settlement_log_index != v.settlement_log_index
-				OR st.address IS NOT t.sell_token OR bt.address IS NOT t.buy_token
-				OR t.sell_amount != v.sell_amount OR t.buy_amount != v.buy_amount
-				OR t.limit_sell_amount IS NOT v.limit_sell_amount
-				OR t.limit_buy_amount IS NOT v.limit_buy_amount
-				OR t.fee_amount IS NOT v.fee_amount`,
-	],
-	[
-		"allow_list",
-		`SELECT count(*) AS n FROM allow_list v
-			LEFT JOIN addresses a ON a.id = v.address
-			LEFT JOIN v1_allow_list l ON l.address = a.address
-			WHERE l.is_solver IS NOT v.is_solver`,
-	],
-	[
-		"auctions",
-		`SELECT count(*) AS n FROM auctions v LEFT JOIN v1_auctions a ON a.id = v.id
-			WHERE a.start_block IS NOT v.start_block`,
-	],
-	[
-		"solutions",
-		`SELECT count(*) AS n FROM solutions v
-			LEFT JOIN v1_solutions s ON s.auction_id = v.auction_id AND s.position = v.position
-			LEFT JOIN addresses a ON a.id = v.solver
-			WHERE s.auction_id IS NULL OR a.address IS NOT s.solver OR s.ranking != v.ranking
-				OR s.winner != v.winner
-				OR s.tx IS NOT (CASE WHEN v.tx IS NULL THEN NULL ELSE ${hexOf("v.tx")} END)`,
-	],
-	[
-		"auction_prices",
-		`SELECT count(*) AS n FROM auction_prices v
-			LEFT JOIN addresses a ON a.id = v.token
-			LEFT JOIN v1_auction_prices p ON p.auction_id = v.auction_id AND p.token = a.address
-			WHERE p.price IS NOT v.price`,
-	],
-	[
-		"auction_txs",
-		`SELECT count(*) AS n FROM auction_txs v LEFT JOIN v1_auction_txs l ON l.tx = ${hexOf("v.tx")}
-			WHERE l.tx IS NULL OR l.auction_id IS NOT v.auction_id OR l.priced != v.priced
-				OR l.checked_at != v.checked_at`,
-	],
-	[
-		"tokens",
-		`SELECT count(*) AS n FROM tokens v
-			LEFT JOIN addresses a ON a.id = v.address
-			LEFT JOIN v1_tokens t ON t.address = a.address
-			WHERE t.symbol IS NOT v.symbol`,
-	],
-];

@@ -70,8 +70,8 @@ same options) also read `apps/indexer/.env` when it exists.
 ### What a sync does
 
 1. Refreshes CoW's solver registry; if the registry is unavailable, it uses the last copy.
-2. Catches up: settlements, receipts and calldata up to 20 blocks below the chain head, then the
-   auctions behind the new settlements.
+2. Catches up: settlements, receipts and calldata up to Base's safe block (the newest block whose
+   transactions Base has posted to Ethereum), then the auctions behind the new settlements.
 3. With `--prune`, deletes settlements older than N days (at least M, as for the backfill) with
    their auction data, and the auction data of settlements older than M days. A flash-loan router
    settlement keeps its auction while it is in the chain data, since its attribution may need the

@@ -2,7 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { backfillAuctions, catchUpAuctions, resolveRouterSenders } from "./auctions.ts";
 import type { AuctionStats, ChainWatch } from "./auctions.ts";
-import { CONFIRMATIONS, NETWORK } from "./config.ts";
+import { NETWORK } from "./config.ts";
 import type { CowApi } from "./cow.ts";
 import { backfillChain, catchUpChain, seedEthUsd } from "./ingest.ts";
 import type { IngestStats } from "./ingest.ts";
@@ -150,6 +150,16 @@ async function refreshRegistry(store: Store): Promise<Registry> {
 	return new Registry(store.cmsEntries(), OVERRIDES);
 }
 
+/**
+ * Base's safe block: the newest block whose transactions Base has posted to Ethereum. Blocks up
+ * to it change only if Ethereum reorganizes the blocks holding that data, so the indexer never
+ * stores a block Base itself might replace.
+ */
 async function safeHead(rpc: Rpc): Promise<number> {
-	return Number(await rpc.call<string>("eth_blockNumber", [])) - CONFIRMATIONS;
+	const block = await rpc.call<{ number: string } | null>("eth_getBlockByNumber", [
+		"safe",
+		false,
+	]);
+	if (block === null) throw new Error("the RPC node has no safe block");
+	return Number(block.number);
 }

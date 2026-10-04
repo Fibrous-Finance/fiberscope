@@ -8,9 +8,6 @@ export const NETWORK = BASE;
 /** Blocks in one rolling day (Base produces a block exactly every 2 seconds). */
 export const BLOCKS_PER_DAY = 86_400 / NETWORK.blockTime;
 
-/** Blocks left between the indexed end and the chain head, as a margin against reorgs. */
-export const CONFIRMATIONS = 20;
-
 /**
  * Blocks per `eth_getLogs` request, and the step of the auction backfill and catch-up. Base's docs
  * recommend ranges under 2,000 blocks; a range the node refuses is split (see `getLogs`).

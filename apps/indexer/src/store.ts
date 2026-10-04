@@ -3,19 +3,22 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { SQLInputValue, StatementSync } from "node:sqlite";
 
+import { ROUTER } from "./chain.ts";
 import type { SettlementRow, TradeRow } from "./chain.ts";
 import type { Competition } from "./cow.ts";
 import type { PricePoint } from "./prices.ts";
 import type { RegistryEntry } from "./registry.ts";
 import type { BlockRange } from "./rules.ts";
-import type { OrderTerms, TradeFacts } from "./terms.ts";
 
 /** Receipt facts of a transaction that holds at least one batch. */
 export interface TxRow {
 	tx: string;
 	block: number;
 	sender: string;
-	/** The receipt's `to`; null in rows stored before it was kept, until the repair fills it. */
+	/**
+	 * The receipt's `to`. Null in rows stored before it was kept; attribution reads it only for
+	 * flash-loan router transactions, and those all have it (see Store's #checkUnversioned).
+	 */
 	recipient: string | null;
 	gasUsed: number;
 	/** `effectiveGasPrice` in wei. */
@@ -89,6 +92,9 @@ export interface SolutionRow {
 	tx: string | null;
 }
 
+/** The schema's `PRAGMA user_version`. */
+const SCHEMA_VERSION = 1;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (
 	key TEXT PRIMARY KEY,
@@ -107,8 +113,6 @@ CREATE TABLE IF NOT EXISTS settlements (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS settlements_block ON settlements (block);
 
--- terms_read: 1 once the calldata was read for the order terms of the transaction's trades; null
--- in rows stored before terms were kept, until the terms backfill reads them.
 CREATE TABLE IF NOT EXISTS txs (
 	tx TEXT PRIMARY KEY,
 	block INTEGER NOT NULL,
@@ -116,8 +120,7 @@ CREATE TABLE IF NOT EXISTS txs (
 	to_address TEXT,
 	gas_used INTEGER NOT NULL,
 	gas_price TEXT NOT NULL,
-	l1_fee TEXT NOT NULL,
-	terms_read INTEGER
+	l1_fee TEXT NOT NULL
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS txs_block ON txs (block);
 
@@ -129,8 +132,7 @@ CREATE TABLE IF NOT EXISTS allow_list (
 ) WITHOUT ROWID;
 
 -- limit_sell_amount, limit_buy_amount and fee_amount are the order terms read from the settle()
--- calldata (see OrderTerms); null when no settle() call in the calldata reproduces the trade, or
--- until its transaction's calldata is read.
+-- calldata (see OrderTerms); null when no settle() call in the calldata reproduces the trade.
 CREATE TABLE IF NOT EXISTS trades (
 	tx TEXT NOT NULL,
 	log_index INTEGER NOT NULL,
@@ -212,31 +214,56 @@ export class Store {
 		if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
 		this.db = new DatabaseSync(path, { timeout: 10_000 });
 		this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
-		this.db.exec(SCHEMA);
-		this.#migrate();
+		const version = this.#get<{ user_version: number }>("PRAGMA user_version")!.user_version;
+		if (version > SCHEMA_VERSION) {
+			throw new Error(
+				`${path} has schema version ${version}; this indexer knows ${SCHEMA_VERSION}`
+			);
+		}
+		if (version === 0 && this.#get("SELECT 1 FROM sqlite_schema WHERE name = 'settlements'")) {
+			this.#checkUnversioned(path);
+		}
+		this.#transaction(() => {
+			this.db.exec(SCHEMA);
+			this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+		});
 	}
 
-	/** Brings a database created by an older version up to the current schema. */
-	#migrate(): void {
-		const added: [table: string, column: string, type: string][] = [
-			["txs", "to_address", "TEXT"],
-			["txs", "terms_read", "INTEGER"],
-			["trades", "limit_sell_amount", "TEXT"],
-			["trades", "limit_buy_amount", "TEXT"],
-			["trades", "fee_amount", "TEXT"],
-		];
-		for (const [table, column, type] of added) {
-			const columns = this.#all<{ name: string }>(
-				`SELECT name FROM pragma_table_info('${table}')`
-			);
-			if (!columns.some((existing) => existing.name === column)) {
-				this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
-			}
-		}
-		// The terms backfill's queue, newest first; it empties as the backfill reads calldata.
-		this.db.exec(
-			"CREATE INDEX IF NOT EXISTS txs_terms_unread ON txs (block) WHERE terms_read IS NULL"
+	/**
+	 * A database written before the schema had a version is used only if earlier indexers
+	 * finished filling it in, since this one no longer does: every column exists, the calldata of
+	 * every transaction was read for order terms, and every flash-loan router transaction has its
+	 * recipient.
+	 */
+	#checkUnversioned(path: string): void {
+		const columns = new Set(
+			this.#all<{ name: string }>(
+				`SELECT name FROM pragma_table_info('txs')
+					UNION ALL SELECT name FROM pragma_table_info('trades')`
+			).map(({ name }) => name)
 		);
+		const filled =
+			[
+				"to_address",
+				"terms_read",
+				"limit_sell_amount",
+				"limit_buy_amount",
+				"fee_amount",
+			].every((column) => columns.has(column)) &&
+			!this.#get("SELECT 1 FROM txs WHERE terms_read IS NULL LIMIT 1") &&
+			!this.#get(
+				`SELECT 1 FROM txs t JOIN settlements s ON s.tx = t.tx
+					WHERE t.to_address IS NULL AND s.solver = ? AND s.trades > 0 LIMIT 1`,
+				ROUTER
+			);
+		if (!filled) {
+			throw new Error(
+				`${path} was written by an older indexer and still lacks order terms or router ` +
+					"recipients, which this one no longer fills in: delete it to index from scratch, " +
+					"or seed a current copy"
+			);
+		}
+		this.db.exec("DROP INDEX IF EXISTS txs_terms_unread");
 	}
 
 	close(): void {
@@ -274,9 +301,8 @@ export class Store {
 	// Chain data
 
 	/**
-	 * Replaces everything in the chunk's block range and records the new chain range. The chunk's
-	 * transactions count as read for order terms: a chunk carries the terms of every trade its
-	 * calldata reproduces.
+	 * Replaces everything in the chunk's block range and records the new chain range. A chunk
+	 * carries the order terms of every trade its calldata reproduces.
 	 */
 	commitChunk(chunk: ChainChunk, chainRange: BlockRange): void {
 		const { from, to } = chunk.range;
@@ -315,8 +341,8 @@ export class Store {
 			}
 			for (const t of chunk.txs) {
 				this.#run(
-					`INSERT INTO txs (tx, block, sender, to_address, gas_used, gas_price, l1_fee,
-						terms_read) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+					`INSERT INTO txs (tx, block, sender, to_address, gas_used, gas_price, l1_fee)
+						VALUES (?, ?, ?, ?, ?, ?, ?)`,
 					t.tx,
 					t.block,
 					t.sender,
@@ -355,24 +381,6 @@ export class Store {
 		);
 	}
 
-	/** Flash-loan router batch transactions stored without their recipient, in block order. */
-	routerTxsWithoutRecipient(router: string): { tx: string; block: number }[] {
-		return this.#all(
-			`SELECT t.tx, t.block FROM txs t WHERE t.to_address IS NULL AND EXISTS
-				(SELECT 1 FROM settlements s WHERE s.tx = t.tx AND s.solver = ? AND s.trades > 0)
-				ORDER BY t.block, t.tx`,
-			router
-		);
-	}
-
-	saveRecipients(rows: { tx: string; recipient: string }[]): void {
-		this.#transaction(() => {
-			for (const row of rows) {
-				this.#run("UPDATE txs SET to_address = ? WHERE tx = ?", row.recipient, row.tx);
-			}
-		});
-	}
-
 	/** Every ETH/USD price point, sorted by block. */
 	ethUsdPoints(): PricePoint[] {
 		return this.#all<PricePoint>("SELECT block, answer FROM eth_usd ORDER BY block");
@@ -390,61 +398,6 @@ export class Store {
 			point.block,
 			point.answer
 		);
-	}
-
-	/** Batch transactions whose calldata was never read for order terms, newest first. */
-	txsWithoutTerms(limit: number): { tx: string; block: number }[] {
-		return this.#all(
-			"SELECT tx, block FROM txs WHERE terms_read IS NULL ORDER BY block DESC LIMIT ?",
-			limit
-		);
-	}
-
-	/** Batch transactions whose calldata was never read, in a block range (default: all). */
-	countTxsWithoutTerms(range: BlockRange = { from: 0, to: Number.MAX_SAFE_INTEGER }): number {
-		return this.#get<{ n: number }>(
-			"SELECT COUNT(*) AS n FROM txs WHERE terms_read IS NULL AND block BETWEEN ? AND ?",
-			range.from,
-			range.to
-		)!.n;
-	}
-
-	/** The block of the newest batch transaction whose calldata was never read, or null. */
-	newestTxWithoutTerms(): number | null {
-		return this.#get<{ block: number | null }>(
-			"SELECT MAX(block) AS block FROM txs WHERE terms_read IS NULL"
-		)!.block;
-	}
-
-	/** A transaction's trades, as matching them to their settle() calls needs them. */
-	txTrades(tx: string): TradeFacts[] {
-		return this.#all(
-			`SELECT log_index AS logIndex, settlement_log_index AS settlementLogIndex,
-				sell_token AS sellToken, buy_token AS buyToken, sell_amount AS sellAmount,
-				buy_amount AS buyAmount
-			FROM trades WHERE tx = ? ORDER BY log_index`,
-			tx
-		);
-	}
-
-	/** Stores the order terms read from transactions' calldata, by trade log index. */
-	saveTerms(rows: { tx: string; terms: Map<number, OrderTerms> }[]): void {
-		this.#transaction(() => {
-			for (const { tx, terms } of rows) {
-				for (const [logIndex, t] of terms) {
-					this.#run(
-						`UPDATE trades SET limit_sell_amount = ?, limit_buy_amount = ?,
-							fee_amount = ? WHERE tx = ? AND log_index = ?`,
-						t.limitSellAmount,
-						t.limitBuyAmount,
-						t.feeAmount,
-						tx,
-						logIndex
-					);
-				}
-				this.#run("UPDATE txs SET terms_read = 1 WHERE tx = ?", tx);
-			}
-		});
 	}
 
 	/** Batch transactions in a block range, in block order. */

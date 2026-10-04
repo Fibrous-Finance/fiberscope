@@ -40,10 +40,6 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 			out.push(`WARNING    ${label} data covers ${has}, not the whole window`);
 		}
 	}
-	const unread = store.countTxsWithoutTerms(range);
-	if (unread > 0) {
-		out.push(`WARNING    ${fmt(unread)} batch txs in the window have unread order terms`);
-	}
 
 	const rows = new Map<string, Row>();
 	const row = (identity: SolverIdentity): Row => {

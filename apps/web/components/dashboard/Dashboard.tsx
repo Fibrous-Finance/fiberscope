@@ -38,6 +38,8 @@ const DEFAULT_CONTENT_WIDTH = 1184;
 const PHONE_CONTENT_WIDTH = 350;
 /** The mosaic starts fading in this long after mount. */
 const INTRO_DELAY_MS = 120;
+/** Until a response replaces the data, the page asks again this often. */
+const RETRY_MS = 60_000;
 
 function subscribeCompact(onChange: () => void) {
 	const media = window.matchMedia(COMPACT_QUERY);
@@ -103,29 +105,45 @@ export function Dashboard({
 		if (query !== search) window.history.replaceState(null, "", `${pathname}${query}${hash}`);
 	}, [period, measure, open]);
 
-	// The age of the data ticks: it turns delayed 30 minutes after its newest block.
+	// The age of the data ticks: it turns delayed 30 minutes after its newest block. A page that
+	// comes back into view reads the clock at once.
 	useEffect(() => {
-		const timer = setInterval(() => setClock(Date.now()), 30_000);
-		return () => clearInterval(timer);
-	}, []);
-	// Fetch again at `nextTryAt` without reloading the page, and keep that pace until a response
-	// replaces this result: every minute while delayed or in error.
-	const { nextTryAt } = fresh;
-	const pace = nextTryAt - result.at;
-	useEffect(() => {
-		let timer = 0;
-		const fetchAt = (at: number) => {
-			timer = window.setTimeout(
-				() => {
-					if (document.visibilityState === "visible") router.refresh();
-					fetchAt(Date.now() + pace);
-				},
-				Math.max(0, at - Date.now())
-			);
+		const tick = () => setClock(Date.now());
+		const timer = setInterval(tick, 30_000);
+		document.addEventListener("visibilitychange", tick);
+		return () => {
+			clearInterval(timer);
+			document.removeEventListener("visibilitychange", tick);
 		};
-		fetchAt(nextTryAt);
-		return () => window.clearTimeout(timer);
-	}, [router, nextTryAt, pace]);
+	}, []);
+	// Fetch again without reloading the page, `nextTryAt - result.at` after this result arrived:
+	// both are on the server's clock, so a device clock that is off does not move the fetch. Only
+	// a visible, online page fetches; a hidden one fetches as soon as it is back in view, an
+	// offline one once it is back online. (Offline, the fetch would fail and Next would fall back
+	// to a full page load, which ends on the browser's error page.) Until a response replaces
+	// this result, the page asks again every minute.
+	const delay = fresh.nextTryAt - result.at;
+	useEffect(() => {
+		const due = Date.now() + delay;
+		let timer = 0;
+		const refresh = () => {
+			window.clearTimeout(timer);
+			if (document.visibilityState !== "visible" || !navigator.onLine) return;
+			router.refresh();
+			timer = window.setTimeout(refresh, RETRY_MS);
+		};
+		const resume = () => {
+			if (Date.now() >= due) refresh();
+		};
+		timer = window.setTimeout(refresh, delay);
+		document.addEventListener("visibilitychange", resume);
+		window.addEventListener("online", resume);
+		return () => {
+			window.clearTimeout(timer);
+			document.removeEventListener("visibilitychange", resume);
+			window.removeEventListener("online", resume);
+		};
+	}, [router, result.at, delay]);
 
 	// Measure before the first paint, so the mosaic never draws a frame at the default width.
 	useLayoutEffect(() => {

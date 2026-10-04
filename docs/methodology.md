@@ -34,9 +34,10 @@ Every figure comes from public data on Base and from CoW Protocol's public servi
   extrapolating.
 - **Earlier window.** Rank changes (▲, ▼, NEW) and share changes compare the window with the window
   of the same length just before it, once the history covers both.
-- **Freshness.** New data arrives every 10 minutes, and an open page fetches it on the same
-  interval. The page shows **Delayed** once the newest block in its data is more than 30 minutes
-  old, and then checks for new data every minute.
+- **Freshness.** New data arrives every 10 minutes, and an open page fetches it within about a
+  minute of its arrival, or as soon as the page is back in view. The page shows **Delayed** once
+  the newest block in its data is more than 30 minutes old, and then checks for new data every
+  minute.
 
 ## Measures
 

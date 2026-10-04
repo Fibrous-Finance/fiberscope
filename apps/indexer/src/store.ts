@@ -132,8 +132,7 @@ CREATE TABLE IF NOT EXISTS allow_list (
 ) WITHOUT ROWID;
 
 -- limit_sell_amount, limit_buy_amount and fee_amount are the order terms read from the settle()
--- calldata (see OrderTerms); null when no settle() call in the calldata reproduces the trade, or
--- until its transaction's calldata is read.
+-- calldata (see OrderTerms); null when no settle() call in the calldata reproduces the trade.
 CREATE TABLE IF NOT EXISTS trades (
 	tx TEXT NOT NULL,
 	log_index INTEGER NOT NULL,
@@ -224,8 +223,10 @@ export class Store {
 		if (version === 0 && this.#get("SELECT 1 FROM sqlite_schema WHERE name = 'settlements'")) {
 			this.#checkUnversioned(path);
 		}
-		this.db.exec(SCHEMA);
-		this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+		this.#transaction(() => {
+			this.db.exec(SCHEMA);
+			this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+		});
 	}
 
 	/**

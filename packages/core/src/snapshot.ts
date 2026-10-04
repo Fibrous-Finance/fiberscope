@@ -18,10 +18,11 @@ export interface Snapshot {
 	end: { block: number; time: number };
 	/**
 	 * When the indexer last caught up with the chain head (Unix ms); a run then backfills history.
-	 * The page measures freshness from `end.time`.
+	 * The page measures freshness from `end.time`, and times its next fetch from this: the next
+	 * run catches up `refreshMinutes` later.
 	 */
 	lastRunAt: number;
-	/** Minutes between scheduled indexer runs; the page also refetches on this interval. */
+	/** Minutes between scheduled indexer runs. */
 	refreshMinutes: number;
 	/**
 	 * How many buckets hold complete data.

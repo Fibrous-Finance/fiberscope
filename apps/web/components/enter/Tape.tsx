@@ -54,16 +54,20 @@ export function Tape({
 	const tc = useTranslations("Common");
 	const f = useFormat();
 	const { hovered, setHovered } = useHover();
-	const [column, setColumn] = useState<number | null>(null);
+	// The picked auction, by id: new data shifts the columns, and the pick stays on its auction
+	// until it leaves the tape. Without a pick, the latest auction is selected.
+	const [picked, setPicked] = useState<number | null>(null);
 	// The selected column shows the focus ring only while the tape has keyboard focus.
 	const [keyboard, setKeyboard] = useState(false);
 
 	const count = Math.min(compact ? COMPACT_COLUMNS : WIDE_COLUMNS, tape.auctions.length);
 	const auctions = tape.auctions.slice(-count);
-	const selected = column === null || column >= count ? count - 1 : column;
+	const pickedColumn = auctions.findIndex((auction) => auction.id === picked);
+	const selected = pickedColumn === -1 ? count - 1 : pickedColumn;
 	const auction = auctions[selected];
 	const href = explorer(auction.tx);
 	const columnBox = { left: `${(selected / count) * 100}%`, width: `${100 / count}%` };
+	const pick = (column: number) => setPicked(auctions[column].id);
 
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
 		if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -83,7 +87,7 @@ export function Tape({
 		const next = moves[event.key];
 		if (next === undefined) return;
 		event.preventDefault();
-		setColumn(Math.min(count - 1, Math.max(0, next)));
+		pick(Math.min(count - 1, Math.max(0, next)));
 		setKeyboard(true);
 	};
 
@@ -127,7 +131,7 @@ export function Tape({
 				onBlur={() => setKeyboard(false)}
 				// Hovering selects on wide pages, so leaving goes back to the latest auction; a
 				// tapped selection stays.
-				onMouseLeave={compact ? undefined : () => setColumn(null)}
+				onMouseLeave={compact ? undefined : () => setPicked(null)}
 				className="mt-3.5 focus-visible:shadow-none focus-visible:outline-none"
 			>
 				<div onMouseLeave={() => setHovered(null)} className="relative">
@@ -153,7 +157,7 @@ export function Tape({
 							compact={compact}
 							explorer={explorer}
 							onHover={setHovered}
-							onColumn={setColumn}
+							onColumn={pick}
 						/>
 					))}
 				</div>

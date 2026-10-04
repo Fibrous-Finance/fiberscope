@@ -27,7 +27,10 @@ export interface Status {
 	refreshMinutes: number;
 	/** When the failed request was made (error state); null otherwise. */
 	failedAt: number | null;
-	/** When the page fetches again on its own: every minute while delayed or in error. */
+	/**
+	 * When the page fetches again on its own (server clock): a minute after the indexer's next
+	 * upload is due while live, every minute while delayed or in error.
+	 */
 	nextTryAt: number;
 	/** `state` is "delayed": period wording reads "in the {period} to {asOf}". */
 	delayed: boolean;

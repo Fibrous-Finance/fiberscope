@@ -25,8 +25,7 @@ In scope:
 Out of scope:
 
 - Services Fiberscope reads or runs on: CoW Protocol's contracts, API and solver registry, Base,
-  Chainlink, Cloudflare, Railway and GitHub. Report vulnerabilities in these services to their
-  owners.
+  Chainlink, Cloudflare, AWS and GitHub. Report vulnerabilities in these services to their owners.
 - A figure you believe is wrong. That is a bug, not a vulnerability: open an issue.
 
 The site has no user accounts and no forms; the appearance choice stays in the browser's local

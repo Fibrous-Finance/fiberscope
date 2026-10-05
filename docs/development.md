@@ -214,13 +214,14 @@ docker run -v fiberscope-data:/data --env-file apps/indexer/.env fiberscope-inde
 ```
 
 The database (`DB_PATH=/data/base.db`) and the local snapshot live on the volume at `/data`. The
-live indexer runs from this image on [Railway](https://railway.com), with a volume at `/data`.
-`SEED_DB_URL`, for example a presigned R2 link to a copy of the database, moves it to a new host
-without indexing again.
+live indexer runs from this image on an AWS EC2 instance: systemd starts the container, its
+variables come from SSM Parameter Store, and its output goes to CloudWatch Logs. `SEED_DB_URL`, for
+example a presigned R2 link to a copy of the database, moves it to a new host without indexing
+again.
 
 ## Running costs
 
-Measured on the live deployment on 3–4 Oct 2026.
+Measured on the live deployment on 3–5 Oct 2026.
 
 - **Site.** The Worker is 5.47 MB, 1.14 MB gzipped, within the Workers Free plan's
   [size limit](https://developers.cloudflare.com/workers/platform/limits/#worker-size). Requests and
@@ -231,13 +232,14 @@ Measured on the live deployment on 3–4 Oct 2026.
   [R2's free tier](https://developers.cloudflare.com/r2/pricing/#free-tier): 10 GB-month of
   storage, 1 million writes and 10 million reads a month.
 - **Indexer.** The database takes about 175 MB at 180 days of settlements and 90 days of auctions,
-  and `--prune` keeps it there. Caught up, a run takes about 10 seconds every 10 minutes, most of
-  it building the snapshot. Memory, as the container's cgroup counts it: about 0.17 GB between
-  runs, which is the database file in the system's page cache, and a peak of about 0.57 GB during
-  a run (before the changes: 0.71 GB and 2.8 GB). Give any host 1 GB of RAM. Railway meters actual
-  use, page cache included: $10 per GB of memory and $20 per vCPU per month, and $0.15 per GB of
-  volume per month ([pricing](https://docs.railway.com/pricing/plans#resource-usage-pricing)).
-  Caught up, that comes to about $2 a month (before: about $8).
+  and `--prune` keeps it there. The live indexer runs on an AWS EC2 t4g.small in Frankfurt (2
+  Graviton vCPUs, 2 GB of memory) with a 16 GB gp3 disk. Caught up, a run takes about 20 seconds
+  every 10 minutes, most of it building the snapshot. The container holds about 0.16 GB between
+  runs, the database file in the page cache, and peaks at about 0.49 GB during a run, so any host
+  with 1 GB of RAM will do. On demand, the instance costs $0.0192 an hour, the disk $0.0952 per
+  GB-month and its public IPv4 address $0.005 an hour
+  ([EC2](https://aws.amazon.com/ec2/pricing/on-demand/),
+  [VPC](https://aws.amazon.com/vpc/pricing/)): about $19 a month.
 - **Data.** The indexer reads public endpoints without API keys: Base's RPC, CoW's API and CoW's
   solver registry.
 

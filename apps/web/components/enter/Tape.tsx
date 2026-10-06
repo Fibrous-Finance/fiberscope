@@ -209,6 +209,8 @@ function TapeRow({
 							className={`${MARKS[cell.state]} ${cell.state === "won" ? (hot ? "bg-teal" : "bg-fg") : ""}`}
 						/>
 					);
+					// A wide cell links to its settlement; a cell without one is a plain mark.
+					const href = compact ? undefined : explorer(cell.tx);
 					return compact ? (
 						<span
 							key={index}
@@ -219,10 +221,10 @@ function TapeRow({
 						>
 							{mark}
 						</span>
-					) : (
+					) : href ? (
 						<a
 							key={index}
-							href={explorer(cell.tx)}
+							href={href}
 							target="_blank"
 							rel="noopener"
 							tabIndex={-1}
@@ -232,6 +234,15 @@ function TapeRow({
 						>
 							{mark}
 						</a>
+					) : (
+						<span
+							key={index}
+							aria-hidden="true"
+							onMouseEnter={() => onColumn(index)}
+							className="grid flex-1 place-items-center"
+						>
+							{mark}
+						</span>
 					);
 				})}
 			</div>

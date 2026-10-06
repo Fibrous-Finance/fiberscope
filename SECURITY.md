@@ -17,7 +17,7 @@ In scope:
 
 - The code in this repository: the site (`apps/web`), the indexer (`apps/indexer`),
   `packages/core` and the GitHub workflows.
-- The live site at [fiberscope.kermo.workers.dev](https://fiberscope.kermo.workers.dev) and its
+- The live site at [fiberscope.org](https://fiberscope.org), its `workers.dev` address and its
   pull-request previews.
 - Leaks of the deployment's credentials: the Cloudflare API token the workflows use and the R2 key
   the indexer uploads with.

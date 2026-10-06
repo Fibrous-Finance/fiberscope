@@ -13,7 +13,7 @@
 	"vars": {
 		"SNAPSHOT_R2_KEY": "base/snapshot.json",
 		// The site's origin, for absolute link-preview URLs.
-		"SITE_URL": "https://fiberscope.kermo.workers.dev",
+		"SITE_URL": "https://fiberscope.org",
 		// "true" lets search engines index the site; any other value makes every page noindex.
 		"ALLOW_INDEXING": "false",
 	},

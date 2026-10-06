@@ -6,7 +6,7 @@ auctions, by how much, whether that is changing, and how efficiently each solver
 [![CI](https://github.com/Fibrous-Finance/fiberscope/actions/workflows/ci.yml/badge.svg)](https://github.com/Fibrous-Finance/fiberscope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-<a href="https://fiberscope.kermo.workers.dev">
+<a href="https://fiberscope.org">
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp">
 <source media="(prefers-color-scheme: light)" srcset="docs/images/hero-light.webp">
@@ -14,8 +14,7 @@ auctions, by how much, whether that is changing, and how efficiently each solver
 </picture>
 </a>
 
-**Live at [fiberscope.kermo.workers.dev](https://fiberscope.kermo.workers.dev)**, updated every 10
-minutes.
+**Live at [fiberscope.org](https://fiberscope.org)**, updated every 10 minutes.
 
 ## What it shows
 

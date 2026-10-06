@@ -165,6 +165,11 @@ pnpm --filter @fiberscope/web run upload    # build and upload a version without
 pnpm --filter @fiberscope/web run preview   # build and serve the Worker locally
 ```
 
+Production answers at `https://fiberscope.org`, a custom domain attached to the Worker in
+Cloudflare's dashboard (the `fiberscope.org` zone is on the same account), and `www.fiberscope.org`
+redirects there through a Redirect Rule. `wrangler.jsonc` lists no routes, so a deploy leaves the
+custom domain in place and keeps the `workers.dev` address, which the pull-request previews use.
+
 `preview` takes overrides for the Worker's variables from `apps/web/.dev.vars`. To run your own
 copy, create an R2 bucket and set `bucket_name` and `SITE_URL` in `wrangler.jsonc`.
 `apps/web/public/_headers` sets the cache policy of static files: one year, immutable, for the
@@ -176,16 +181,15 @@ fingerprinted files under `/_next/static/`, and one day for the icons and the so
 The site keeps search engines out until the deployment sets `ALLOW_INDEXING` to `"true"`, and then
 lets them in only on `SITE_URL`'s host:
 
-- Pages on any other host, such as pull-request previews or the `workers.dev` address once a custom
-  domain serves the site, are `noindex`.
+- Pages on any other host, such as pull-request previews or the `workers.dev` address, are
+  `noindex`.
 - `/robots.txt` allows everything and names the sitemap on the indexed host; everywhere else it
   answers `Disallow: /`.
 - `/sitemap.xml` lists one URL, the site's root.
 - Every page has a canonical link to the site's root: query strings such as `?period=7d` are views
   of the same page.
 
-At launch, set `SITE_URL` to the final origin and `ALLOW_INDEXING` to `"true"` in
-`wrangler.jsonc`, then deploy.
+At launch, set `ALLOW_INDEXING` to `"true"` in `wrangler.jsonc`, then deploy.
 
 ### Previews
 

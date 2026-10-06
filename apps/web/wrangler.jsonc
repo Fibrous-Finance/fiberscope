@@ -14,8 +14,9 @@
 		"SNAPSHOT_R2_KEY": "base/snapshot.json",
 		// The site's origin, for absolute link-preview URLs.
 		"SITE_URL": "https://fiberscope.org",
-		// "true" lets search engines index the site; any other value makes every page noindex.
-		"ALLOW_INDEXING": "false",
+		// "true" lets search engines index SITE_URL's host, and only that host; any other value
+		// makes every page noindex.
+		"ALLOW_INDEXING": "true",
 	},
 	// Uploaded versions get their own preview URLs (the deploy workflow uploads one per pull request).
 	"preview_urls": true,

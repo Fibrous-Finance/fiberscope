@@ -40,20 +40,23 @@ export function Hero() {
 	}
 
 	// Nothing to show and nothing to control: the message, Retry now and the next automatic try.
+	// data-nosnippet keeps the message out of search snippets if a crawler comes by meanwhile.
 	if (status.state === "error" || !view) {
 		return (
 			<Frame>
-				<h1 className="mt-[18px] max-w-[19ch] headline">{t("error.headline")}</h1>
-				<p className="mt-6 max-w-[560px] answer">
-					{t("error.text", { time: f.time(status.failedAt ?? status.now) })}
-				</p>
-				<div className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-3">
-					<button type="button" onClick={status.retry} className="btn-teal">
-						{t("error.retry")}
-					</button>
-					<span className="font-mono text-[12px] leading-[normal] font-medium whitespace-nowrap text-fa">
-						{t("error.next", { time: f.time(status.nextTryAt) })}
-					</span>
+				<div data-nosnippet="">
+					<h1 className="mt-[18px] max-w-[19ch] headline">{t("error.headline")}</h1>
+					<p className="mt-6 max-w-[560px] answer">
+						{t("error.text", { time: f.time(status.failedAt ?? status.now) })}
+					</p>
+					<div className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-3">
+						<button type="button" onClick={status.retry} className="btn-teal">
+							{t("error.retry")}
+						</button>
+						<span className="font-mono text-[12px] leading-[normal] font-medium whitespace-nowrap text-fa">
+							{t("error.next", { time: f.time(status.nextTryAt) })}
+						</span>
+					</div>
 				</div>
 			</Frame>
 		);

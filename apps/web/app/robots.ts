@@ -3,13 +3,15 @@ import { headers } from "next/headers";
 
 import { isIndexable, siteUrl } from "@/lib/site";
 
-/** Crawlers are welcome on the site's own host once indexing is on; everywhere else, kept out. */
+/**
+ * Crawlers may fetch every host, so they see the noindex on the hosts that are not to be indexed:
+ * a page that robots.txt blocks keeps its noindex unread and can still be listed. The sitemap is
+ * named only on the indexed host.
+ */
 export default async function robots(): Promise<MetadataRoute.Robots> {
-	if (!isIndexable((await headers()).get("host"))) {
-		return { rules: { userAgent: "*", disallow: "/" } };
-	}
+	const indexable = isIndexable((await headers()).get("host"));
 	return {
 		rules: { userAgent: "*", allow: "/" },
-		sitemap: new URL("/sitemap.xml", siteUrl()).href,
+		...(indexable && { sitemap: new URL("/sitemap.xml", siteUrl()).href }),
 	};
 }

@@ -168,28 +168,51 @@ pnpm --filter @fiberscope/web run preview   # build and serve the Worker locally
 Production answers at `https://fiberscope.org`, a custom domain attached to the Worker in
 Cloudflare's dashboard (the `fiberscope.org` zone is on the same account), and `www.fiberscope.org`
 redirects there through a Redirect Rule. `wrangler.jsonc` lists no routes, so a deploy leaves the
-custom domain in place and keeps the `workers.dev` address, which the pull-request previews use.
+custom domain in place. The Worker's own address, `fiberscope.kermo.workers.dev`, was the public
+link before the domain; its pages answer with a permanent redirect to `https://fiberscope.org`
+(`redirects` in `apps/web/next.config.ts`), while its static files, served before the Worker runs,
+still answer there, with `X-Robots-Tag: noindex`. The pull-request previews are version URLs,
+which `preview_urls: true` keeps on independently of that address.
 
 `preview` takes overrides for the Worker's variables from `apps/web/.dev.vars`. To run your own
-copy, create an R2 bucket and set `bucket_name` and `SITE_URL` in `wrangler.jsonc`.
+copy, create an R2 bucket and set `bucket_name` and `SITE_URL` in `wrangler.jsonc`, and set
+`ALLOW_INDEXING` to `"false"` unless the copy should appear in search results.
 `apps/web/public/_headers` sets the cache policy of static files: one year, immutable, for the
 fingerprinted files under `/_next/static/`, and one day for the icons and the social image
-(`favicon.svg`, `apple-touch-icon.png` and `og-image.png`), which keep their names when they change.
+(`favicon.svg`, `favicon.ico`, `apple-touch-icon.png` and `og-image.png`), which keep their names
+when they change. `favicon.ico` is there for clients that ask for it by name; without the file,
+each such request would render the not-found page.
 
 ### Search engines
 
-The site keeps search engines out until the deployment sets `ALLOW_INDEXING` to `"true"`, and then
-lets them in only on `SITE_URL`'s host:
+`ALLOW_INDEXING` is `"true"` in `wrangler.jsonc`: search engines may index `SITE_URL`'s host, and
+only that host. Any other value makes every page `noindex`, which is how to take the site out of
+search results.
 
-- Pages on any other host, such as pull-request previews or the `workers.dev` address, are
-  `noindex`.
-- `/robots.txt` allows everything and names the sitemap on the indexed host; everywhere else it
-  answers `Disallow: /`.
-- `/sitemap.xml` lists one URL, the site's root.
+- Pages on any other host, such as pull-request previews, are `noindex`, and static files on
+  `workers.dev` hosts carry `X-Robots-Tag: noindex` (`apps/web/public/_headers`).
+- `/robots.txt` lets every crawler in on every host, so crawlers can read those `noindex` tags: a
+  page that robots.txt blocks keeps its `noindex` unread and can still be listed. It names the
+  sitemap only on the indexed host.
+- `/sitemap.xml` lists one URL, the site's root, last modified at the snapshot's newest block. It is
+  rendered per request, because `SITE_URL` is a Worker variable that `next build` does not see.
 - Every page has a canonical link to the site's root: query strings such as `?period=7d` are views
   of the same page.
+- The home page carries WebSite structured data (JSON-LD), which gives search results the site's
+  name.
 
-At launch, set `ALLOW_INDEXING` to `"true"` in `wrangler.jsonc`, then deploy.
+Indexing also depends on settings outside the repository. Check them at launch and whenever the
+zone's settings change:
+
+- Cloudflare's AI bot policies for the `fiberscope.org` zone (Security, Settings) allow Search and
+  Training. Cloudflare counts crawlers that serve both search and AI training under Training, so
+  blocking Training can block search crawlers too. Agent is allowed as well, so AI assistants can
+  fetch the page for their users.
+- Always Use HTTPS is on, and the `www` Redirect Rule answers 301 and keeps the path and query
+  string.
+- Google Search Console has a Domain property for `fiberscope.org`, verified by a TXT record on the
+  zone (keep the record), with `/sitemap.xml` submitted. Bing Webmaster Tools imports the site from
+  Search Console.
 
 ### Previews
 

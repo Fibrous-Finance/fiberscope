@@ -1,4 +1,8 @@
-/** Networks Fiberscope indexes. Only Base is live; the header lists the upcoming ones. */
+/**
+ * Networks Fiberscope indexes. Only Base is live; the header lists the upcoming ones. When another
+ * network goes live, also update the copy that names Base (`grep -rn Base apps/web/messages/en`),
+ * the README and the social image, apps/web/public/og-image.png.
+ */
 export type NetworkId = "base";
 
 export interface Network {

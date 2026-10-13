@@ -5,7 +5,7 @@
 	"source": "Source code <arrow>↗</arrow>",
 	"dataSources": "Data from the CoW Protocol API, Base settlement events, CoW’s solver registry and Chainlink.",
 	"independent": "Independent project, not affiliated with CoW DAO.",
-	"commit": "This page runs commit <siteLink>{site}</siteLink>.",
-	"commits": "This page runs commit <siteLink>{site}</siteLink>; its data comes from commit <dataLink>{data}</dataLink>.",
+	"commit": "This page was built from code version <siteLink>{site}</siteLink>.",
+	"commits": "This page was built from code version <siteLink>{site}</siteLink>. Its data was prepared with code version <dataLink>{data}</dataLink>.",
 	"builtBy": "Built by Fibrous, which also runs a solver"
 }

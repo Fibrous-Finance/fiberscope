@@ -105,6 +105,15 @@ export function tradeVolumeUsd(
 	return lower === null ? null : (Number(lower) / 1e36) * ethUsd;
 }
 
+/**
+ * A token amount's USD value at a native price, as each side of tradeVolumeUsd is valued; null
+ * without a price or with a zero price.
+ */
+export function tokenUsd(amount: string, price: string | null, ethUsd: number): number | null {
+	const native = price === null ? 0n : BigInt(price);
+	return native > 0n ? (Number(BigInt(amount) * native) / 1e36) * ethUsd : null;
+}
+
 /** What surplus needs from a trade: its executed amounts and its order terms (see OrderTerms). */
 export interface SurplusFacts {
 	/** Sold, fee included. */

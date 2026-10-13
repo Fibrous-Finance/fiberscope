@@ -21,8 +21,9 @@ const USAGE = `Usage:
   node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune]
                        [--snapshot <path>]
       Catch up with Base's safe block, then backfill at least N days of chain data and M days of
-      auction data. Resumable and idempotent: a re-run fetches only what is missing. With
-      --budget-minutes the backfill stops B minutes after the start and the next run resumes it.
+      auction data, with the auctions' scores and the quotes and fees of the orders traded.
+      Resumable and idempotent: a re-run fetches only what is missing. With --budget-minutes the
+      backfill stops B minutes after the start and the next run resumes it.
       With --prune, once the head is caught up, chain data older than N days (at least M, as for
       the backfill) is deleted with its auction data, and so is the auction data of settlements
       older than M days; with both at 0 nothing is deleted. With --snapshot the snapshot is
@@ -31,7 +32,8 @@ const USAGE = `Usage:
   node src/cli.ts snapshot [--out <path>]
       Write the snapshot JSON (default ${relative(process.cwd(), DEFAULT_SNAPSHOT_PATH)}).
   node src/cli.ts window --from <block> --to <block>
-      Print totals and the per-solver table for a block range, from the database.
+      Print totals and the per-solver table for a block range, from the database, with scores,
+      quotes and protocol fees where the detail range covers it.
   node src/cli.ts attribution --from <block> --to <block>
       Compare, from the database, each batch's credited solver address in a block range with the
       solver address of the winning solution for its transaction in CoW's competition data.
@@ -108,6 +110,7 @@ async function main(): Promise<void> {
 			const stats = await sync(store, rpc, cow, options);
 			const chain = store.chainRange()!;
 			const auctions = store.auctionRange();
+			const details = store.detailRange();
 			const { receipts, seconds: chainSeconds } = stats.chain;
 			const { lookups, missing, seconds: auctionSeconds } = stats.auctions;
 			log(`sync: done in ${duration((performance.now() - started) / 1000)}`);
@@ -121,6 +124,11 @@ async function main(): Promise<void> {
 					`(${fmt(missing)} not found) in ${duration(auctionSeconds)} ` +
 					`(${rate(lookups, auctionSeconds)}/s), ${fmt(cow.stats.bytes / 1e6)} MB uncompressed, ` +
 					`${fmt(cow.stats.retries)} retries`
+			);
+			log(
+				`  details ${details ? `${details.from}..${details.to}` : "none"}: ` +
+					`${fmt(stats.details.scores)} auctions scored, ${fmt(stats.details.orders)} orders, ` +
+					`${fmt(stats.details.fees)} fee lookups in ${duration(stats.details.seconds)}`
 			);
 			store.checkpoint();
 			log(`  database ${dbPath}: ${fmt(statSync(dbPath).size / 1e6, 1)} MB`);

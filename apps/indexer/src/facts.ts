@@ -6,6 +6,7 @@ import {
 	batchCostUsd,
 	creditedAddress,
 	priceToken,
+	tokenUsd,
 	tradeSurplus,
 	tradeVolumeUsd,
 } from "./rules.ts";
@@ -92,12 +93,7 @@ export class TradeValuer {
 
 	value(trade: TradeValueRow): TradeValue {
 		if (trade.auctionId === null) return { usd: null, pricedSides: 0, surplus: null };
-		let prices = this.#prices.get(trade.auctionId);
-		if (!prices) {
-			if (this.#prices.size >= 4_096) this.#prices.clear();
-			prices = this.#store.auctionPrices(trade.auctionId);
-			this.#prices.set(trade.auctionId, prices);
-		}
+		const prices = this.#pricesOf(trade.auctionId);
 		const sellPrice = prices.get(priceToken(trade.sellToken)) ?? null;
 		const buyPrice = prices.get(priceToken(trade.buyToken)) ?? null;
 		const ethUsd = ethUsdAt(this.#points, trade.block);
@@ -111,18 +107,50 @@ export class TradeValuer {
 			surplus: tradeSurplus(usd, trade),
 		};
 	}
+
+	/**
+	 * An amount of one of a trade's tokens in USD, such as a protocol fee: at the native price its
+	 * auction gave the token and ETH/USD at its block. Null when either is missing.
+	 */
+	amountUsd(
+		auctionId: number | null,
+		block: number,
+		token: string,
+		amount: string
+	): number | null {
+		if (auctionId === null) return null;
+		const ethUsd = ethUsdAt(this.#points, block);
+		const price = this.#pricesOf(auctionId).get(priceToken(token)) ?? null;
+		return ethUsd === null ? null : tokenUsd(amount, price, ethUsd);
+	}
+
+	#pricesOf(auctionId: number): Map<string, string> {
+		let prices = this.#prices.get(auctionId);
+		if (!prices) {
+			if (this.#prices.size >= 4_096) this.#prices.clear();
+			prices = this.#store.auctionPrices(auctionId);
+			this.#prices.set(auctionId, prices);
+		}
+		return prices;
+	}
 }
 
 /** A solver that submitted at least one solution to an auction (filtered-out ones included). */
 interface Entrant {
 	identity: SolverIdentity;
 	addresses: Set<string>;
+	/** Its solutions in the auction. */
+	solutions: number;
+	/** Those of them CIP-67's filter removed. */
+	filteredOut: number;
 }
 
 export interface AuctionOutcome {
 	id: number;
 	startBlock: number;
 	solutions: number;
+	/** Whether its solutions carry their scores and filter outcomes. */
+	scored: boolean;
 	/** By solver id, best rank first. */
 	entrants: Map<string, Entrant>;
 	/** One entry per winning solver id, best rank first. */
@@ -145,15 +173,21 @@ export function* auctionOutcomes(
 				id: row.auctionId,
 				startBlock: row.startBlock,
 				solutions: 0,
+				scored: row.filteredOut !== null,
 				entrants: new Map(),
 				winners: [],
 			};
 		}
 		const identity = registry.identify(row.solver);
 		current.solutions++;
-		const entrant = current.entrants.get(identity.id);
-		if (entrant) entrant.addresses.add(row.solver);
-		else current.entrants.set(identity.id, { identity, addresses: new Set([row.solver]) });
+		let entrant = current.entrants.get(identity.id);
+		if (!entrant) {
+			entrant = { identity, addresses: new Set(), solutions: 0, filteredOut: 0 };
+			current.entrants.set(identity.id, entrant);
+		}
+		entrant.addresses.add(row.solver);
+		entrant.solutions++;
+		if (row.filteredOut === 1) entrant.filteredOut++;
 		if (row.winner === 1 && !current.winners.some((winner) => winner.solver === identity.id)) {
 			current.winners.push({ solver: identity.id, tx: row.tx });
 		}

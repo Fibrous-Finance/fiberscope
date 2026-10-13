@@ -61,11 +61,26 @@ export interface TradeRow {
 	/** Sold, fee included. */
 	sellAmount: string;
 	buyAmount: string;
+	/** The traded order's uid (56 bytes), `0x`-prefixed lowercase hex. */
+	orderUid: string;
 	/**
 	 * The signed order's terms, read from the settle() calldata; absent when no settle() call in
 	 * the calldata reproduces the trade.
 	 */
 	terms?: OrderTerms;
+}
+
+/**
+ * The order uid in a `Trade` event's data: its dynamic `bytes` member, an offset (word 5) to the
+ * length and then the bytes.
+ */
+export function orderUidOf(data: string): string {
+	const at = Number(BigInt(`0x${word(data, 5)}`)) / 32;
+	const length = Number(BigInt(`0x${word(data, at)}`));
+	const start = 2 + (at + 1) * 64;
+	const uid = data.slice(start, start + length * 2);
+	if (uid.length !== length * 2) throw new Error(`Trade event data has no order uid: ${data}`);
+	return `0x${uid}`.toLowerCase();
 }
 
 /**
@@ -103,6 +118,7 @@ export function parseSettlementLogs(logs: Log[]): {
 					buyToken: wordAddress(word(entry.data, 1)),
 					sellAmount: BigInt(`0x${word(entry.data, 2)}`).toString(),
 					buyAmount: BigInt(`0x${word(entry.data, 3)}`).toString(),
+					orderUid: orderUidOf(entry.data),
 				});
 			} else if (topic === TOPIC.interaction) {
 				if (!NOT_SWAPS[word(entry.data, 1).slice(0, 8)]) swaps++;

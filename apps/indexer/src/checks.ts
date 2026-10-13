@@ -1,5 +1,13 @@
 import { word } from "./abi.ts";
-import { getInputs, getLogs, parseSettlementLogs, ROUTER, SETTLEMENT, TOPIC } from "./chain.ts";
+import {
+	getInputs,
+	getLogs,
+	orderUidOf,
+	parseSettlementLogs,
+	ROUTER,
+	SETTLEMENT,
+	TOPIC,
+} from "./chain.ts";
 import type { Log } from "./chain.ts";
 import type { CowApi } from "./cow.ts";
 import { creditedBatches } from "./facts.ts";
@@ -197,11 +205,7 @@ export async function termsReport(
 		if (terms.feeAmount === eventFee) feeAsEvent++;
 		else disagreements.push(`${at}: decoded fee ${terms.feeAmount}, Trade event ${eventFee}`);
 
-		// The order uid is the event's dynamic `bytes` member: an offset, then length and bytes.
-		const uidWord = Number(BigInt(`0x${word(event.data, 5)}`)) / 32;
-		const uidLength = Number(BigInt(`0x${word(event.data, uidWord)}`));
-		const uidStart = 2 + (uidWord + 1) * 64;
-		const uid = `0x${event.data.slice(uidStart, uidStart + uidLength * 2)}`;
+		const uid = orderUidOf(event.data);
 		const order = await cow.order(uid);
 		if (order === null) continue;
 		inBook++;

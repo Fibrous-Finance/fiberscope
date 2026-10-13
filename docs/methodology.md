@@ -143,14 +143,14 @@ against, not who earned quote rewards, which CoW pays by a different rule.
 The protocol fees CoW's trades API lists for each trade, one per fee policy, in the order CoW
 applied them. CoW's own fees come first; an order's partner fees, which its app data asks for on
 behalf of the app or wallet that placed it, are applied last, so the last fees, one per partner fee
-in the app data, are the partner fees. When the fees do not line up with the app data, the split
-is left open and the fee counts in neither total. Each fee is in one of the trade's two tokens and
-is valued at the trade's own exchange rate, its share of the trade's amount in that token times the
-trade's value (as in Volume), since a single token's native price can be far off. Fees count for
-the solver that settled the trade; solvers do not set them, so the page shows them per settlement
-and for the network, and per solver only in the exports. A settlement shows its fees only when the
-fees of all its trades are known. In basis points, the fees are divided by the volume of the same
-days.
+in the app data, are the partner fees. When a trade's fees do not line up with the app data, the
+split is left open and none of its fees count in either total. Each fee is in one of the trade's
+two tokens and is valued at the trade's own exchange rate, its share of the trade's amount in that
+token times the trade's value (as in Volume), since a single token's native price can be far off.
+Fees count for the solver that settled the trade; solvers do not set them, so the page shows them
+per settlement and for the network, and per solver only in the exports. A settlement shows its
+fees only when the fees of all its trades are known. In basis points, fees are divided by the
+volume for the same days.
 
 ### Network average
 
@@ -173,20 +173,20 @@ detail also gives its wins as a share of all the window's auctions.
 
 ### Score
 
-The value CoW's protocol computes for each solution from its executed amounts and chooses winners
-by (CIP-20): roughly the surplus the solution generates for traders. CoW's API gives it in ETH; the
+The value CoW's protocol computes from each solution's executed amounts to choose winners
+(CIP-20): roughly the surplus the solution generates for traders. CoW's API gives it in ETH; the
 page converts it to USD at Chainlink's ETH/USD rate at the auction's start block, to 6 significant
 figures. **Below winner** is (winning score − score) ÷ winning score. It is given only for auctions
-with a single winning solution: with several winners, a losing solution competed only with the
-winner whose orders it would also have settled, which the scores do not say. Each solver's row
-shows its best solution, its first in CoW's ranking: the winners, then the other solutions by
-score, then the filtered-out ones.
+with a single winning solution. With several winners, a losing solution competed only with the
+winner whose orders it would also have settled; the scores do not identify that winner. Each
+solver's row shows its best solution, its first in CoW's ranking: the winners, then the other
+solutions by score, then the filtered-out ones.
 
 ### Filtered out
 
 Removed by the fairness filter of CoW's combinatorial auction (CIP-67). For each token pair traded
 in one direction, CoW takes the best solution with only that pair's orders as a reference; a
-solution that batches several pairs is filtered out when it gives any of them less than that
+solution that batches several pairs is filtered out when it scores less on any of them than that
 reference. A filtered-out solution cannot win. A solver's share is its filtered-out solutions
 divided by all its solutions, in the auctions that started in the window.
 
@@ -194,8 +194,7 @@ divided by all its solutions, in the auctions that started in the window.
 
 Of the auctions with a single winning solution that a solver entered and lost with at least one
 solution that passed the filter, the share in which its best such solution scored at least 99% of
-the winning score, decided exactly on the scores. Auctions with several winners count in neither
-part.
+the winning score, using the exact scores. Auctions with several winners count in neither part.
 
 ### Leading since
 
@@ -208,7 +207,7 @@ reaches back to the start of the data, the page says "N+ days in a row".
 The tape shows the latest 48 auctions and, for each solver, whether it won, entered or stayed out
 of each; selecting an auction shows all its solutions and their scores. Latest settlements lists
 the 50 most recent batches across all solvers, with their protocol and partner fees and the solver
-whose quote the first trade's order was placed with; each solver's detail lists its 6 most recent,
+whose quote the first trade's order was placed with; each solver's detail view lists its latest 6,
 with the quote but not the fees. A settlement's pair shows the tokens in its first trade.
 
 ## Attribution

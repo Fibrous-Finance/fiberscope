@@ -17,10 +17,10 @@
 	},
 	"tape": {
 		"title": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}",
-		"label": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}. Left and right arrow keys move between auctions, Home and End jump to the first and last, and Enter shows the selected auction’s solutions.",
+		"label": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}. Left and right arrow keys move between auctions. Home and End jump to the first and last. Enter shows the selected auction’s solutions.",
 		"readout": "#{id} · {time}\u00a0UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
 	},
-	"note": "Click an auction to see its solutions. Filtered out: the share of a solver’s solutions that CoW’s fairness filter set aside; a filtered-out solution cannot win.",
+	"note": "Click an auction to see its solutions. Filtered out: the share of a solver’s solutions that CoW’s fairness filter removed; a filtered-out solution cannot win.",
 	"noteCompact": "Tap an auction to see its solutions.",
 	"noAuctions": "{names}: no auction data in this window.",
 	"source": "Source: CoW Protocol solver-competition API",
@@ -58,7 +58,7 @@
 			"partnerFee": "{fee} partner fee",
 			"quotedBy": "quoted by {solver}"
 		},
-		"fees": "In {span}, CoW’s protocol fees came to {protocol}, {protocolBps}\u00a0bps of volume, and partner fees to {partner}, {partnerBps}\u00a0bps.",
+		"fees": "In {span}, CoW’s protocol fees totaled {protocol} ({protocolBps}\u00a0bps of volume) and partner fees {partner} ({partnerBps}\u00a0bps).",
 		"feesEmpty": "No fee data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet. Fees need auction data."
 	},
 	"ratesFiltered": "{participation} · <win>{winRate}</win> · {filtered}",
@@ -88,19 +88,19 @@
 			"same": "Same score",
 			"filtered": "Filtered out"
 		},
-		"head": "{solutions, plural, one {1\u00a0solution, from {solver}} other {#\u00a0solutions from {solvers, plural, one {#\u00a0solver} other {#\u00a0solvers}}}}",
+		"head": "{solutions, plural, one {1\u00a0solution from {solver}} other {#\u00a0solutions from {solvers, plural, one {#\u00a0solver} other {#\u00a0solvers}}}}",
 		"single": "{head}. {winner} won with a score of {score}; the best rival, {rival}’s, scored {gap} lower.",
 		"singleTie": "{head}. {winner} won with a score of {score}; {rival}’s best solution had the same score.",
 		"singleNoRival": "{head}. {winner} won with a score of {score}; no other solver’s solution passed the filter.",
 		"singleOnly": "{head}. {winner} won with a score of {score}.",
-		"oneSolution": "{head}, which won with a score of {score}.",
-		"multi": "{head}. {winners} won together, settling different orders, with scores of {scores}. Each losing solution competed with the winner whose orders it would also have settled, which the scores alone don’t show, so no gaps are given.",
-		"none": "{head}. None of them won.",
+		"oneSolution": "{head} won with a score of {score}.",
+		"multi": "{head}. {winners} won together, settling different orders, with scores of {scores}. Each losing solution competed with the winner whose orders it would also have settled. The scores alone don’t show this, so no gaps are given.",
+		"none": "{head}. No solution won.",
 		"filteredOne": "{solver}’s solution was filtered out.",
 		"filteredSome": "{count, plural, one {1 of {solver}’s {total}\u00a0solutions was filtered out.} other {# of {solver}’s {total}\u00a0solutions were filtered out.}}",
 		"filteredBoth": "Both of {solver}’s solutions were filtered out.",
 		"filteredAll": "All {count} of {solver}’s solutions were filtered out.",
-		"filteredMany": "{count}\u00a0solutions were filtered out, from {solvers}.",
+		"filteredMany": "{count}\u00a0solutions from {solvers} were filtered out.",
 		"dot": "{solver}: {solutions}",
 		"dotItem": "{score}{state, select, won {, won} filtered {, filtered out} same {, same score as the winner} gap {, {gap} below the winner} other {}}",
 		"note": "Score: roughly the surplus a solution generates for traders, in USD at the auction’s ETH/USD rate. One row per solver, with its best solution: ×2 means it submitted two{track, select, yes {, and its other solutions are the small dots} other {}}.",
@@ -116,7 +116,7 @@
 	"quotes": {
 		"title": "Quotes",
 		"scope": "Share of quoted trades{partial, select, yes {†} other {}}",
-		"sentence": "In {span}, {quoted} of {trades}\u00a0trades were placed with a solver’s quote, and CoW had verified {verified} of those quotes by simulating them. {solver} gave {share} of them. The solver that gave the quote went on to settle {settled} of those trades itself.",
+		"sentence": "In {span}, {quoted} of {trades}\u00a0trades were placed with a solver’s quote. CoW had verified {verified} of those quotes by simulating them. {solver} gave {share} of all those quotes. The solver that gave the quote settled {settled} of those trades itself.",
 		"empty": "No quote data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet. Quotes need auction data.",
 		"noQuotes": "No trade in {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} was placed with a solver’s quote.",
 		"legend": {

@@ -276,12 +276,10 @@ function useDetail(row: Row) {
 						? noData
 						: detail.solutions === 0
 							? t("detail.stats.noSolutions")
-							: detail.filteredOut > 0
-								? t("detail.stats.filteredOut", {
-										filtered: f.int(detail.filteredOut),
-										solutions: f.int(detail.solutions),
-									})
-								: t("detail.stats.filteredNone", { solutions: detail.solutions }),
+							: t("detail.stats.filteredOut", {
+									filtered: f.int(detail.filteredOut),
+									solutions: detail.solutions,
+								}),
 			},
 			{
 				key: "closeLosses",

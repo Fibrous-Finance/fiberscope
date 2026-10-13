@@ -63,15 +63,15 @@
 		},
 		"score": {
 			"term": "Score",
-			"text": "The value CoW’s protocol computes for each solution from its executed amounts and chooses winners by: roughly the surplus the solution generates for traders. It is in ETH; the page shows it in USD at Chainlink’s ETH/USD rate when the auction started. Below winner: how much lower a solution scored than the winning one, given only for auctions with a single winner, since in the others a solution competes with only one of the winners."
+			"text": "The value CoW’s protocol computes from each solution’s executed amounts to choose winners: roughly the surplus the solution generates for traders. It is in ETH; the page shows it in USD at Chainlink’s ETH/USD rate when the auction started. Below winner: how much lower a solution scored than the winning one, given only for auctions with a single winner, since in the others a solution competes with only one of the winners."
 		},
 		"filteredOut": {
 			"term": "Filtered out",
-			"text": "Removed by the fairness filter of CoW’s combinatorial auction (CIP-67). For each token pair traded in one direction, CoW takes the best solution with only that pair’s orders as a reference; a solution that batches several pairs is filtered out when it gives any of them less than that reference. A filtered-out solution cannot win. A solver’s share: its filtered-out solutions divided by all its solutions."
+			"text": "Removed by the fairness filter of CoW’s combinatorial auction (CIP-67). For each token pair traded in one direction, CoW takes the best solution with only that pair’s orders as a reference; a solution that batches several pairs is filtered out when it scores less on any of them than that reference. A filtered-out solution cannot win. A solver’s share: its filtered-out solutions divided by all its solutions."
 		},
 		"closeLosses": {
 			"term": "Lost by 1% or less",
-			"text": "Of the auctions with one winner that a solver entered and lost with a solution that passed the filter, the share in which its best solution scored at most 1% below the winning score."
+			"text": "Of the auctions with one winner that a solver entered and lost with a solution that passed the filter, the share in which its best such solution scored at most 1% below the winning score."
 		},
 		"leadingSince": {
 			"term": "Leading since",
@@ -105,7 +105,7 @@
 		},
 		"coverage": {
 			"term": "Coverage",
-			"text": "Settlement history goes back {chain, plural, one {#\u00a0day} other {#\u00a0days}}, auction history {auction, plural, one {#\u00a0day} other {#\u00a0days}}, surplus history {surplus, plural, one {#\u00a0day} other {#\u00a0days}} and auction details, the solutions, quotes and fees, {detail, plural, one {#\u00a0day} other {#\u00a0days}}. Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page.",
+			"text": "Settlement history goes back {chain, plural, one {#\u00a0day} other {#\u00a0days}}, auction history {auction, plural, one {#\u00a0day} other {#\u00a0days}}, surplus history {surplus, plural, one {#\u00a0day} other {#\u00a0days}} and auction details (solutions, quotes and fees) {detail, plural, one {#\u00a0day} other {#\u00a0days}}. Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page.",
 			"noData": "Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page."
 		},
 		"names": {

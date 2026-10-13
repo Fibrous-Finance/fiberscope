@@ -47,6 +47,7 @@ function ingest(store: Store, range: BlockRange, settled: Settled[]): void {
 				buyToken: buy ?? WETH,
 				sellAmount: "1000000000",
 				buyAmount: "500000000000000000",
+				orderUid: `${tx}${"0".repeat(48)}`,
 			})),
 			txs: settled.map(({ tx, block }) => ({
 				tx,
@@ -74,7 +75,15 @@ function competition(auctionId: number, txHashes: string[]): Competition {
 			[WETH, "1000000000000000000"],
 			[USDC, "500000000000000000000000000"],
 		]),
-		solutions: txHashes.map((tx, i) => ({ solver: SOLVER, ranking: i + 1, winner: true, tx })),
+		solutions: txHashes.map((tx, i) => ({
+			solver: SOLVER,
+			ranking: i + 1,
+			winner: true,
+			tx,
+			score: "1000",
+			referenceScore: null,
+			filteredOut: false,
+		})),
 	};
 }
 

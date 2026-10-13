@@ -4,7 +4,9 @@ import { backfillAuctions, catchUpAuctions, resolveRouterSenders } from "./aucti
 import type { AuctionStats, ChainWatch } from "./auctions.ts";
 import { NETWORK } from "./config.ts";
 import type { CowApi } from "./cow.ts";
-import { backfillChain, catchUpChain, seedEthUsd } from "./ingest.ts";
+import { backfillDetails, catchUpDetails } from "./details.ts";
+import type { DetailStats, DetailWatch } from "./details.ts";
+import { backfillChain, catchUpChain, fillOrderUids, seedEthUsd } from "./ingest.ts";
 import type { IngestStats } from "./ingest.ts";
 import { log } from "./log.ts";
 import { OVERRIDES } from "./overrides.ts";
@@ -33,6 +35,7 @@ export interface SyncOptions {
 export interface SyncStats {
 	chain: IngestStats;
 	auctions: AuctionStats;
+	details: DetailStats;
 }
 
 /** Blocks the end may trail the head after a catch-up round before another round runs (5 min). */
@@ -40,10 +43,11 @@ const CATCH_UP_SLACK = 150;
 
 /**
  * Brings the database up to date. Chain and auction data catch up with Base's safe block, which
- * makes the data current (the last run time) and is when the snapshot is written. Then chain and
- * auction history are backfilled to the requested depths, within the budget if there is one; the
- * snapshot is written again if history grew. Every step resumes where an interrupted or stopped
- * run left off.
+ * makes the data current (the last run time) and is when the snapshot is written. Then the
+ * details (the auctions' scores, and the quotes and protocol fees of the orders traded) catch up
+ * with the auctions, and chain, auction and detail history are backfilled to the requested
+ * depths, within the budget if there is one; the snapshot is written again if history grew. Every
+ * step resumes where an interrupted or stopped run left off.
  */
 export async function sync(
 	store: Store,
@@ -61,6 +65,7 @@ export async function sync(
 	const stats: SyncStats = {
 		chain: { receipts: 0, seconds: 0 },
 		auctions: { lookups: 0, missing: 0, seconds: 0 },
+		details: { scores: 0, orders: 0, fees: 0, seconds: 0 },
 	};
 	await seedEthUsd(store, rpc);
 
@@ -89,11 +94,15 @@ export async function sync(
 
 	// Backfill. The chain runs newest first and the auction backfill trails it, so the RPC and
 	// the CoW API rate limits are spent at the same time, and the chain reaches the auction depth
-	// before it goes deeper: auction history never waits for the full chain depth.
+	// before it goes deeper: auction history never waits for the full chain depth. The details
+	// first catch up with the auctions, then trail the auction backfill; the page does not show
+	// them yet, so they come after the snapshot and cannot hold it up. The trades stored before
+	// the schema held order uids get them from the RPC.
 	const head = empty ? await safeHead(rpc) : store.chainRange()!.to;
 	const chainFrom = store.chainRange()?.from;
 	const auctionFrom = store.auctionRange()?.from;
 	const chain: ChainWatch = { done: false };
+	const details: DetailWatch = { auctionsDone: false, uidsDone: false };
 	const abort = new AbortController();
 	const stop = budget === null ? abort.signal : AbortSignal.any([abort.signal, budget]);
 	const chainWork = (async () => {
@@ -109,10 +118,24 @@ export async function sync(
 			chain.done = true;
 		}
 	})();
+	const uidWork = (async () => {
+		try {
+			await fillOrderUids(store, rpc, stop);
+		} catch (error) {
+			abort.abort(error);
+			throw error;
+		} finally {
+			details.uidsDone = true;
+		}
+	})();
 	const auctionWork = (async () => {
-		if (options.auctionDays > 0) {
-			const low = windowStart(head, options.auctionDays);
-			await backfillAuctions(store, cow, low, chain, stats.auctions, stop);
+		try {
+			if (options.auctionDays > 0) {
+				const low = windowStart(head, options.auctionDays);
+				await backfillAuctions(store, cow, low, chain, stats.auctions, stop);
+			}
+		} finally {
+			details.auctionsDone = true;
 		}
 		// Once the auction backfill is done, the CoW API's rate allowance is idle while the chain
 		// backfill runs on: spend it on the router settlements whose attribution needs the API's
@@ -122,9 +145,15 @@ export async function sync(
 			for (let waited = 0; waited < 20 && !chain.done; waited++) await sleep(500);
 		}
 	})();
-	const [chainDone, auctionsDone] = await Promise.allSettled([chainWork, auctionWork]);
-	if (chainDone.status === "rejected") throw chainDone.reason;
-	if (auctionsDone.status === "rejected") throw auctionsDone.reason;
+	const detailWork = (async () => {
+		await catchUpDetails(store, cow, stats.details);
+		if (options.auctionDays > 0) {
+			const low = windowStart(head, options.auctionDays);
+			await backfillDetails(store, cow, low, details, stats.details, stop);
+		}
+	})();
+	const settled = await Promise.allSettled([chainWork, uidWork, auctionWork, detailWork]);
+	for (const work of settled) if (work.status === "rejected") throw work.reason;
 	if (budget?.aborted) {
 		log(`sync: the ${budgetMinutes}-minute budget is spent; the next run resumes the backfill`);
 	}

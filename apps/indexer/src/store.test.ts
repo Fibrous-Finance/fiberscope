@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { describe, test } from "node:test";
 
 import { ROUTER } from "./chain.ts";
@@ -38,6 +42,7 @@ function storeWith(batches: { label: string; block: number; router?: boolean }[]
 				buyToken: WETH,
 				sellAmount: "1000000000",
 				buyAmount: "500000000000000000",
+				orderUid: `${hash(label)}${"0".repeat(48)}`,
 			})),
 			txs: batches.map(({ label, block }) => ({
 				tx: hash(label),
@@ -68,6 +73,9 @@ function settle(store: Store, auctionId: number, startBlock: number, labels: str
 				ranking: i + 1,
 				winner: true,
 				tx: hash(label),
+				score: "1000",
+				referenceScore: null,
+				filteredOut: false,
 			})),
 		},
 		[
@@ -118,5 +126,106 @@ describe("prune", () => {
 			store.ethUsdPoints().map(({ block }) => block),
 			[140, 350]
 		);
+	});
+
+	test("drops the orders and fees of trades below the auction depth with the detail range", () => {
+		const store = storeWith([
+			{ label: "a", block: 100 },
+			{ label: "b", block: 600 },
+		]);
+		store.setDetailRange({ from: 1, to: 1_000 });
+		store.saveOrders(
+			["a", "b"].map((label, i) => ({
+				uid: `${hash(label)}${"0".repeat(48)}`,
+				block: [100, 600][i],
+				detail: { kind: "sell", appClass: null, partnerFees: [], quote: null },
+			}))
+		);
+		for (const [label, block] of [
+			["a", 100],
+			["b", 600],
+		] as const) {
+			store.saveTradeFees(`${hash(label)}${"0".repeat(48)}`, [
+				{
+					block,
+					logIndex: 1,
+					fees: [
+						{
+							policy: "volume",
+							factor: 0.0002,
+							maxVolumeFactor: null,
+							partner: false,
+							amount: "1",
+							token: USDC,
+						},
+					],
+				},
+			]);
+		}
+
+		store.prune(50, 300);
+
+		assert.deepEqual(store.detailRange(), { from: 300, to: 1_000 });
+		const details = [...store.tradeDetails({ from: 1, to: 1_000 })];
+		// a's trade stays with the chain data, but its order and fees go, to be looked up again
+		// if the auction range ever reaches it.
+		assert.deepEqual(
+			details.map(({ block, found, feesChecked, fees }) => [block, found, feesChecked, fees]),
+			[
+				[100, null, null, null],
+				[600, 1, 1, `0 1 ${USDC}`],
+			]
+		);
+	});
+});
+
+describe("schema", () => {
+	test("a version 2 database is upgraded in place, and its trades and auctions are filled in later", () => {
+		const path = join(mkdtempSync(join(tmpdir(), "fiberscope-")), "v2.db");
+		const tx = hash("a");
+		const v2 = new DatabaseSync(path);
+		v2.exec(`
+			CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
+			CREATE TABLE addresses (id INTEGER PRIMARY KEY, address TEXT NOT NULL UNIQUE);
+			CREATE TABLE settlements (block INTEGER NOT NULL, log_index INTEGER NOT NULL,
+				tx BLOB NOT NULL, solver INTEGER NOT NULL, trades INTEGER NOT NULL,
+				swaps INTEGER NOT NULL, sender INTEGER, recipient INTEGER, gas_used INTEGER,
+				fee INTEGER, tx_batches INTEGER, PRIMARY KEY (block, log_index)) WITHOUT ROWID;
+			CREATE TABLE trades (block INTEGER NOT NULL, log_index INTEGER NOT NULL,
+				settlement_log_index INTEGER NOT NULL, sell_token INTEGER NOT NULL,
+				buy_token INTEGER NOT NULL, sell_amount TEXT NOT NULL, buy_amount TEXT NOT NULL,
+				limit_sell_amount TEXT, limit_buy_amount TEXT, fee_amount TEXT,
+				PRIMARY KEY (block, log_index)) WITHOUT ROWID;
+			CREATE TABLE auctions (id INTEGER PRIMARY KEY, start_block INTEGER NOT NULL);
+			CREATE TABLE solutions (auction_id INTEGER NOT NULL, position INTEGER NOT NULL,
+				solver INTEGER NOT NULL, ranking INTEGER NOT NULL, winner INTEGER NOT NULL, tx BLOB,
+				PRIMARY KEY (auction_id, position)) WITHOUT ROWID;
+			INSERT INTO addresses VALUES (1, '${SOLVER}'), (2, '${USDC}'), (3, '${WETH}');
+			INSERT INTO settlements VALUES (500, 2, unhex('${tx.slice(2)}'), 1, 1, 1, 1, NULL,
+				400000, 1000, 1);
+			INSERT INTO trades VALUES (500, 1, 2, 2, 3, '1000000000', '500000000000000000',
+				NULL, NULL, NULL);
+			INSERT INTO auctions VALUES (7, 495);
+			INSERT INTO solutions VALUES (7, 0, 1, 1, 1, unhex('${tx.slice(2)}'));
+			PRAGMA user_version = 2;
+		`);
+		v2.close();
+
+		const store = new Store(path);
+		const [trade] = store.tradeRows({ from: 1, to: 1_000 });
+		assert.equal(trade.sellAmount, "1000000000");
+		assert.deepEqual(store.uidGap(), { from: 500, to: 500 });
+		assert.deepEqual(store.unscoredAuctions({ from: 1, to: 1_000 }), [7]);
+		const [solution] = store.solutionsByStart({ from: 1, to: 1_000 });
+		assert.equal(solution.filteredOut, null);
+
+		const orderUid = `${tx}${"0".repeat(48)}`;
+		store.fillOrderUids({ from: 500, to: 500 }, new Map([["500:1", orderUid]]));
+		assert.equal(store.uidGap(), null);
+		store.close();
+		// Reopened, it is current.
+		const reopened = new Store(path);
+		assert.equal(reopened.uidGap(), null);
+		reopened.close();
 	});
 });

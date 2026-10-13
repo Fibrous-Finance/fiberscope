@@ -46,11 +46,27 @@ build.
 `apps/indexer` reads data from Base and CoW's API into a SQLite database
 (`apps/indexer/.data/base.db`) and writes the snapshot from it. Node 24 runs the indexer's
 TypeScript directly. The indexer has no build step or third-party dependencies; it uses
-`node:sqlite` for SQLite. Settlements and trades are stored by block, addresses by id and hashes
-as bytes (`apps/indexer/src/store.ts`). The database records its schema version, and the indexer
+`node:sqlite` for SQLite. Settlements and trades are stored by block, addresses by id, and hashes
+and order uids as bytes (`apps/indexer/src/store.ts`). The database records its schema version. The
+indexer upgrades a version 2 database in place, and the next syncs fill in what version 3 adds; it
 refuses a database written by an older version: delete it to index again, or `seed` a current
 copy. The snapshot is built while the rows are read, one at a time, so the indexer's memory does
 not grow with the depth of the history.
+
+Besides each settlement's auction, the indexer keeps from CoW's API what the page does not show
+yet:
+
+- each solution's score, reference score and whether CIP-67's filter removed it
+  (`GET /api/v2/solver_competition/{auction_id}`, for auctions stored before the schema held them);
+- each traded order's quote (the solver that gave it, whether CoW verified it, and its amounts),
+  its app data's order class and the policies of its partner fees (`POST /api/v1/orders/by_uids`,
+  128 orders a request);
+- each trade's protocol fees, one per fee policy in the order CoW applied them
+  (`GET /api/v2/trades?orderUid=`). CoW applies an order's partner fees after its own fees, one
+  per partner fee in the app data, so the last ones are marked as partner fees; when they do not
+  match the app data's policies, the split is left open.
+
+These details cover the detail range, which lies within the auction range.
 
 ### Commands
 
@@ -61,7 +77,7 @@ the same summary.
 | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune] [--snapshot <path>]` | Catches up with Base's safe block, then backfills at least N days of settlements and M days of auctions. With `--snapshot`, writes the snapshot once caught up, and again if the backfill added history. With `--budget-minutes`, the backfill stops B minutes after the start, and the next run resumes it. With `--prune`, deletes the data older than those depths once caught up (see below); with both at 0 it deletes nothing.                                                                     |
 | `node src/cli.ts snapshot [--out <path>]`                                                                     | Writes the snapshot from the database (default `apps/web/data/snapshot.json`).                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `node src/cli.ts window --from <block> --to <block>`                                                          | Prints totals (batches, trades, DEX swaps, volume, surplus, gas and cost) and the per-solver table for a block range, from the database.                                                                                                                                                                                                                                                                                                                                                                 |
+| `node src/cli.ts window --from <block> --to <block>`                                                          | Prints totals (batches, trades, DEX swaps, volume, surplus, gas and cost; scores and filtered-out solutions; quotes; protocol and partner fees) and the per-solver table for a block range, from the database.                                                                                                                                                                                                                                                                                           |
 | `node src/cli.ts attribution --from <block> --to <block>`                                                     | Uses the database to compare each batch's credited solver address in a block range with the solver address of the winning solution for its transaction in CoW's competition data. Breaks down flash-loan router batches by how the credited address was chosen. See [Validation](methodology.md#validation).                                                                                                                                                                                             |
 | `node src/cli.ts terms --from <block> --to <block> [--sample N]`                                              | Counts trades with order terms decoded from `settle()` calldata, grouped by how the calldata reached the settlement contract. It then samples trades across the block range and routes, targeting N trades (default: 90). For each sampled trade, it rereads and decodes the transaction from the RPC, compares the executed fee with the fee in its `Trade` event, and compares the signed-order fields with the corresponding fields in CoW's order book. See [Validation](methodology.md#validation). |
 | `node src/cli.ts seed --url <url>`                                                                            | Downloads a database from `<url>` when there is none yet, so a new host does not index again. It never overwrites a database and runs SQLite's integrity check on the download before using it.                                                                                                                                                                                                                                                                                                          |
@@ -75,20 +91,26 @@ same options) also read `apps/indexer/.env` when it exists.
 2. Catches up: settlements, receipts and calldata up to Base's safe block (the newest block whose
    transactions Base has posted to Ethereum), then the auctions behind the new settlements.
 3. With `--prune`, deletes settlements older than N days (at least M, as for the backfill) with
-   their auction data, and the auction data of settlements older than M days. A flash-loan router
-   settlement keeps its auction while it is in the chain data, since its attribution may need the
-   auction's winner.
+   their auction data, and the auction data, orders and fees of settlements older than M days. A
+   flash-loan router settlement keeps its auction while it is in the chain data, since its
+   attribution may need the auction's winner.
 4. Marks the data current and, with `--snapshot`, writes the snapshot.
-5. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
-   settlements, followed by their auction lookups. Settlement history is kept at least as deep as
-   auction history.
-6. Writes the snapshot again if the history grew.
+5. Catches up the details of the new blocks: the orders traded and their trades' protocol fees,
+   looking again at the last 10 minutes of trades whose fees the API did not list yet. The page
+   does not show the details yet, so they come after the snapshot and never hold it up.
+6. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
+   settlements, followed by their auction lookups, followed by their details. Settlement history
+   is kept at least as deep as auction history. Trades stored before the schema held order uids
+   get theirs from their `Trade` events.
+7. Writes the snapshot again if the history grew.
 
 On an empty database there is nothing to catch up: the backfill starts at the safe block and the
 snapshot is written once it ends. Every step commits as it goes, so an interrupted run loses
 nothing. Requests are paced: by default at most 15 RPC calls per second (`eth_call` at a thirtieth
 of that, the public RPC's tightest limit) and 3 CoW API requests per second, slowing down when a
-server answers that the rate is too high.
+server answers that the rate is too high. At 5 CoW API requests per second, filling in the details
+of a version 2 database with 90 days of auctions on Base takes about a day: about 200,000 auctions
+to score again and 240,000 orders whose trades are looked up one order at a time.
 
 ### Keep it running
 
@@ -285,6 +307,7 @@ Measured on the live deployment on 3–5 Oct 2026.
 | ------------------------------- | ------------------------------------------------------------------------------ |
 | `apps/indexer/src/cli.ts`       | The commands                                                                   |
 | `apps/indexer/src/sync.ts`      | The order of a sync: catch-up, snapshot, backfill                              |
+| `apps/indexer/src/details.ts`   | Scores, orders' quotes and trades' protocol fees from CoW's API                |
 | `apps/indexer/src/rules.ts`     | The counting rules as pure functions: days, attribution, volume, surplus, cost |
 | `apps/indexer/src/snapshot.ts`  | Builds the snapshot from the database                                          |
 | `packages/core/src/snapshot.ts` | The snapshot contract                                                          |

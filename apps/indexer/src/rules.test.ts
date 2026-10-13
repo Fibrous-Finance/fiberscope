@@ -8,6 +8,7 @@ import {
 	bucketOf,
 	completeBuckets,
 	creditedAddress,
+	feeUsd,
 	priceToken,
 	tradeSurplus,
 	tradeVolumeUsd,
@@ -150,6 +151,34 @@ describe("trade surplus", () => {
 		assert.equal(tradeSurplus(900, { ...sell, limitSellAmount: null }), null);
 		assert.equal(tradeSurplus(900, { ...sell, feeAmount: null }), null);
 		assert.equal(tradeSurplus(900, { ...sell, limitSellAmount: "0" }), null);
+	});
+});
+
+describe("fee value", () => {
+	// 1,000 USDC sold for 0.5 WETH, a trade worth $1,000 at its lower side.
+	const trade = {
+		sellToken: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+		buyToken: WETH,
+		sellAmount: "1000000000",
+		buyAmount: "500000000000000000",
+	};
+
+	test("is the fee's share of the trade's amount in its token, times the trade's value", () => {
+		// 0.0005 WETH of 0.5 WETH bought, and 2 USDC of 1,000 USDC sold.
+		assert.equal(feeUsd({ token: WETH, amount: "500000000000000" }, trade, 1_000), 1);
+		assert.equal(feeUsd({ token: trade.sellToken, amount: "2000000" }, trade, 1_000), 2);
+		// Native ETH is the same side as WETH.
+		const native = { ...trade, buyToken: NATIVE_ETH };
+		assert.equal(feeUsd({ token: WETH, amount: "500000000000000" }, native, 1_000), 1);
+	});
+
+	test("has none in a token the trade did not touch, or on an empty side", () => {
+		const other = "0x4200000000000000000000000000000000000042";
+		assert.equal(feeUsd({ token: other, amount: "1" }, trade, 1_000), null);
+		assert.equal(
+			feeUsd({ token: WETH, amount: "1" }, { ...trade, buyAmount: "0" }, 1_000),
+			null
+		);
 	});
 });
 

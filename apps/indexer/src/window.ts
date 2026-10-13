@@ -3,6 +3,7 @@ import { timeOf } from "./config.ts";
 import { auctionOutcomes, creditedBatches, TradeValuer } from "./facts.ts";
 import { fmt, shortAddress } from "./log.ts";
 import type { Registry, SolverIdentity } from "./registry.ts";
+import { feeUsd } from "./rules.ts";
 import type { BlockRange } from "./rules.ts";
 import type { Store } from "./store.ts";
 
@@ -20,15 +21,29 @@ interface Row {
 	unusualSurplus: number;
 	entered: number;
 	won: number;
+	/** Its solutions in scored auctions, and those of them CIP-67's filter removed. */
+	scoredSolutions: number;
+	filteredOut: number;
+	/** Trades whose order was placed with its quote. */
+	quotes: number;
+	/** Its settled trades whose order had a quote, and those of them it had quoted itself. */
+	quotedTrades: number;
+	ownQuotes: number;
+	/** USD of the protocol fees on its settled trades: CoW's own, and partners'. */
+	protocolFees: number;
+	partnerFees: number;
 }
 
 /**
  * Totals and a per-solver table for a block range, read from the database. Batches, trades,
- * volume, surplus, gas and cost count settlements inside the range; entered and won count
- * auctions that started inside it.
+ * volume, surplus, gas, cost, quotes and fees count settlements inside the range; entered, won
+ * and filtered-out solutions count auctions that started inside it.
  */
 export function windowReport(store: Store, registry: Registry, range: BlockRange): string {
-	const out = [windowLine(range), ...coverageWarnings(store, range, ["chain", "auction"])];
+	const out = [
+		windowLine(range),
+		...coverageWarnings(store, range, ["chain", "auction", "detail"]),
+	];
 
 	const rows = new Map<string, Row>();
 	const row = (identity: SolverIdentity): Row => {
@@ -46,6 +61,13 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 				unusualSurplus: 0,
 				entered: 0,
 				won: 0,
+				scoredSolutions: 0,
+				filteredOut: 0,
+				quotes: 0,
+				quotedTrades: 0,
+				ownQuotes: 0,
+				protocolFees: 0,
+				partnerFees: 0,
 			};
 			rows.set(identity.id, entry);
 		}
@@ -78,6 +100,11 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 	}
 
 	const valuer = new TradeValuer(store);
+	// The row a trade's batch is credited to.
+	const creditOf = (trade: { solver: string; block: number; settlementLogIndex: number }) =>
+		trade.solver === ROUTER
+			? routedRows.get(`${trade.block}:${trade.settlementLogIndex}`)!
+			: rows.get(registry.identify(trade.solver).id)!;
 	let trades = 0;
 	let unpriced = 0;
 	let oneSided = 0;
@@ -96,10 +123,7 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		}
 		if (value.pricedSides === 1) oneSided++;
 		volume += value.usd;
-		const entry =
-			trade.solver === ROUTER
-				? routedRows.get(`${trade.block}:${trade.settlementLogIndex}`)!
-				: rows.get(registry.identify(trade.solver).id)!;
+		const entry = creditOf(trade);
 		entry.volume += value.usd;
 		if (value.surplus === null) continue;
 		surplus += value.surplus.usd;
@@ -113,14 +137,67 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		entry.unusualSurplus += value.surplus.usd;
 	}
 
+	const orders = { booked: 0, notBooked: 0, unknown: 0, quoted: 0, verified: 0, ownQuotes: 0 };
+	const fees = { checked: 0, unknown: 0, pending: 0, protocol: 0, partner: 0 };
+	let unclearFees = 0;
+	let unpricedFees = 0;
+	for (const trade of store.tradeDetails(range)) {
+		const entry = creditOf(trade);
+		if (trade.found === null) orders.unknown++;
+		else if (trade.found === 0) orders.notBooked++;
+		else orders.booked++;
+		if (trade.quoteSolver !== null) {
+			const quoter = row(registry.identify(trade.quoteSolver));
+			quoter.quotes++;
+			orders.quoted++;
+			if (trade.quoteVerified === 1) orders.verified++;
+			entry.quotedTrades++;
+			if (quoter === entry) {
+				entry.ownQuotes++;
+				orders.ownQuotes++;
+			}
+		}
+		if (trade.feesChecked === null) fees.pending++;
+		else if (trade.feesChecked === 0) fees.unknown++;
+		else fees.checked++;
+		const tradeUsd = trade.fees === null ? null : valuer.usd(trade);
+		for (const item of trade.fees?.split(",") ?? []) {
+			const [partner, amount, token] = item.split(" ");
+			const usd = tradeUsd === null ? null : feeUsd({ token, amount }, trade, tradeUsd);
+			if (usd === null) unpricedFees++;
+			else if (partner === "?") unclearFees += usd;
+			else if (partner === "1") {
+				fees.partner += usd;
+				entry.partnerFees += usd;
+			} else {
+				fees.protocol += usd;
+				entry.protocolFees += usd;
+			}
+		}
+	}
+
 	let auctions = 0;
+	let scored = 0;
 	let solutions = 0;
+	let scoredSolutions = 0;
+	let filteredOut = 0;
 	let winners = 0;
 	for (const auction of auctionOutcomes(store.solutionsByStart(range), registry)) {
 		auctions++;
 		solutions += auction.solutions;
 		winners += auction.winners.length;
-		for (const { identity } of auction.entrants.values()) row(identity).entered++;
+		if (auction.scored) {
+			scored++;
+			scoredSolutions += auction.solutions;
+		}
+		for (const entrant of auction.entrants.values()) {
+			const entry = row(entrant.identity);
+			entry.entered++;
+			if (!auction.scored) continue;
+			entry.scoredSolutions += entrant.solutions;
+			entry.filteredOut += entrant.filteredOut;
+			filteredOut += entrant.filteredOut;
+		}
 		for (const winner of auction.winners) rows.get(winner.solver)!.won++;
 	}
 
@@ -146,6 +223,17 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		`Solvers    ${fmt(settling)} with batches, ${fmt(sorted.length)} with batches or solutions`,
 		`Auctions   ${fmt(auctions)} started in the window, ${fmt(solutions)} solutions, ` +
 			`${(winners / Math.max(1, auctions)).toFixed(2)} winners per auction`,
+		`Scores     ${fmt(scored)} of those auctions scored; ${share(filteredOut, scoredSolutions, 1)} ` +
+			`of their ${fmt(scoredSolutions)} solutions filtered out`,
+		`Orders     ${fmt(orders.booked)} trades of orders in CoW's order book, ` +
+			`${fmt(orders.notBooked)} of orders outside it, ${fmt(orders.unknown)} not looked up; ` +
+			`${fmt(orders.quoted)} placed with a quote (${fmt(orders.verified)} verified), ` +
+			`${share(orders.ownQuotes, orders.quoted)} settled by the quote's solver`,
+		`Fees       protocol $${fmt(fees.protocol, 2)}, partner $${fmt(fees.partner, 2)} over ` +
+			`${fmt(fees.checked)} trades with fee data; ${fmt(fees.unknown)} trades without, ` +
+			`${fmt(fees.pending)} not looked up` +
+			`${unclearFees > 0 ? `; $${fmt(unclearFees, 2)} not split into protocol and partner` : ""}` +
+			`${unpricedFees > 0 ? `; ${fmt(unpricedFees)} fees unpriced` : ""}`,
 		""
 	);
 
@@ -163,6 +251,11 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 			"Cost/trade",
 			"Entered",
 			"Won",
+			"Filtered",
+			"Quotes",
+			"Own quote",
+			"Protocol fee $",
+			"Partner fee $",
 		],
 		...sorted.map((entry) => [
 			entry.identity.name ?? shortAddress(entry.identity.id),
@@ -177,6 +270,11 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 			usdPer(entry.cost, entry.trades, 4),
 			fmt(entry.entered),
 			fmt(entry.won),
+			share(entry.filteredOut, entry.scoredSolutions, 1),
+			fmt(entry.quotes),
+			share(entry.ownQuotes, entry.quotedTrades),
+			fmt(entry.protocolFees, 2),
+			fmt(entry.partnerFees, 2),
 		]),
 	];
 
@@ -202,11 +300,15 @@ export function windowLine(range: BlockRange): string {
 export function coverageWarnings(
 	store: Store,
 	range: BlockRange,
-	kinds: ("chain" | "auction")[]
+	kinds: ("chain" | "auction" | "detail")[]
 ): string[] {
 	const warnings: string[] = [];
 	for (const kind of kinds) {
-		const covered = kind === "chain" ? store.chainRange() : store.auctionRange();
+		const covered = {
+			chain: store.chainRange(),
+			auction: store.auctionRange(),
+			detail: store.detailRange(),
+		}[kind];
 		if (covered === null || covered.from > range.from || covered.to < range.to) {
 			const has = covered ? `${covered.from}..${covered.to}` : "nothing";
 			warnings.push(`WARNING    ${kind} data covers ${has}, not the whole window`);
@@ -225,7 +327,7 @@ function usdPer(usd: number, count: number, digits = 2): string {
 	return count === 0 ? "—" : `$${(usd / count).toFixed(digits)}`;
 }
 
-/** A part of a total as a whole percentage. */
-function share(part: number, total: number): string {
-	return total > 0 ? `${((part / total) * 100).toFixed(0)}%` : "—";
+/** A part of a total as a percentage. */
+function share(part: number, total: number, digits = 0): string {
+	return total > 0 ? `${((part / total) * 100).toFixed(digits)}%` : "—";
 }

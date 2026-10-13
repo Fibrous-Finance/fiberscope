@@ -150,6 +150,7 @@ async function build(): Promise<Snapshot> {
 					buyToken: WETH,
 					sellAmount: "1000000000",
 					buyAmount: "500000000000000000",
+					orderUid: `${tx}${String(i).padStart(48, "0")}`,
 					terms: terms(limitBuy),
 				}))
 			),
@@ -173,7 +174,17 @@ async function build(): Promise<Snapshot> {
 			startBlock: END - 14,
 			txHashes: [hash("won"), hash("pair")],
 			prices: new Map(),
-			solutions: [{ solver: ARC, ranking: 1, winner: true, tx: hash("won") }],
+			solutions: [
+				{
+					solver: ARC,
+					ranking: 1,
+					winner: true,
+					tx: hash("won"),
+					score: "1000",
+					referenceScore: null,
+					filteredOut: false,
+				},
+			],
 		},
 		[
 			[USDC, "500000000000000000000000000"],

@@ -3,6 +3,7 @@ import {
 	getInputs,
 	getLogs,
 	getReceipts,
+	orderUidOf,
 	parseSettlementLogs,
 	ROUTER,
 	SELECTOR,
@@ -21,6 +22,8 @@ import { readOrderTerms } from "./terms.ts";
 
 /** Block ranges in flight at once, the next one to commit included. */
 const PIPELINE = 2;
+/** `eth_getLogs` requests in flight at once while order uids are filled in. */
+const UID_LANES = 4;
 
 /** Running totals of chain ingestion, for throughput reports. */
 export interface IngestStats {
@@ -275,4 +278,47 @@ async function ingest(
 	stats.seconds += seconds;
 	const outcome = done < ranges.length ? `stopped at block ${store.chainRange()?.from}` : "done";
 	log(`chain ${label}: ${outcome}, ${fmt(receipts)} batch txs in ${duration(seconds)}`);
+}
+
+/**
+ * Gives the trades stored before the schema held order uids their uids, read from the Trade
+ * events of their block ranges, newest blocks first. When `stop` aborts it finishes the ranges in
+ * flight and stops; the next run resumes with the trades still without a uid.
+ */
+export async function fillOrderUids(store: Store, rpc: Rpc, stop?: AbortSignal): Promise<void> {
+	const gap = store.uidGap();
+	if (gap === null || stop?.aborted) return;
+	const ranges: BlockRange[] = [];
+	for (let to = gap.to; to >= gap.from; to -= LOG_RANGE) {
+		ranges.push({ from: Math.max(gap.from, to - LOG_RANGE + 1), to });
+	}
+	log(`order uids: blocks ${gap.from}..${gap.to}, ${fmt(ranges.length)} ranges`);
+	const started = performance.now();
+	const report = throttledLog();
+	let next = 0;
+	let done = 0;
+	let filled = 0;
+	const lane = async () => {
+		while (next < ranges.length && !stop?.aborted) {
+			const range = ranges[next++];
+			const logs = await getLogs(rpc, range.from, range.to, [SETTLEMENT], [[TOPIC.trade]]);
+			const uids = new Map(
+				logs.map((entry) => [
+					`${Number(entry.blockNumber)}:${Number(entry.logIndex)}`,
+					orderUidOf(entry.data),
+				])
+			);
+			filled += store.fillOrderUids(range, uids);
+			done++;
+			report(() => {
+				const seconds = (performance.now() - started) / 1000;
+				const eta = (seconds / done) * (ranges.length - done);
+				return `order uids: ${fmt(done)}/${fmt(ranges.length)} ranges · ${fmt(filled)} trades · eta ${duration(eta)}`;
+			});
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(UID_LANES, ranges.length) }, lane));
+	const seconds = (performance.now() - started) / 1000;
+	const outcome = done < ranges.length ? "stopped" : "done";
+	log(`order uids: ${outcome}, ${fmt(filled)} trades in ${duration(seconds)}`);
 }

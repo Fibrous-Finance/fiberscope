@@ -5,7 +5,8 @@ import type { SQLInputValue, StatementSync } from "node:sqlite";
 
 import { ROUTER } from "./chain.ts";
 import type { SettlementRow, TradeRow } from "./chain.ts";
-import type { Competition } from "./cow.ts";
+import type { Competition, ExecutedFee, FeePolicy, OrderDetail, Solution } from "./cow.ts";
+import { log } from "./log.ts";
 import type { PricePoint } from "./prices.ts";
 import type { RegistryEntry } from "./registry.ts";
 import type { BlockRange } from "./rules.ts";
@@ -102,15 +103,55 @@ export interface SolutionRow {
 	solver: string;
 	winner: number;
 	tx: string | null;
+	/** 1 when CIP-67's filter removed the solution; null until its auction is scored. */
+	filteredOut: number | null;
+}
+
+/** A trade whose protocol fees were never looked up, with what its order's lookup found. */
+export interface PendingFeeTrade {
+	uid: string;
+	block: number;
+	logIndex: number;
+	/** Whether CoW's order book has the order. */
+	found: boolean;
+	/** The policies of the partner fees in the order's app data, in order. */
+	partnerFees: FeePolicy[];
+}
+
+/** A protocol fee as stored: whether it is a partner fee, or null when that is unclear. */
+export interface StoredFee extends ExecutedFee {
+	partner: boolean | null;
+}
+
+/** A trade with its order's quote and its protocol fees, for reports. */
+export interface TradeDetailRow {
+	block: number;
+	logIndex: number;
+	settlementLogIndex: number;
+	/** The address that called `settle` for the trade's settlement. */
+	solver: string;
+	auctionId: number | null;
+	sellToken: string;
+	buyToken: string;
+	sellAmount: string;
+	buyAmount: string;
+	/** 1 when CoW's order book has the order, 0 when it lacks it, null when not looked up. */
+	found: number | null;
+	quoteSolver: string | null;
+	quoteVerified: number | null;
+	/** See the trades table. */
+	feesChecked: number | null;
+	/** The fee rows as `partner amount token` items joined by commas; partner is 1, 0 or ?. */
+	fees: string | null;
 }
 
 /** The schema's `PRAGMA user_version`. */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 /**
  * Settlements and trades are keyed by block and log index, so a block range is one stretch of
  * each table. Addresses are stored once, in `addresses`, and referred to by id; transaction
- * hashes are stored as their 32 bytes.
+ * hashes and order uids are stored as their bytes.
  */
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -147,6 +188,10 @@ CREATE INDEX IF NOT EXISTS settlements_by_solver ON settlements (solver, block);
 -- One row per Trade event, under the settlement at settlement_log_index in the same block.
 -- limit_sell_amount, limit_buy_amount and fee_amount are the order terms read from the settle()
 -- calldata (see OrderTerms); null when no settle() call in the calldata reproduces the trade.
+-- order_uid is null only in rows stored before the schema held it, until it is filled in.
+-- fees_checked is null until the trade's protocol fees are looked up; then 1 when trade_fees
+-- holds them (possibly none), 0 when they are unknown: the order is not in CoW's order book, or
+-- the API never listed the trade.
 CREATE TABLE IF NOT EXISTS trades (
 	block INTEGER NOT NULL,
 	log_index INTEGER NOT NULL,
@@ -158,8 +203,11 @@ CREATE TABLE IF NOT EXISTS trades (
 	limit_sell_amount TEXT,
 	limit_buy_amount TEXT,
 	fee_amount TEXT,
+	order_uid BLOB,
+	fees_checked INTEGER,
 	PRIMARY KEY (block, log_index)
 ) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS trades_without_uid ON trades (block) WHERE order_uid IS NULL;
 
 -- AllowList isSolver verdicts, checked once per address (flash-loan router senders, recipients).
 CREATE TABLE IF NOT EXISTS allow_list (
@@ -174,13 +222,18 @@ CREATE TABLE IF NOT EXISTS eth_usd (
 );
 
 -- Auctions that ended in a settlement, and every solution submitted to them, in the API's order.
+-- scored is 1 once the solutions carry their scores (0 for auctions stored before the schema
+-- held them, until they are fetched again).
 CREATE TABLE IF NOT EXISTS auctions (
 	id INTEGER PRIMARY KEY,
-	start_block INTEGER NOT NULL
+	start_block INTEGER NOT NULL,
+	scored INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS auctions_by_start ON auctions (start_block);
 
 -- tx: the settlement of a winning solution; null for the others and for winners that never settled.
+-- score and reference_score (see Solution) are decimal wei; filtered_out is 1 when CIP-67's
+-- filter removed the solution. All three are null until the auction is scored.
 CREATE TABLE IF NOT EXISTS solutions (
 	auction_id INTEGER NOT NULL,
 	position INTEGER NOT NULL,
@@ -188,6 +241,9 @@ CREATE TABLE IF NOT EXISTS solutions (
 	ranking INTEGER NOT NULL,
 	winner INTEGER NOT NULL,
 	tx BLOB,
+	score TEXT,
+	reference_score TEXT,
+	filtered_out INTEGER,
 	PRIMARY KEY (auction_id, position)
 ) WITHOUT ROWID;
 
@@ -208,6 +264,41 @@ CREATE TABLE IF NOT EXISTS auction_txs (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS auction_txs_by_auction ON auction_txs (auction_id);
 
+-- The orders traded in the detail range as CoW's order book holds them (see OrderDetail). found
+-- is 0 for an order the book lacks, such as a solver's just-in-time order, and then the other
+-- columns are null. block is the block of its latest trade, for pruning. partner_fees holds the
+-- policies of its app data's partner fees, comma-separated; null for none.
+CREATE TABLE IF NOT EXISTS orders (
+	uid BLOB PRIMARY KEY,
+	block INTEGER NOT NULL,
+	found INTEGER NOT NULL,
+	kind TEXT,
+	app_class TEXT,
+	partner_fees TEXT,
+	quote_solver INTEGER,
+	quote_verified INTEGER,
+	quote_sell_amount TEXT,
+	quote_buy_amount TEXT,
+	quote_fee_amount TEXT
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS orders_by_block ON orders (block);
+
+-- The protocol fees CoW charged on each trade, one row per fee policy in the order CoW applied
+-- them (see ExecutedFee). partner is 1 for a partner fee from the order's app data, 0 for CoW's
+-- own fee, and null when the policies do not line up with the app data.
+CREATE TABLE IF NOT EXISTS trade_fees (
+	block INTEGER NOT NULL,
+	log_index INTEGER NOT NULL,
+	position INTEGER NOT NULL,
+	policy TEXT NOT NULL,
+	factor REAL NOT NULL,
+	max_volume_factor REAL,
+	partner INTEGER,
+	amount TEXT NOT NULL,
+	token INTEGER NOT NULL,
+	PRIMARY KEY (block, log_index, position)
+) WITHOUT ROWID;
+
 CREATE TABLE IF NOT EXISTS tokens (
 	address INTEGER PRIMARY KEY,
 	symbol TEXT NOT NULL
@@ -221,6 +312,20 @@ CREATE TABLE IF NOT EXISTS cms_solvers (
 	solver_id TEXT NOT NULL,
 	name TEXT NOT NULL
 );
+`;
+
+/**
+ * Turns a version 2 database into version 3 in place: the new columns start empty and are filled
+ * in by the sync (order uids from the chain, scores, orders and fees from CoW's API). SCHEMA then
+ * adds the new tables and indexes.
+ */
+const UPGRADE_FROM_2 = `
+ALTER TABLE trades ADD COLUMN order_uid BLOB;
+ALTER TABLE trades ADD COLUMN fees_checked INTEGER;
+ALTER TABLE auctions ADD COLUMN scored INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE solutions ADD COLUMN score TEXT;
+ALTER TABLE solutions ADD COLUMN reference_score TEXT;
+ALTER TABLE solutions ADD COLUMN filtered_out INTEGER;
 `;
 
 /** Binds a `0x`-prefixed hex hash to a column that stores its bytes. */
@@ -246,19 +351,20 @@ export class Store {
 				`${path} has schema version ${version}; this indexer reads version ${SCHEMA_VERSION}`
 			);
 		}
-		if (
-			version < SCHEMA_VERSION &&
-			this.#get("SELECT 1 FROM sqlite_schema WHERE name = 'settlements'")
-		) {
+		const written = this.#get("SELECT 1 FROM sqlite_schema WHERE name = 'settlements'");
+		if (written && version < 2) {
 			throw new Error(
 				`${path} was written by an older indexer (schema version ${version}): delete it to ` +
 					"index from scratch, or seed a current copy"
 			);
 		}
 		this.#transaction(() => {
+			if (written && version === 2) this.db.exec(UPGRADE_FROM_2);
 			this.db.exec(SCHEMA);
 			this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 		});
+		if (written && version === 2)
+			log(`${path}: schema version 2 upgraded to ${SCHEMA_VERSION}`);
 	}
 
 	close(): void {
@@ -284,6 +390,18 @@ export class Store {
 		this.#transaction(() => this.#setRange("auction", range));
 	}
 
+	/**
+	 * The blocks whose auctions carry their scores and whose trades carry their orders' quotes and
+	 * their protocol fees, as far as CoW's API has them. It lies within the auction range.
+	 */
+	detailRange(): BlockRange | null {
+		return this.#range("detail");
+	}
+
+	setDetailRange(range: BlockRange): void {
+		this.#transaction(() => this.#setRange("detail", range));
+	}
+
 	lastRunAt(): number | null {
 		const value = this.#meta("last_run_at");
 		return value === null ? null : Number(value);
@@ -307,7 +425,7 @@ export class Store {
 			if (s.trades > 0) batches.set(s.tx, (batches.get(s.tx) ?? 0) + 1);
 		}
 		this.#transaction(() => {
-			for (const table of ["settlements", "trades", "eth_usd"]) {
+			for (const table of ["settlements", "trades", "trade_fees", "eth_usd"]) {
 				this.#run(`DELETE FROM ${table} WHERE block BETWEEN ? AND ?`, from, to);
 			}
 			for (const s of chunk.settlements) {
@@ -335,8 +453,8 @@ export class Store {
 			for (const t of chunk.trades) {
 				this.#run(
 					`INSERT INTO trades (block, log_index, settlement_log_index, sell_token, buy_token,
-						sell_amount, buy_amount, limit_sell_amount, limit_buy_amount, fee_amount)
-						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						sell_amount, buy_amount, limit_sell_amount, limit_buy_amount, fee_amount, order_uid)
+						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${HASH})`,
 					t.block,
 					t.logIndex,
 					t.settlementLogIndex,
@@ -346,7 +464,8 @@ export class Store {
 					t.buyAmount,
 					t.terms?.limitSellAmount ?? null,
 					t.terms?.limitBuyAmount ?? null,
-					t.terms?.feeAmount ?? null
+					t.terms?.feeAmount ?? null,
+					t.orderUid
 				);
 			}
 			for (const p of chunk.prices) {
@@ -362,10 +481,11 @@ export class Store {
 
 	/**
 	 * Deletes the chain data below `chainFrom`, and the competition links of the settlements below
-	 * `auctionFrom` (null: none), and moves both ranges up to them. A flash-loan router settlement
-	 * keeps its link while it is in the chain data, since its attribution may need its auction's
-	 * winner. An auction goes with its last link, so one that started below `auctionFrom` stays
-	 * while a later settlement needs its prices. ETH/USD keeps the answer in force at `chainFrom`.
+	 * `auctionFrom` (null: none) with the orders and fees of their trades, and moves the chain,
+	 * auction and detail ranges up to them. A flash-loan router settlement keeps its link while it
+	 * is in the chain data, since its attribution may need its auction's winner. An auction goes
+	 * with its last link, so one that started below `auctionFrom` stays while a later settlement
+	 * needs its prices. ETH/USD keeps the answer in force at `chainFrom`.
 	 */
 	prune(chainFrom: number, auctionFrom: number | null): void {
 		const chain = this.chainRange();
@@ -409,8 +529,24 @@ export class Store {
 				this.#run("DELETE FROM auction_prices WHERE auction_id = ?", id);
 				this.#run("DELETE FROM auctions WHERE id = ?", id);
 			}
-			if (linksGone !== null)
+			if (linksGone !== null) {
+				// An order goes when its latest trade is below the auction range; a trade there
+				// loses its fees, and is looked up again if the auction range ever reaches it.
+				this.#run("DELETE FROM trade_fees WHERE block < ?", linksGone.to);
+				this.#run("DELETE FROM orders WHERE block < ?", linksGone.to);
+				this.#run(
+					`UPDATE trades SET fees_checked = NULL
+						WHERE block >= ? AND block < ? AND fees_checked IS NOT NULL`,
+					linksGone.from,
+					linksGone.to
+				);
+				const details = this.detailRange();
+				if (details !== null && details.from < linksGone.to) {
+					if (details.to < linksGone.to) this.#deleteRange("detail");
+					else this.#setRange("detail", { from: linksGone.to, to: details.to });
+				}
 				this.#setRange("auction", { from: linksGone.to, to: auctions!.to });
+			}
 			if (chainGone !== null) {
 				this.#run("DELETE FROM settlements WHERE block < ?", chainFrom);
 				this.#run("DELETE FROM trades WHERE block < ?", chainFrom);
@@ -600,23 +736,11 @@ export class Store {
 		const id = competition.auctionId;
 		this.#transaction(() => {
 			this.#run(
-				"INSERT OR REPLACE INTO auctions (id, start_block) VALUES (?, ?)",
+				"INSERT OR REPLACE INTO auctions (id, start_block, scored) VALUES (?, ?, 1)",
 				id,
 				competition.startBlock
 			);
-			this.#run("DELETE FROM solutions WHERE auction_id = ?", id);
-			competition.solutions.forEach((s, position) => {
-				this.#run(
-					`INSERT INTO solutions (auction_id, position, solver, ranking, winner, tx)
-						VALUES (?, ?, ?, ?, ?, ${HASH})`,
-					id,
-					position,
-					this.#addressId(s.solver),
-					s.ranking,
-					Number(s.winner),
-					s.tx
-				);
-			});
+			this.#replaceSolutions(id, competition.solutions);
 			for (const [token, price] of prices) {
 				this.#run(
 					"INSERT OR REPLACE INTO auction_prices (auction_id, token, price) VALUES (?, ?, ?)",
@@ -698,6 +822,258 @@ export class Store {
 		);
 	}
 
+	// Scores
+
+	/** Auctions that started in a block range whose solutions lack their scores, newest first. */
+	unscoredAuctions(range: BlockRange): number[] {
+		return this.#all<{ id: number }>(
+			`SELECT id FROM auctions WHERE start_block BETWEEN ? AND ? AND scored = 0
+				ORDER BY id DESC`,
+			range.from,
+			range.to
+		).map((row) => row.id);
+	}
+
+	/**
+	 * Gives an auction's solutions their scores from a fresh copy of its competition, or records
+	 * that the API no longer has it (null), which leaves them unscored for good. When the copy
+	 * lists other solutions than the stored ones, it replaces them; returns whether it did.
+	 */
+	saveScores(auctionId: number, solutions: Solution[] | null): boolean {
+		let replaced = false;
+		this.#transaction(() => {
+			if (solutions !== null) {
+				const stored = this.#all<{
+					solver: string;
+					ranking: number;
+					winner: number;
+					tx: string | null;
+				}>(
+					`SELECT a.address AS solver, s.ranking, s.winner,
+						CASE WHEN s.tx IS NULL THEN NULL ELSE ${hexOf("s.tx")} END AS tx
+					FROM solutions s JOIN addresses a ON a.id = s.solver
+					WHERE s.auction_id = ? ORDER BY s.position`,
+					auctionId
+				);
+				const same =
+					stored.length === solutions.length &&
+					stored.every(
+						(row, i) =>
+							row.solver === solutions[i].solver &&
+							row.ranking === solutions[i].ranking &&
+							row.winner === Number(solutions[i].winner) &&
+							row.tx === solutions[i].tx
+					);
+				if (same) {
+					solutions.forEach((s, position) => {
+						this.#run(
+							`UPDATE solutions SET score = ?, reference_score = ?, filtered_out = ?
+								WHERE auction_id = ? AND position = ?`,
+							s.score,
+							s.referenceScore,
+							Number(s.filteredOut),
+							auctionId,
+							position
+						);
+					});
+				} else {
+					this.#replaceSolutions(auctionId, solutions);
+					replaced = true;
+				}
+			}
+			this.#run("UPDATE auctions SET scored = 1 WHERE id = ?", auctionId);
+		});
+		return replaced;
+	}
+
+	// Order uids
+
+	/** The blocks of the trades stored without their order uid; null when there are none. */
+	uidGap(): BlockRange | null {
+		const row = this.#get<{ low: number | null; high: number | null }>(
+			"SELECT MIN(block) AS low, MAX(block) AS high FROM trades WHERE order_uid IS NULL"
+		)!;
+		return row.low === null || row.high === null ? null : { from: row.low, to: row.high };
+	}
+
+	/** Whether a block range holds trades stored without their order uid. */
+	tradesWithoutUid(range: BlockRange): boolean {
+		const row = this.#get(
+			"SELECT 1 FROM trades WHERE order_uid IS NULL AND block BETWEEN ? AND ? LIMIT 1",
+			range.from,
+			range.to
+		);
+		return row !== undefined;
+	}
+
+	/**
+	 * Gives each trade of a block range that lacks its order uid the uid of its Trade event, from
+	 * `uids` by `block:logIndex`; every such trade must be there. Returns how many it filled.
+	 */
+	fillOrderUids(range: BlockRange, uids: Map<string, string>): number {
+		let filled = 0;
+		this.#transaction(() => {
+			const rows = this.#all<{ block: number; logIndex: number }>(
+				`SELECT block, log_index AS logIndex FROM trades
+					WHERE order_uid IS NULL AND block BETWEEN ? AND ?`,
+				range.from,
+				range.to
+			);
+			for (const { block, logIndex } of rows) {
+				const uid = uids.get(`${block}:${logIndex}`);
+				if (uid === undefined)
+					throw new Error(`no Trade event at block ${block}, log ${logIndex}`);
+				this.#run(
+					`UPDATE trades SET order_uid = ${HASH} WHERE block = ? AND log_index = ?`,
+					uid,
+					block,
+					logIndex
+				);
+				filled++;
+			}
+		});
+		return filled;
+	}
+
+	// Orders and fees
+
+	/**
+	 * The orders traded in a block range that were never looked up, with the block of their latest
+	 * trade in it.
+	 */
+	unknownOrders(range: BlockRange): { uid: string; block: number }[] {
+		return this.#all(
+			`SELECT ${hexOf("t.order_uid")} AS uid, MAX(t.block) AS block FROM trades t
+				LEFT JOIN orders o ON o.uid = t.order_uid
+				WHERE t.block BETWEEN ? AND ? AND t.order_uid IS NOT NULL AND o.uid IS NULL
+				GROUP BY t.order_uid`,
+			range.from,
+			range.to
+		);
+	}
+
+	/** Stores looked-up orders; a null detail records an order CoW's order book lacks. */
+	saveOrders(orders: { uid: string; block: number; detail: OrderDetail | null }[]): void {
+		this.#transaction(() => {
+			for (const { uid, block, detail } of orders) {
+				const quote = detail?.quote ?? null;
+				this.#run(
+					`INSERT OR REPLACE INTO orders (uid, block, found, kind, app_class, partner_fees,
+						quote_solver, quote_verified, quote_sell_amount, quote_buy_amount, quote_fee_amount)
+						VALUES (${HASH}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					uid,
+					block,
+					Number(detail !== null),
+					detail?.kind ?? null,
+					detail?.appClass ?? null,
+					detail && detail.partnerFees.length > 0 ? detail.partnerFees.join(",") : null,
+					quote === null ? null : this.#addressId(quote.solver),
+					quote === null ? null : Number(quote.verified),
+					quote?.sellAmount ?? null,
+					quote?.buyAmount ?? null,
+					quote?.feeAmount ?? null
+				);
+			}
+		});
+	}
+
+	/** The trades of a block range whose fees were never looked up and whose order was, newest first. */
+	pendingFeeTrades(range: BlockRange): PendingFeeTrade[] {
+		return this.#all<{
+			uid: string;
+			block: number;
+			logIndex: number;
+			found: number;
+			partnerFees: string | null;
+		}>(
+			`SELECT ${hexOf("t.order_uid")} AS uid, t.block, t.log_index AS logIndex, o.found,
+				o.partner_fees AS partnerFees
+			FROM trades t JOIN orders o ON o.uid = t.order_uid
+			WHERE t.block BETWEEN ? AND ? AND t.fees_checked IS NULL
+			ORDER BY t.block DESC, t.log_index`,
+			range.from,
+			range.to
+		).map((row) => ({
+			uid: row.uid,
+			block: row.block,
+			logIndex: row.logIndex,
+			found: row.found === 1,
+			partnerFees:
+				row.partnerFees === null ? [] : (row.partnerFees.split(",") as FeePolicy[]),
+		}));
+	}
+
+	/**
+	 * Stores the protocol fees of trades of one order: each trade's fees (an empty list for none),
+	 * or null when they are unknown. The order's block moves up to its latest trade.
+	 */
+	saveTradeFees(
+		uid: string,
+		trades: { block: number; logIndex: number; fees: StoredFee[] | null }[]
+	): void {
+		this.#transaction(() => {
+			for (const { block, logIndex, fees } of trades) {
+				this.#run(
+					"DELETE FROM trade_fees WHERE block = ? AND log_index = ?",
+					block,
+					logIndex
+				);
+				(fees ?? []).forEach((fee, position) => {
+					this.#run(
+						`INSERT INTO trade_fees (block, log_index, position, policy, factor,
+							max_volume_factor, partner, amount, token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						block,
+						logIndex,
+						position,
+						fee.policy,
+						fee.factor,
+						fee.maxVolumeFactor,
+						fee.partner === null ? null : Number(fee.partner),
+						fee.amount,
+						this.#addressId(fee.token)
+					);
+				});
+				this.#run(
+					"UPDATE trades SET fees_checked = ? WHERE block = ? AND log_index = ?",
+					fees === null ? 0 : 1,
+					block,
+					logIndex
+				);
+				this.#run(
+					`UPDATE orders SET block = MAX(block, ?) WHERE uid = ${HASH}`,
+					block,
+					uid
+				);
+			}
+		});
+	}
+
+	/** Trades in a block range with their order's quote and their protocol fees, read one at a time. */
+	tradeDetails(range: BlockRange): IterableIterator<TradeDetailRow> {
+		return this.#iterate(
+			`SELECT tr.block, tr.log_index AS logIndex, tr.settlement_log_index AS settlementLogIndex,
+				so.address AS solver, a.auction_id AS auctionId, st.address AS sellToken,
+				bt.address AS buyToken, tr.sell_amount AS sellAmount, tr.buy_amount AS buyAmount,
+				o.found, qs.address AS quoteSolver, o.quote_verified AS quoteVerified,
+				tr.fees_checked AS feesChecked,
+				(SELECT GROUP_CONCAT(COALESCE(f.partner, '?') || ' ' || f.amount || ' ' || fa.address, ',')
+					FROM trade_fees f JOIN addresses fa ON fa.id = f.token
+					WHERE f.block = tr.block AND f.log_index = tr.log_index) AS fees
+			FROM trades tr
+				JOIN settlements s ON s.block = tr.block AND s.log_index = tr.settlement_log_index
+				JOIN addresses so ON so.id = s.solver
+				JOIN addresses st ON st.id = tr.sell_token
+				JOIN addresses bt ON bt.id = tr.buy_token
+				LEFT JOIN auction_txs a ON a.tx = s.tx
+				LEFT JOIN orders o ON o.uid = tr.order_uid
+				LEFT JOIN addresses qs ON qs.id = o.quote_solver
+			WHERE tr.block BETWEEN ? AND ?
+			ORDER BY tr.block, tr.log_index`,
+			range.from,
+			range.to
+		);
+	}
+
 	// Tokens and registry
 
 	symbols(): Map<string, string> {
@@ -760,6 +1136,26 @@ export class Store {
 		return row!.id;
 	}
 
+	/** Replaces an auction's solutions, scores included, in the API's order. */
+	#replaceSolutions(auctionId: number, solutions: Solution[]): void {
+		this.#run("DELETE FROM solutions WHERE auction_id = ?", auctionId);
+		solutions.forEach((s, position) => {
+			this.#run(
+				`INSERT INTO solutions (auction_id, position, solver, ranking, winner, tx, score,
+					reference_score, filtered_out) VALUES (?, ?, ?, ?, ?, ${HASH}, ?, ?, ?)`,
+				auctionId,
+				position,
+				this.#addressId(s.solver),
+				s.ranking,
+				Number(s.winner),
+				s.tx,
+				s.score,
+				s.referenceScore,
+				Number(s.filteredOut)
+			);
+		});
+	}
+
 	#statement(sql: string): StatementSync {
 		let statement = this.#statements.get(sql);
 		if (!statement) {
@@ -817,6 +1213,10 @@ export class Store {
 		this.#setMeta(`${name}_from`, String(range.from));
 		this.#setMeta(`${name}_to`, String(range.to));
 	}
+
+	#deleteRange(name: string): void {
+		this.#run("DELETE FROM meta WHERE key IN (?, ?)", `${name}_from`, `${name}_to`);
+	}
 }
 
 const TRADE_ROWS = `SELECT ${hexOf("s.tx")} AS tx, so.address AS solver,
@@ -832,5 +1232,6 @@ const TRADE_ROWS = `SELECT ${hexOf("s.tx")} AS tx, so.address AS solver,
 	LEFT JOIN auction_txs a ON a.tx = s.tx`;
 
 const SOLUTION_ROWS = `SELECT a.id AS auctionId, a.start_block AS startBlock, ad.address AS solver,
-	s.winner, CASE WHEN s.tx IS NULL THEN NULL ELSE ${hexOf("s.tx")} END AS tx
+	s.winner, CASE WHEN s.tx IS NULL THEN NULL ELSE ${hexOf("s.tx")} END AS tx,
+	s.filtered_out AS filteredOut
 	FROM auctions a JOIN solutions s ON s.auction_id = a.id JOIN addresses ad ON ad.id = s.solver`;

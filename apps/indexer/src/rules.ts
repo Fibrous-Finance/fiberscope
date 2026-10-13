@@ -45,25 +45,38 @@ export interface SettlementParties {
 }
 
 /**
- * The address credited with a settlement. The flash-loan router settles on behalf of the auction
- * winner, which calls it either from its own account or through its own contract, sent from
- * per-transaction helper accounts. So a router settlement goes to the transaction's recipient
- * when that is a registered or allow-listed solver other than the router itself; else to the
- * sender when it is registered or allow-listed; else to the competition's winning solution for
- * the transaction; and to the sender only if the competition is unknown too.
+ * How a settlement's credited address was chosen: the Settlement event's solver, or for a
+ * flash-loan router settlement the transaction's recipient or sender, CoW's winning solution, or
+ * the unverified sender.
+ */
+export type CreditSource = "event" | "recipient" | "sender" | "winner" | "unverified";
+
+/**
+ * The address credited with a settlement, and how it was chosen. The flash-loan router settles
+ * on behalf of the auction winner, which calls it either from its own account or through its own
+ * contract, sent from per-transaction helper accounts. So a router settlement goes to the
+ * transaction's recipient when that is a registered or allow-listed solver other than the router
+ * itself; else to the sender when it is registered or allow-listed; else to the competition's
+ * winning solution for the transaction; and to the sender only if the competition is unknown too.
  */
 export function creditedAddress(
 	settlement: SettlementParties,
 	isRegistered: (address: string) => boolean,
 	apiWinner: () => string | null
-): string {
-	if (settlement.solver !== ROUTER) return settlement.solver;
+): { address: string; source: CreditSource } {
+	if (settlement.solver !== ROUTER) return { address: settlement.solver, source: "event" };
 	const { recipient, sender } = settlement;
 	if (recipient !== null && recipient !== ROUTER) {
-		if (settlement.recipientIsSolver || isRegistered(recipient)) return recipient;
+		if (settlement.recipientIsSolver || isRegistered(recipient)) {
+			return { address: recipient, source: "recipient" };
+		}
 	}
-	if (settlement.senderIsSolver || isRegistered(sender)) return sender;
-	return apiWinner() ?? sender;
+	if (settlement.senderIsSolver || isRegistered(sender))
+		return { address: sender, source: "sender" };
+	const winner = apiWinner();
+	return winner === null
+		? { address: sender, source: "unverified" }
+		: { address: winner, source: "winner" };
 }
 
 /** The token whose native price values `token`: native ETH is priced as WETH. */

@@ -47,7 +47,7 @@
 		},
 		"entered": {
 			"term": "Entered",
-			"text": "Share of the window’s auctions in which the solver submitted at least one solution. Only auctions that ended in a settlement count. “Average solver” is the mean Entered share among the table’s solvers that entered at least one auction."
+			"text": "Share of the window’s auctions in which the solver submitted at least one solution, counting solutions CoW filtered out. Only auctions that ended in a settlement count. “Average solver” is the mean Entered share among the table’s solvers that entered at least one auction."
 		},
 		"winRate": {
 			"term": "Win rate",

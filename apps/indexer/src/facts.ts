@@ -9,7 +9,7 @@ import {
 	tradeSurplus,
 	tradeVolumeUsd,
 } from "./rules.ts";
-import type { BlockRange, TradeSurplus } from "./rules.ts";
+import type { BlockRange, CreditSource, TradeSurplus } from "./rules.ts";
 import type { SolutionRow, Store, TradeValueRow } from "./store.ts";
 
 /** Stored rows turned into methodology facts, shared by the snapshot and the window report. */
@@ -20,6 +20,8 @@ export interface Batch {
 	block: number;
 	/** The credited submission address. */
 	address: string;
+	/** How that address was chosen (see creditedAddress). */
+	credit: CreditSource;
 	solver: SolverIdentity;
 	viaRouter: boolean;
 	trades: number;
@@ -39,7 +41,7 @@ export function* creditedBatches(
 ): Generator<Batch> {
 	const points = store.ethUsdPoints();
 	for (const row of store.batchRows(range)) {
-		const address = creditedAddress(
+		const credited = creditedAddress(
 			{
 				solver: row.solver,
 				sender: row.sender,
@@ -51,11 +53,13 @@ export function* creditedBatches(
 			() => store.apiWinner(row.tx)
 		);
 		const ethUsd = ethUsdAt(points, row.block);
+		const address = credited.address;
 		yield {
 			tx: row.tx,
 			logIndex: row.logIndex,
 			block: row.block,
 			address,
+			credit: credited.source,
 			solver: registry.identify(address),
 			viaRouter: row.solver === ROUTER,
 			trades: row.trades,

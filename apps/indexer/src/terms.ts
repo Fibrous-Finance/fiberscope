@@ -217,6 +217,12 @@ function execution(call: SettleCall, trade: CalldataTrade): Execution | null {
 	};
 }
 
+/** A trade's order terms with the signed trade from the settle() call that reproduced it. */
+export interface SignedTrade {
+	terms: OrderTerms;
+	signed: CalldataTrade;
+}
+
 /**
  * The order terms of a transaction's trades, by trade log index. Each settlement, its trades in
  * log order, takes the first unused settle() call of the input whose trades execute to exactly
@@ -224,6 +230,13 @@ function execution(call: SettleCall, trade: CalldataTrade): Execution | null {
  * settle() call. A settlement no call reproduces gets no terms.
  */
 export function readOrderTerms(input: string, trades: TradeFacts[]): Map<number, OrderTerms> {
+	return new Map(
+		[...readSignedTrades(input, trades)].map(([logIndex, { terms }]) => [logIndex, terms])
+	);
+}
+
+/** As readOrderTerms, with each trade's signed trade (its kind, flags and signed fee). */
+export function readSignedTrades(input: string, trades: TradeFacts[]): Map<number, SignedTrade> {
 	// Log order puts each settlement's trades together, settlements in the order they ran.
 	const settlements = new Map<number, TradeFacts[]>();
 	for (const trade of [...trades].sort((a, b) => a.logIndex - b.logIndex)) {
@@ -233,23 +246,23 @@ export function readOrderTerms(input: string, trades: TradeFacts[]): Map<number,
 	}
 	const calls = settleCalls(input);
 	const used = new Set<SettleCall>();
-	const terms = new Map<number, OrderTerms>();
+	const signed = new Map<number, SignedTrade>();
 	for (const settled of settlements.values()) {
 		for (const call of calls) {
 			if (used.has(call)) continue;
 			const matched = match(call, settled);
 			if (matched === null) continue;
 			used.add(call);
-			settled.forEach((trade, i) => terms.set(trade.logIndex, matched[i]));
+			settled.forEach((trade, i) => signed.set(trade.logIndex, matched[i]));
 			break;
 		}
 	}
-	return terms;
+	return signed;
 }
 
-function match(call: SettleCall, settled: TradeFacts[]): OrderTerms[] | null {
+function match(call: SettleCall, settled: TradeFacts[]): SignedTrade[] | null {
 	if (call.trades.length !== settled.length) return null;
-	const terms: OrderTerms[] = [];
+	const matched: SignedTrade[] = [];
 	for (let i = 0; i < settled.length; i++) {
 		const trade = call.trades[i];
 		const executed = execution(call, trade);
@@ -263,11 +276,14 @@ function match(call: SettleCall, settled: TradeFacts[]): OrderTerms[] | null {
 		) {
 			return null;
 		}
-		terms.push({
-			limitSellAmount: trade.sellAmount.toString(),
-			limitBuyAmount: trade.buyAmount.toString(),
-			feeAmount: executed.feeAmount.toString(),
+		matched.push({
+			terms: {
+				limitSellAmount: trade.sellAmount.toString(),
+				limitBuyAmount: trade.buyAmount.toString(),
+				feeAmount: executed.feeAmount.toString(),
+			},
+			signed: trade,
 		});
 	}
-	return terms;
+	return matched;
 }

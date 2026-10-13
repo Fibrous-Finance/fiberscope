@@ -2,6 +2,7 @@ import { mkdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import { parseArgs } from "node:util";
 
+import { attributionReport, termsReport } from "./checks.ts";
 import { DEFAULT_DB_PATH, DEFAULT_SNAPSHOT_PATH, type Env, NETWORK, readEnv } from "./config.ts";
 import { CowApi } from "./cow.ts";
 import { duration, fmt, log } from "./log.ts";
@@ -31,6 +32,13 @@ const USAGE = `Usage:
       Write the snapshot JSON (default ${relative(process.cwd(), DEFAULT_SNAPSHOT_PATH)}).
   node src/cli.ts window --from <block> --to <block>
       Print totals and the per-solver table for a block range, from the database.
+  node src/cli.ts attribution --from <block> --to <block>
+      Check, from the database, that every batch in a block range is credited to the solver of
+      the winning solution that settled its transaction in CoW's competition data.
+  node src/cli.ts terms --from <block> --to <block> [--sample N]
+      Check the order terms read from settle() calldata: for N trades (default 90) spread over
+      the range, decode the transaction again, compare the fee with its Trade event, and compare
+      the order with CoW's order book.
   node src/cli.ts seed --url <url>
       Download a database from <url> when there is none yet, e.g. to move the indexer to a new
       host without indexing again. It is integrity-checked before it is used.
@@ -53,6 +61,7 @@ async function main(): Promise<void> {
 			out: { type: "string" },
 			from: { type: "string" },
 			to: { type: "string" },
+			sample: { type: "string" },
 			db: { type: "string" },
 			url: { type: "string" },
 			help: { type: "boolean", short: "h" },
@@ -116,12 +125,21 @@ async function main(): Promise<void> {
 		} else if (command === "snapshot") {
 			const rpc = new Rpc(env.rpcUrl, env.rpcRps);
 			await writeSnapshot(store, rpc, env, values.out ?? DEFAULT_SNAPSHOT_PATH);
-		} else if (command === "window") {
+		} else if (command === "window" || command === "attribution" || command === "terms") {
 			const from = wholeNumber(values.from, "from", null);
 			const to = wholeNumber(values.to, "to", null);
 			if (from > to) throw new Error("--from must not be after --to");
 			const registry = new Registry(store.cmsEntries(), OVERRIDES);
-			process.stdout.write(windowReport(store, registry, { from, to }));
+			const range = { from, to };
+			if (command === "window") process.stdout.write(windowReport(store, registry, range));
+			else if (command === "attribution") {
+				process.stdout.write(attributionReport(store, registry, range));
+			} else {
+				const rpc = new Rpc(env.rpcUrl, env.rpcRps);
+				const cow = new CowApi(NETWORK.cowApi, env.cowApiRps);
+				const sample = wholeNumber(values.sample, "sample", 90);
+				process.stdout.write(await termsReport(store, rpc, cow, range, sample));
+			}
 		} else {
 			throw new Error(`unknown command "${command}"\n\n${USAGE}`);
 		}

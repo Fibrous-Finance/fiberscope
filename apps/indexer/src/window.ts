@@ -28,19 +28,7 @@ interface Row {
  * auctions that started inside it.
  */
 export function windowReport(store: Store, registry: Registry, range: BlockRange): string {
-	const iso = (block: number) => new Date(timeOf(block) * 1000).toISOString().replace(".000", "");
-	const out = [
-		`Window     blocks ${range.from}..${range.to}, ${iso(range.from)} → ${iso(range.to)}`,
-	];
-	for (const [label, covered] of [
-		["chain", store.chainRange()],
-		["auction", store.auctionRange()],
-	] as const) {
-		if (covered === null || covered.from > range.from || covered.to < range.to) {
-			const has = covered ? `${covered.from}..${covered.to}` : "nothing";
-			out.push(`WARNING    ${label} data covers ${has}, not the whole window`);
-		}
-	}
+	const out = [windowLine(range), ...coverageWarnings(store, range, ["chain", "auction"])];
 
 	const rows = new Map<string, Row>();
 	const row = (identity: SolverIdentity): Row => {
@@ -67,6 +55,7 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 	let routed = 0;
 	let uncosted = 0;
 	let gas = 0;
+	let swaps = 0;
 	let cost = 0;
 	// Trades follow their batch's credit: a router batch's by its block and log index, any other
 	// to the solver that settled it.
@@ -79,6 +68,7 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		entry.cost += batch.cost ?? 0;
 		batches++;
 		gas += batch.gas;
+		swaps += batch.swaps;
 		cost += batch.cost ?? 0;
 		if (batch.cost === null) uncosted++;
 		if (batch.viaRouter) {
@@ -144,6 +134,7 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 			`${fmt(store.zeroTradeSettlements(range))} zero-trade settlements excluded)`,
 		`Trades     ${fmt(trades)} (${fmt(trades - unpriced - oneSided)} priced on both sides, ` +
 			`${fmt(oneSided)} on one side, ${fmt(unpriced)} unpriced)`,
+		`DEX swaps  ${fmt(swaps)} (${trades === 0 ? "—" : (swaps / trades).toFixed(2)} per trade)`,
 		`Volume     $${fmt(volume)}`,
 		`Surplus    $${fmt(surplus)} over ${fmt(surplusTrades)} priced trades with order terms ` +
 			`(${usdPer(surplus, surplusTrades)} per trade, ${bps} bps of their volume); ` +
@@ -199,6 +190,29 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		out.push(line.join("  ").trimEnd());
 	}
 	return `${out.join("\n")}\n`;
+}
+
+/** A report's first line: the block range and its times. */
+export function windowLine(range: BlockRange): string {
+	const iso = (block: number) => new Date(timeOf(block) * 1000).toISOString().replace(".000", "");
+	return `Window     blocks ${range.from}..${range.to}, ${iso(range.from)} → ${iso(range.to)}`;
+}
+
+/** A warning for each kind of data that does not cover the whole range. */
+export function coverageWarnings(
+	store: Store,
+	range: BlockRange,
+	kinds: ("chain" | "auction")[]
+): string[] {
+	const warnings: string[] = [];
+	for (const kind of kinds) {
+		const covered = kind === "chain" ? store.chainRange() : store.auctionRange();
+		if (covered === null || covered.from > range.from || covered.to < range.to) {
+			const has = covered ? `${covered.from}..${covered.to}` : "nothing";
+			warnings.push(`WARNING    ${kind} data covers ${has}, not the whole window`);
+		}
+	}
+	return warnings;
 }
 
 /** Gas per trade as Σgas ÷ Σtrades, in thousands. */

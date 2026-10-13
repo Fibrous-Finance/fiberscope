@@ -17,6 +17,10 @@ Every figure comes from public data on Base and from CoW Protocol's public servi
 | Chainlink ETH/USD on Base (`0x71041dddad3595f9ced3dccfbe3d1f4b0a16bb70`)                                                            | The dollar rate at each settlement: the latest answer at or before its block                                                    |
 | ERC-20 `symbol()`                                                                                                                   | Token symbols for the latest settlements' pairs                                                                                 |
 
+Only the production settlement contract is read. CoW's barn (staging) environment settles through
+a separate contract, `0xf553d092b50bdcbdded1a99af2ca29fbe5e2cb13`, so barn's settlements are not
+counted.
+
 ## Days, windows and coverage
 
 - **Rolling days.** Time is cut into 24-hour days that end at the newest block in the data, not at
@@ -182,18 +186,25 @@ including inactive solvers and solvers without settlements.
 
 ## Validation
 
-**Against CoW's Dune dashboard.** For blocks 50,409,187–51,705,186 (the 30 days to 23 Sep 2026 at
-21:42 UTC), the Base figures read from CoW's [Solver Info](https://dune.com/cowprotocol/solver-info)
-dashboard for that window and Fiberscope's figures for the same blocks differ by about 0.1%:
+**Against CoW's Dune dashboard.** CoW's [Solver Info](https://dune.com/cowprotocol/solver-info)
+dashboard, as run on 23 Sep 2026 for 30 days on Base, covers blocks 50,413,327–51,705,186 (25 Aug
+2026 at 00:00 UTC to 23 Sep at 21:42 UTC): its window starts at midnight UTC. Its table
+[V2: Ranked Active Solvers](https://dune.com/queries/1756858) also counts the settlements of CoW's
+staging settlement contract, which Fiberscope does not read (see [Data sources](#data-sources)):
+69 in these blocks, from the barn addresses of six solvers. Set those aside and every figure
+matches Fiberscope's for the same blocks exactly, for each of the 22 solvers and in total:
 
-| Measure   | Dune    | Fiberscope | Difference |
-| --------- | ------- | ---------- | ---------- |
-| Batches   | 76,873  | 76,954     | +0.11%     |
-| Trades    | 80,808  | 80,892     | +0.10%     |
-| DEX swaps | 116,034 | 116,166    | +0.11%     |
-| Gas/trade | 730.6K  | 730.7K     | +0.01%     |
+| Measure   | Dune           | Staging contract | Dune, production contract | Fiberscope     |
+| --------- | -------------- | ---------------- | ------------------------- | -------------- |
+| Batches   | 76,873         | 69               | 76,804                    | 76,804         |
+| Trades    | 80,808         | 69               | 80,739                    | 80,739         |
+| DEX swaps | 116,034        | 86               | 115,948                   | 115,948        |
+| Gas       | 59,036,427,079 | 29,912,162       | 59,006,514,917            | 59,006,514,917 |
 
-A recount from the Base RPC for five solvers matched the database exactly.
+A recount from the Base RPC of the production contract's `Settlement` events in these blocks
+matched the database exactly: 77,289, of which 485 hold no trades and are not batches. An earlier
+version of this comparison started at block 50,409,187 (24 Aug at 21:42 UTC), 2 hours and 18
+minutes before the dashboard's window, and reported differences of about 0.1%.
 
 **Attribution against CoW's competition data.** For blocks 51,811,228–52,115,823 (26 Sep 2026 at
 08:36 UTC to 3 Oct 2026 at 09:49 UTC), all 24,534 batches had a winning solution for their

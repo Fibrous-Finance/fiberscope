@@ -15,6 +15,10 @@ COPY apps/indexer apps/indexer
 RUN pnpm install --frozen-lockfile --prod --filter @fiberscope/indexer...
 
 ENV DB_PATH=/data/base.db
+# The commit the image is built from, written into every snapshot and linked in the page's footer:
+# docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD) ... from a clean checkout of that commit.
+ARG GIT_COMMIT=""
+ENV GIT_COMMIT=$GIT_COMMIT
 # --budget-minutes matches loop.sh's default REFRESH_MINUTES (10); change them together. --prune
 # keeps the database at the depths the page shows.
 CMD ["sh", "apps/indexer/loop.sh", "--snapshot", "/data/snapshot.json", "--chain-days", "180", "--auction-days", "90", "--budget-minutes", "10", "--prune"]

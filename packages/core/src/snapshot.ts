@@ -14,6 +14,11 @@ export interface Snapshot {
 	network: NetworkId;
 	/** When this file was written (Unix ms). */
 	builtAt: number;
+	/**
+	 * The commit (full hash) of the indexer code that wrote this file; absent when its build did
+	 * not record one. The page links it in the footer.
+	 */
+	commit?: string;
 	/** The last indexed block and its timestamp (Unix ms). Every window ends here. */
 	end: { block: number; time: number };
 	/**

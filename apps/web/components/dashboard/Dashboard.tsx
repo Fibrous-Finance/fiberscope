@@ -207,7 +207,7 @@ export function Dashboard({
 						) : null}
 						<Methodology />
 					</main>
-					<Footer />
+					<Footer dataCommit={snapshot?.commit} />
 				</div>
 			</HoverContext>
 		</DashboardContext>

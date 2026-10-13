@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
 	poweredByHeader: false,
 	reactCompiler: true,
 	transpilePackages: ["@fiberscope/core"],
+	// The commit this build comes from, inlined at build time and linked in the footer.
+	// deploy.yml sets SITE_COMMIT to the commit it deploys; other builds leave it empty and the
+	// footer leaves the line out.
+	env: { SITE_COMMIT: process.env.SITE_COMMIT ?? "" },
 	// The Worker's own workers.dev address was the public link before fiberscope.org (the README
 	// until #31), so its pages answer with a permanent redirect to the domain, query string
 	// included. Pull-request previews (pr-<number>-fiberscope.kermo.workers.dev) don't match. The

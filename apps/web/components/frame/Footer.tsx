@@ -1,17 +1,30 @@
+import type { ReactNode } from "react";
+
 import { useTranslations } from "next-intl";
 
 import { Logo } from "@/components/frame/Logo";
 import { arrow } from "@/components/ui/Section";
 
 const SOURCE_URL = "https://github.com/Fibrous-Finance/fiberscope";
+/** The commit this build comes from (see `env` in next.config.ts); empty outside deploys. */
+const SITE_COMMIT = process.env.SITE_COMMIT ?? "";
 
 /**
  * The same footer on every page. The Fibrous credit sits in the small print, the one place the
  * builder is named, and says that Fibrous also runs a solver. Its mark is monochrome, in the link's
  * colour: teal is the page's accent for hover and selection, never a solver's. Compact:
- * everything stacks on the left and every link is a 44px target.
+ * everything stacks on the left and every link is a 44px target. The small print names the
+ * commits behind the page and its data, so anyone can check them against the source.
  */
-export function Footer({ away }: { /** On pages other than the overview. */ away?: boolean }) {
+export function Footer({
+	away,
+	dataCommit,
+}: {
+	/** On pages other than the overview. */
+	away?: boolean;
+	/** The commit of the code that prepared the data (the snapshot's `commit`), if known. */
+	dataCommit?: string;
+}) {
 	const t = useTranslations("Footer");
 	return (
 		<footer
@@ -46,6 +59,16 @@ export function Footer({ away }: { /** On pages other than the overview. */ away
 				<p className="flex max-w-[640px] flex-col gap-0.5 text-fa">
 					<span>{t("dataSources")}</span>
 					<span>{t("independent")}</span>
+					{SITE_COMMIT && (
+						<span>
+							{t.rich(dataCommit ? "commits" : "commit", {
+								site: SITE_COMMIT.slice(0, 7),
+								data: dataCommit?.slice(0, 7) ?? "",
+								siteLink: (chunks) => commitLink(SITE_COMMIT, chunks),
+								dataLink: (chunks) => commitLink(dataCommit ?? "", chunks),
+							})}
+						</span>
+					)}
 				</p>
 				<a
 					href="https://fibrous.finance"
@@ -63,5 +86,19 @@ export function Footer({ away }: { /** On pages other than the overview. */ away
 				</a>
 			</div>
 		</footer>
+	);
+}
+
+/** A short hash linked to its commit; the padding makes it a 44px target without moving the line. */
+function commitLink(commit: string, chunks: ReactNode) {
+	return (
+		<a
+			href={`${SOURCE_URL}/commit/${commit}`}
+			target="_blank"
+			rel="noopener"
+			className="py-3.5 font-mono quiet"
+		>
+			{chunks}
+		</a>
 	);
 }

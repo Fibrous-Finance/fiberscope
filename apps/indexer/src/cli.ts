@@ -36,9 +36,10 @@ const USAGE = `Usage:
       host without indexing again. It is integrity-checked before it is used.
 
 Every command takes --db <path> (default DB_PATH, else ${relative(process.cwd(), DEFAULT_DB_PATH)}).
-Environment: BASE_RPC_URL, BASE_RPC_RPS, COW_API_RPS, REFRESH_MINUTES. With SNAPSHOT_R2_BUCKET
-(plus CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and optionally SNAPSHOT_R2_KEY,
-default ${NETWORK.id}/snapshot.json) every snapshot written is also uploaded to that R2 bucket.
+Environment: BASE_RPC_URL, BASE_RPC_RPS, COW_API_RPS, REFRESH_MINUTES, GIT_COMMIT. With
+SNAPSHOT_R2_BUCKET (plus CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and
+optionally SNAPSHOT_R2_KEY, default ${NETWORK.id}/snapshot.json) every snapshot written is also
+uploaded to that R2 bucket.
 `;
 
 async function main(): Promise<void> {
@@ -141,6 +142,7 @@ async function writeSnapshot(store: Store, rpc: Rpc, env: Env, out: string): Pro
 		store,
 		registry: new Registry(store.cmsEntries(), OVERRIDES),
 		refreshMinutes: env.refreshMinutes,
+		commit: env.commit,
 		symbols: (tokens) => resolveSymbols(rpc, store, tokens),
 	});
 	const json = JSON.stringify(snapshot);

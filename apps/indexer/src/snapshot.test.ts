@@ -191,6 +191,7 @@ async function build(): Promise<Snapshot> {
 		store,
 		registry: new Registry(CMS, OVERRIDES),
 		refreshMinutes: 10,
+		commit: null,
 		symbols: async () =>
 			new Map([
 				[USDC, "USDC"],

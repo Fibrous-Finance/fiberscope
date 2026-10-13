@@ -53,6 +53,11 @@ export interface Env {
 	refreshMinutes: number;
 	/** Where snapshots are uploaded besides the local file; null without SNAPSHOT_R2_BUCKET. */
 	upload: R2Target | null;
+	/**
+	 * GIT_COMMIT: the full hash of the commit the indexer was built from, written into every
+	 * snapshot; null when unset. The Docker image sets it from its GIT_COMMIT build argument.
+	 */
+	commit: string | null;
 }
 
 export function readEnv(env: NodeJS.ProcessEnv = process.env): Env {
@@ -63,6 +68,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): Env {
 		cowApiRps: positive(env, "COW_API_RPS", 3),
 		refreshMinutes: positive(env, "REFRESH_MINUTES", 10),
 		upload: r2Target(env),
+		commit: commit(env),
 	};
 }
 
@@ -79,6 +85,15 @@ function r2Target(env: NodeJS.ProcessEnv): R2Target | null {
 	}
 	const key = env.SNAPSHOT_R2_KEY || `${NETWORK.id}/snapshot.json`;
 	return { accountId, bucket, key, accessKeyId, secretAccessKey };
+}
+
+function commit(env: NodeJS.ProcessEnv): string | null {
+	const value = env.GIT_COMMIT;
+	if (!value) return null;
+	if (!/^[0-9a-f]{40}$/.test(value)) {
+		throw new Error(`GIT_COMMIT must be a full lowercase commit hash, got "${value}"`);
+	}
+	return value;
 }
 
 function positive(env: NodeJS.ProcessEnv, name: string, fallback: number): number {

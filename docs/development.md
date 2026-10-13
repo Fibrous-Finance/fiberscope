@@ -117,10 +117,12 @@ downloads the database with `seed`.
 | `SEED_DB_URL`                                                       | indexer | With `loop.sh`, download the database from this URL when `DB_PATH` does not exist                                                                                                                                           |
 | `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                                                                                                                                |
 | `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | indexer | The account, and the S3 credentials of an R2 API token with Object Read & Write on that bucket only                                                                                                                         |
+| `GIT_COMMIT`                                                        | indexer | The full commit hash for the indexer's code, recorded in every snapshot. The page's footer links to it when `SITE_COMMIT` is also set. The Docker image sets this variable from its `GIT_COMMIT` build argument             |
 | `SNAPSHOT_R2_KEY`                                                   | both    | The snapshot's object key: where the indexer uploads it (default `base/snapshot.json`) and what the site reads through its `SNAPSHOTS` binding. If `SNAPSHOT_R2_KEY` is unset, the site reads the local file                |
 | `SNAPSHOT_PATH`                                                     | web     | The local snapshot file when `SNAPSHOT_R2_KEY` is unset (default `apps/web/data/snapshot.json`)                                                                                                                             |
 | `SITE_URL`                                                          | web     | The site's origin (default `http://localhost:3000`): absolute link-preview URLs, the canonical link, the sitemap, and the one host search engines may index                                                                 |
 | `ALLOW_INDEXING`                                                    | web     | `true` lets search engines index requests to `SITE_URL`'s host; other hosts, pull-request previews included, stay `noindex`. Without it, every page is `noindex`                                                            |
+| `SITE_COMMIT`                                                       | web     | The site's commit hash, supplied at build time and linked in the footer. `deploy.yml` sets it to the commit being deployed. If unset, the footer shows no commit links                                                      |
 
 On Cloudflare, the site's variables come from `vars` in `apps/web/wrangler.jsonc`.
 
@@ -136,6 +138,8 @@ site; the indexer writes it and the site derives every view from it with the vie
   gas and transaction cost; `auctionDays` for volume, entries and wins; `surplusDays` for surplus.
 - `solvers` holds each solver's identity, addresses and daily series, and its latest settlements;
   `auctions`, `latestAuctions`, `latestSettlements` and `registry` hold the rest of the page.
+- When `GIT_COMMIT` is set, `commit` records the commit hash for the indexer's code. The page's
+  footer links to it alongside the site's own commit when `SITE_COMMIT` is also set.
 - `schema` is `1`. Additive changes keep it; a breaking change bumps it, and the site refuses a
   snapshot whose schema it does not know.
 
@@ -216,8 +220,9 @@ zone's settings change:
 
 ### Previews
 
-`.github/workflows/deploy.yml` deploys `main` on every push. For every pull request from a branch
-of this repository it uploads a preview version, which leaves production untouched, at
+On each push to `main`, `.github/workflows/deploy.yml` builds and deploys the site with
+`SITE_COMMIT` set to that commit. The page's footer links to that commit. For every pull request
+from a branch of this repository it uploads a preview version, which leaves production untouched, at
 `https://pr-<number>-fiberscope.<subdomain>.workers.dev`, and links it in a comment on the pull
 request. It needs the `CLOUDFLARE_API_TOKEN` (an "Edit Cloudflare Workers" token) and
 `CLOUDFLARE_ACCOUNT_ID` secrets, and the comment needs the `CLOUDFLARE_WORKERS_SUBDOMAIN` variable.
@@ -233,10 +238,12 @@ Manage API tokens); the indexer signs S3 requests with the token's S3 credential
 nowhere else in the account.
 
 `apps/indexer/Dockerfile` builds an image that runs `loop.sh` with 180 days of settlements, 90 days
-of auctions, a 10-minute budget and `--prune`. Build it from the repository root:
+of auctions, a 10-minute budget and `--prune`. Build the image from the repository root, using a
+clean checkout of the commit you want to run. Pass that commit as the `GIT_COMMIT` build argument
+so every snapshot records it and the page's footer can link to it.
 
 ```sh
-docker build -f apps/indexer/Dockerfile -t fiberscope-indexer .
+docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD) -f apps/indexer/Dockerfile -t fiberscope-indexer .
 docker run -v fiberscope-data:/data --env-file apps/indexer/.env fiberscope-indexer
 ```
 

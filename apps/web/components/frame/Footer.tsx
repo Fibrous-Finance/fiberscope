@@ -1,17 +1,35 @@
+import type { ReactNode } from "react";
+
 import { useTranslations } from "next-intl";
 
 import { Logo } from "@/components/frame/Logo";
 import { arrow } from "@/components/ui/Section";
 
 const SOURCE_URL = "https://github.com/Fibrous-Finance/fiberscope";
+/** The commit this build comes from (see `env` in next.config.ts); empty outside deploys. */
+const SITE_COMMIT = process.env.SITE_COMMIT ?? "";
+/**
+ * A sentence of the code-version line: wide pages keep both on one line; in compact mode each is
+ * its own 44px line, so the two links' 44px targets never overlap.
+ */
+const SENTENCE = "max-wide:block max-wide:leading-11";
 
 /**
  * The same footer on every page. The Fibrous credit sits in the small print, the one place the
  * builder is named, and says that Fibrous also runs a solver. Its mark is monochrome, in the link's
  * colour: teal is the page's accent for hover and selection, never a solver's. Compact:
- * everything stacks on the left and every link is a 44px target.
+ * everything stacks on the left and every link is a 44px target. The small print names the
+ * commits behind the page and its data, so anyone can check them against the source.
  */
-export function Footer({ away }: { /** On pages other than the overview. */ away?: boolean }) {
+export function Footer({
+	away,
+	dataCommit,
+}: {
+	/** On pages other than the overview. */
+	away?: boolean;
+	/** The commit of the code that prepared the data (the snapshot's `commit`), if known. */
+	dataCommit?: string;
+}) {
 	const t = useTranslations("Footer");
 	return (
 		<footer
@@ -46,6 +64,27 @@ export function Footer({ away }: { /** On pages other than the overview. */ away
 				<p className="flex max-w-[640px] flex-col gap-0.5 text-fa">
 					<span>{t("dataSources")}</span>
 					<span>{t("independent")}</span>
+					{SITE_COMMIT && (
+						<span>
+							<span className={SENTENCE}>
+								{t.rich("commit", {
+									site: SITE_COMMIT.slice(0, 7),
+									siteLink: (chunks) => commitLink(SITE_COMMIT, chunks),
+								})}
+							</span>
+							{dataCommit && (
+								<>
+									{" "}
+									<span className={SENTENCE}>
+										{t.rich("dataCommit", {
+											data: dataCommit.slice(0, 7),
+											dataLink: (chunks) => commitLink(dataCommit, chunks),
+										})}
+									</span>
+								</>
+							)}
+						</span>
+					)}
 				</p>
 				<a
 					href="https://fibrous.finance"
@@ -63,5 +102,22 @@ export function Footer({ away }: { /** On pages other than the overview. */ away
 				</a>
 			</div>
 		</footer>
+	);
+}
+
+/**
+ * A short hash linked to its commit. Its hit area moves nothing: 4px of vertical padding on wide
+ * pages (24px), and in compact mode its sentence's whole 44px line.
+ */
+function commitLink(commit: string, chunks: ReactNode) {
+	return (
+		<a
+			href={`${SOURCE_URL}/commit/${commit}`}
+			target="_blank"
+			rel="noopener"
+			className="py-1 font-mono quiet max-wide:inline-block max-wide:py-0 max-wide:leading-11"
+		>
+			{chunks}
+		</a>
 	);
 }

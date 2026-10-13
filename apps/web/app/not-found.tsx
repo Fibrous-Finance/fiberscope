@@ -37,7 +37,7 @@ export default async function NotFound() {
 						{t.rich("back", { arrow })}
 					</Link>
 				</main>
-				<Footer away />
+				<Footer away dataCommit={result.ok ? result.snapshot.commit : undefined} />
 			</div>
 		</>
 	);

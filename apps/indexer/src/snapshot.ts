@@ -25,6 +25,8 @@ export interface SnapshotOptions {
 	store: Store;
 	registry: Registry;
 	refreshMinutes: number;
+	/** The indexer's commit, written into the snapshot; null when unknown. */
+	commit: string | null;
 	/** Token symbols by address, for the given tokens; it may fetch the ones it lacks. */
 	symbols: (tokens: string[]) => Promise<Map<string, string>>;
 }
@@ -301,6 +303,7 @@ export async function buildSnapshot(
 		schema: 1,
 		network: NETWORK.id,
 		builtAt: Date.now(),
+		commit: options.commit ?? undefined,
 		end: { block: end, time: timeOf(end) * 1000 },
 		lastRunAt,
 		refreshMinutes: options.refreshMinutes,

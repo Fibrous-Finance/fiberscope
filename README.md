@@ -76,9 +76,10 @@ Cloudflare Worker, reads the snapshot from R2 and derives every window, share an
 
 ## Accuracy
 
-Over 30 days of Base blocks, batches, trades, DEX swaps and gas per trade agree with CoW's own Dune
-dashboard to within about 0.1%. Over a week, every batch was credited to the solver that CoW's
-competition data names as its winner, and the order terms behind surplus match CoW's order book.
+Over 30 days of Base blocks, batches, trades, DEX swaps and gas match CoW's own Dune dashboard
+exactly, for every solver, once the dashboard's settlements through CoW's staging contract are set
+aside. Over a week, every batch was credited to the solver that CoW's competition data names as its
+winner, and the order terms behind surplus match CoW's order book.
 The figures are in [Validation](docs/methodology.md#validation); every definition is in
 [docs/methodology.md](docs/methodology.md).
 

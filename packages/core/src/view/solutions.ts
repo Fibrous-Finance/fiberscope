@@ -110,6 +110,79 @@ export function auctionSolutions(snapshot: Snapshot, id: number): AuctionSolutio
 	};
 }
 
+/**
+ * Which of the solutions' sentences (`enter.solutions.<outcome>`) tells how the auction went: no
+ * winner; a single solution, which won; one winner and how far below it the best rival scored,
+ * or a tie; one winner whose rivals the filter all removed; one winner with no rival to measure
+ * (only its own solutions, or no score to measure against); several winners.
+ */
+export type AuctionOutcome =
+	"none" | "oneSolution" | "single" | "singleTie" | "singleNoRival" | "singleOnly" | "multi";
+
+export function auctionOutcome(auction: AuctionSolutions): AuctionOutcome {
+	const { winners, rival } = auction;
+	if (winners.length === 0) return "none";
+	if (winners.length > 1) return "multi";
+	if (auction.solutions === 1) return "oneSolution";
+	if (rival) return rival.gap <= 0 ? "singleTie" : "single";
+	// No rival: either the filter removed every other solver's solutions, or there is nothing to
+	// say about them.
+	const others = auction.rows.filter((row) => !row.solutions.some((s) => s.winner));
+	return others.length > 0 && others.every((row) => row.solutions.every((s) => s.filteredOut))
+		? "singleNoRival"
+		: "singleOnly";
+}
+
+/**
+ * How the solutions' sentence (`enter.solutions.<kind>`) names the solutions the fairness filter
+ * removed.
+ */
+export interface FilteredOutcome {
+	/**
+	 * One solver's only solution, some of its solutions, both of its two or all of its three or
+	 * more; or solutions from several solvers.
+	 */
+	kind: "filteredOne" | "filteredSome" | "filteredBoth" | "filteredAll" | "filteredMany";
+	/** The solvers whose solutions it removed, in row order. */
+	solvers: SolverRef[];
+	/** The solutions it removed. */
+	count: number;
+	/** Every solution of those solvers. */
+	total: number;
+}
+
+/** The filtered-out solutions as the sentence names them; null when the filter removed none. */
+export function filteredOutcome(auction: AuctionSolutions): FilteredOutcome | null {
+	const { filtered } = auction;
+	if (filtered.length === 0) return null;
+	const count = filtered.reduce((sum, f) => sum + f.filtered, 0);
+	const total = filtered.reduce((sum, f) => sum + f.solutions, 0);
+	const kind =
+		filtered.length > 1
+			? "filteredMany"
+			: count < total
+				? "filteredSome"
+				: total === 1
+					? "filteredOne"
+					: total === 2
+						? "filteredBoth"
+						: "filteredAll";
+	return { kind, solvers: filtered.map((f) => f.solver), count, total };
+}
+
+/**
+ * What a solution's "Below winner" says: it won, the filter removed it, it matched the single
+ * winning score, how far below that score it came, or nothing (several winners, or no score).
+ */
+export type SolutionState = "won" | "filtered" | "same" | "gap" | "none";
+
+export function solutionState(solution: SolutionPoint): SolutionState {
+	if (solution.winner) return "won";
+	if (solution.filteredOut) return "filtered";
+	if (solution.gap === null) return "none";
+	return solution.gap <= 0 ? "same" : "gap";
+}
+
 /** The track's left end: gaps of 0.01% or less, ties and scores above the winner sit there. */
 const TRACK_LOW = 1e-4;
 

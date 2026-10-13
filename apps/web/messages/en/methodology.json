@@ -105,7 +105,7 @@
 		},
 		"coverage": {
 			"term": "Coverage",
-			"text": "Settlement history goes back {chain, plural, one {# day} other {# days}}, auction history {auction, plural, one {# day} other {# days}}, surplus history {surplus, plural, one {# day} other {# days}} and auction details, the solutions, quotes and fees, {detail, plural, one {# day} other {# days}}. Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page.",
+			"text": "Settlement history goes back {chain, plural, one {#\u00a0day} other {#\u00a0days}}, auction history {auction, plural, one {#\u00a0day} other {#\u00a0days}}, surplus history {surplus, plural, one {#\u00a0day} other {#\u00a0days}} and auction details, the solutions, quotes and fees, {detail, plural, one {#\u00a0day} other {#\u00a0days}}. Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page.",
 			"noData": "Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page."
 		},
 		"names": {

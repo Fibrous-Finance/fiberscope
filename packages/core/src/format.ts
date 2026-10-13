@@ -40,6 +40,8 @@ export interface Format {
 	points(value: number): string;
 	/** A multiple: 3.6× */
 	times(value: number): string;
+	/** Names joined as the sentences list them: "Nexroute, Sector Finance and Rosato" */
+	list(items: readonly string[]): string;
 	/** 10:35 */
 	time(ms: number): string;
 	/** 10:34:52 */
@@ -122,6 +124,8 @@ export function createFormat(locale: string): Format {
 	const dayMonth = dates({ day: "numeric", month: "short" });
 	const dayMonthYear = dates({ day: "numeric", month: "short", year: "numeric" });
 	const relative = new Intl.RelativeTimeFormat(locale, { numeric: "always" });
+	// The page's English lists have no comma before "and", as British English writes them.
+	const conjunction = new Intl.ListFormat(english ? "en-GB" : locale, { type: "conjunction" });
 
 	const fixed = (value: number, digits: number) => {
 		let f = decimals.get(digits);
@@ -175,6 +179,7 @@ export function createFormat(locale: string): Format {
 		locale,
 		int: (value) => integer.format(value),
 		fixed,
+		list: (items) => conjunction.format(items),
 		usd,
 		usdCents,
 		usdWhole: (value) => (value === null ? DASH : wholeUsd.format(value)),

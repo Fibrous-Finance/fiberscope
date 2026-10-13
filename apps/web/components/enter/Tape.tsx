@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, Ref } from "react";
 
 import { useTranslations } from "next-intl";
 
@@ -9,7 +9,6 @@ import type { TapeCell, TapeRow as TapeRowData, View } from "@fiberscope/core";
 
 import { useHover } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
-import { arrow } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
 
@@ -32,62 +31,83 @@ const MARKS: Record<TapeCell["state"], string> = {
 	absent: "size-0.5 rounded-full bg-ln2",
 };
 
+type TapeAuction = View["tape"]["auctions"][number];
+
+/** The auctions on the tape, oldest first: the latest 48, the latest 24 on compact pages. */
+export function tapeAuctions(tape: View["tape"], compact: boolean): TapeAuction[] {
+	return tape.auctions.slice(-(compact ? COMPACT_COLUMNS : WIDE_COLUMNS));
+}
+
 /**
- * The latest auctions, one column each and one row per solver. The tape is a single tab stop:
- * ← → Home End move the selected auction, Enter opens its settlement in CoW Explorer. On wide pages
- * hovering a column selects it and each cell links to its settlement, kept out of the tab order;
- * on compact pages a tap only selects, and the readout's link opens the settlement.
+ * The latest auctions, one column each and one row per solver. One auction is selected: a click
+ * or tap selects a column and opens its solutions under the tape, while hovering a column only
+ * previews it in the readout. The tape is a single tab stop: ← → Home End move the selection,
+ * Enter or Space opens or closes the solutions, Escape closes them. Cells are plain marks.
  */
 export function Tape({
-	tape,
-	compact,
+	ref,
+	auctions,
+	rows,
 	rankIndex,
-	explorer,
+	selected,
+	open,
+	onSelect,
+	onOpenChange,
 }: {
-	tape: View["tape"];
-	compact: boolean;
+	/** The tape's tab stop. */
+	ref?: Ref<HTMLDivElement>;
+	/** The auctions shown, oldest first (`tapeAuctions`). */
+	auctions: TapeAuction[];
+	rows: TapeRowData[];
 	rankIndex: Map<string, number>;
-	/** The CoW Explorer page of a settlement. */
-	explorer: (tx: string | null) => string | undefined;
+	/** The selected auction's id, one of `auctions`. */
+	selected: number;
+	/** The selected auction's solutions are open under the tape. */
+	open: boolean;
+	onSelect: (id: number) => void;
+	onOpenChange: (open: boolean) => void;
 }) {
 	const t = useTranslations("Enter.tape");
 	const tc = useTranslations("Common");
 	const f = useFormat();
 	const { hovered, setHovered } = useHover();
-	// The picked auction, by id: new data shifts the columns, and the pick stays on its auction
-	// until it leaves the tape. Without a pick, the latest auction is selected.
-	const [picked, setPicked] = useState<number | null>(null);
+	// The column under the pointer, which the readout previews.
+	const [pointed, setPointed] = useState<number | null>(null);
 	// The selected column shows the focus ring only while the tape has keyboard focus.
 	const [keyboard, setKeyboard] = useState(false);
 
-	const count = Math.min(compact ? COMPACT_COLUMNS : WIDE_COLUMNS, tape.auctions.length);
-	const auctions = tape.auctions.slice(-count);
-	const pickedColumn = auctions.findIndex((auction) => auction.id === picked);
-	const selected = pickedColumn === -1 ? count - 1 : pickedColumn;
-	const auction = auctions[selected];
-	const href = explorer(auction.tx);
-	const columnBox = { left: `${(selected / count) * 100}%`, width: `${100 / count}%` };
-	const pick = (column: number) => setPicked(auctions[column].id);
+	const count = auctions.length;
+	const column = auctions.findIndex((auction) => auction.id === selected);
+	const shown = pointed !== null && pointed < count ? pointed : column;
+	const auction = auctions[shown];
+	const columnBox = (index: number) => ({
+		left: `${(index / count) * 100}%`,
+		width: `${100 / count}%`,
+	});
 
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
 		if (event.altKey || event.ctrlKey || event.metaKey) return;
-		if (event.key === "Enter") {
-			if (href) {
-				event.preventDefault();
-				window.open(href, "_blank", "noopener");
-			}
-			return;
-		}
 		const moves: Partial<Record<string, number>> = {
-			ArrowLeft: selected - 1,
-			ArrowRight: selected + 1,
+			ArrowLeft: column - 1,
+			ArrowRight: column + 1,
 			Home: 0,
 			End: count - 1,
 		};
 		const next = moves[event.key];
-		if (next === undefined) return;
+		if (next !== undefined) {
+			onSelect(auctions[Math.min(count - 1, Math.max(0, next))].id);
+		} else if (event.key === "Enter" || event.key === " ") {
+			// Enter selects and opens, as a click does: the auction stays put when new data comes.
+			onSelect(auctions[column].id);
+			onOpenChange(!open);
+		} else if (event.key === "Escape" && open) {
+			onOpenChange(false);
+		} else {
+			return;
+		}
 		event.preventDefault();
-		pick(Math.min(count - 1, Math.max(0, next)));
+		// The keys act on the selection: the readout shows it again, and the ring marks it.
+		setPointed(null);
 		setKeyboard(true);
 	};
 
@@ -97,67 +117,67 @@ export function Tape({
 				<h3 className="text-[15px] font-medium max-wide:basis-full">
 					{t("title", { count })}
 				</h3>
-				<span className="flex flex-wrap items-baseline gap-x-3.5 font-mono text-[12px] leading-[normal] font-medium text-mu">
-					<span aria-live="polite">
-						{t.rich("readout", {
-							id: f.int(auction.id),
-							time: f.clock(auction.time),
-							entered: auction.entered,
-							winners: auction.winners.length,
-							names: auction.winners.map((winner) => winner.label).join(" + "),
-							winner: (chunks) => (
-								<span className="whitespace-nowrap text-fg">{chunks}</span>
-							),
-						})}
-					</span>
-					{href ? (
-						<a
-							href={href}
-							target="_blank"
-							rel="noopener"
-							className="whitespace-nowrap quiet max-wide:inline-flex max-wide:min-h-11 max-wide:items-center"
-						>
-							{tc.rich("cowExplorer", { arrow })}
-						</a>
-					) : null}
+				{/* Quiet while the solutions are open: a screen reader hears one of the two. */}
+				<span
+					aria-live={open ? "off" : "polite"}
+					className="font-mono text-[12px] leading-[normal] font-medium text-mu"
+				>
+					{t.rich("readout", {
+						id: f.int(auction.id),
+						time: f.clock(auction.time),
+						entered: auction.entered,
+						winners: auction.winners.length,
+						names: auction.winners.map((winner) => winner.label).join(" + "),
+						winner: (chunks) => (
+							<span className="whitespace-nowrap text-fg">{chunks}</span>
+						),
+					})}
 				</span>
 			</div>
 			<div
+				ref={ref}
 				tabIndex={0}
 				role="group"
 				aria-label={t("label", { count })}
 				onKeyDown={onKeyDown}
 				onFocus={(event) => setKeyboard(event.currentTarget.matches(":focus-visible"))}
 				onBlur={() => setKeyboard(false)}
-				// Hovering selects on wide pages, so leaving goes back to the latest auction; a
-				// tapped selection stays.
-				onMouseLeave={compact ? undefined : () => setPicked(null)}
+				onMouseLeave={() => setPointed(null)}
 				className="mt-3.5 focus-visible:shadow-none focus-visible:outline-none"
 			>
 				<div onMouseLeave={() => setHovered(null)} className="relative">
-					{/* Over the cells: the selected column's highlight and, from the keyboard, its ring. */}
+					{/*
+					 * Over the cells: the highlight of the column in the readout and, while its
+					 * solutions are open, of the selected one; from the keyboard, the selected
+					 * column's ring.
+					 */}
 					<div
 						aria-hidden="true"
 						className={`pointer-events-none absolute inset-y-0 right-0 ${CELLS_LEFT}`}
 					>
-						<div className="absolute inset-y-0 bg-hov" style={columnBox} />
+						<div className="absolute inset-y-0 bg-hov" style={columnBox(shown)} />
+						{open && shown !== column ? (
+							<div className="absolute inset-y-0 bg-hov" style={columnBox(column)} />
+						) : null}
 						{keyboard ? (
 							<div
 								className="absolute -inset-y-[3px] z-[2] rounded-[3px] shadow-[0_0_0_2px_#1b1f2c,0_0_0_4px_#11b2ba]"
-								style={columnBox}
+								style={columnBox(column)}
 							/>
 						) : null}
 					</div>
-					{tape.rows.map((row) => (
+					{rows.map((row) => (
 						<TapeRow
 							key={row.id}
 							row={row}
 							count={count}
 							hot={isHot(hovered, row.id, rankIndex.get(row.id) ?? -1)}
-							compact={compact}
-							explorer={explorer}
 							onHover={setHovered}
-							onColumn={pick}
+							onPoint={setPointed}
+							onPick={(index) => {
+								onSelect(auctions[index].id);
+								onOpenChange(true);
+							}}
 						/>
 					))}
 				</div>
@@ -177,20 +197,19 @@ function TapeRow({
 	row,
 	count,
 	hot,
-	compact,
-	explorer,
 	onHover,
-	onColumn,
+	onPoint,
+	onPick,
 }: {
 	row: TapeRowData;
 	/** Latest auctions shown. */
 	count: number;
 	hot: boolean;
-	/** Cells select their auction instead of linking to it. */
-	compact: boolean;
-	explorer: (tx: string | null) => string | undefined;
 	onHover: (id: string | null) => void;
-	onColumn: (index: number) => void;
+	/** The pointer entered a column. */
+	onPoint: (index: number) => void;
+	/** A column was clicked or tapped. */
+	onPick: (index: number) => void;
 }) {
 	return (
 		<div
@@ -203,48 +222,19 @@ function TapeRow({
 				{row.label}
 			</div>
 			<div className="flex h-full flex-1">
-				{row.cells.slice(-count).map((cell, index) => {
-					const mark = (
+				{row.cells.slice(-count).map((cell, index) => (
+					<span
+						key={index}
+						aria-hidden="true"
+						onMouseEnter={() => onPoint(index)}
+						onClick={() => onPick(index)}
+						className="grid flex-1 cursor-pointer place-items-center"
+					>
 						<span
 							className={`${MARKS[cell.state]} ${cell.state === "won" ? (hot ? "bg-teal" : "bg-fg") : ""}`}
 						/>
-					);
-					// A wide cell links to its settlement; a cell without one is a plain mark.
-					const href = compact ? undefined : explorer(cell.tx);
-					return compact ? (
-						<span
-							key={index}
-							aria-hidden="true"
-							onMouseEnter={() => onColumn(index)}
-							onClick={() => onColumn(index)}
-							className="grid flex-1 cursor-pointer place-items-center"
-						>
-							{mark}
-						</span>
-					) : href ? (
-						<a
-							key={index}
-							href={href}
-							target="_blank"
-							rel="noopener"
-							tabIndex={-1}
-							aria-hidden="true"
-							onMouseEnter={() => onColumn(index)}
-							className="grid flex-1 place-items-center"
-						>
-							{mark}
-						</a>
-					) : (
-						<span
-							key={index}
-							aria-hidden="true"
-							onMouseEnter={() => onColumn(index)}
-							className="grid flex-1 place-items-center"
-						>
-							{mark}
-						</span>
-					);
-				})}
+					</span>
+				))}
 			</div>
 		</div>
 	);

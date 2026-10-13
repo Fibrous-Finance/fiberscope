@@ -6,6 +6,7 @@ import type { KeyboardEvent } from "react";
 import { useTranslations } from "next-intl";
 
 import {
+	auctionDetails,
 	autoRange,
 	BASE,
 	DASH,
@@ -13,14 +14,15 @@ import {
 	mediumAddress,
 	registrationOf,
 	shortAddress,
+	solverRefs,
 	surplusAndCost,
 	tapeCell,
 } from "@fiberscope/core";
-import type { LinePath, Row, TapeCell } from "@fiberscope/core";
+import type { LinePath, Row, SolverRef, TapeCell } from "@fiberscope/core";
 
 import { useDashboard, useView } from "@/components/dashboard/context";
 import { arrow } from "@/components/ui/Section";
-import { cellText, useColumnLabels } from "@/components/winning/columns";
+import { cellText, filteredText, useColumnLabels } from "@/components/winning/columns";
 import { useCopy } from "@/components/winning/useCopy";
 
 import { useFormat } from "@/lib/format";
@@ -47,11 +49,11 @@ const SMALL_LABEL =
 /** "Retired" in place of an address's actions. */
 const RETIRED = "text-[10.5px] tracking-[.06em] text-fa uppercase";
 /**
- * Time, trades, swaps, pair, volume, surplus, cost, gas and links; the header and every
- * settlement share it.
+ * Time, trades, swaps, pair, volume, surplus, cost, gas, quoted by and links; the header and
+ * every settlement share it.
  */
 const SETTLEMENT_GRID =
-	"grid grid-cols-[96px_46px_46px_minmax(0,1fr)_76px_72px_56px_56px_200px] items-center gap-3";
+	"grid grid-cols-[96px_46px_46px_minmax(0,1fr)_76px_72px_56px_56px_minmax(96px,.6fr)_200px] items-center gap-3";
 /** The compact settlement's figures, in order, as one wrapping list. */
 const SETTLEMENT_ITEMS = ["trades", "swaps", "volume", "surplus", "cost", "gas"] as const;
 
@@ -109,6 +111,14 @@ function useDetail(row: Row) {
 	const own = figures.get(row.id);
 	const typical = own?.typicalSurplusRate ?? null;
 	const auctionData = view.coverage.auction > 0;
+	// Filtered out, close losses and quotes: over the window's days with auction details, with
+	// "†" on their labels when those cover only part of it.
+	const details = auctionDetails(snapshot!, view);
+	const detail = details.coverage > 0 ? (details.solvers.get(row.id) ?? null) : null;
+	const detailPartial = details.coverage > 0 && details.coverage < view.days;
+	const detailLabel = (label: string) =>
+		detailPartial ? t("detail.labels.partial", { label }) : label;
+	const quoter = solverRefs(snapshot!);
 
 	// Without auction data in the window the strip stays empty, as the auction stats do.
 	const cells: AuctionCell[] = (auctionData ? (snapshot?.latestAuctions ?? []) : [])
@@ -153,7 +163,10 @@ function useDetail(row: Row) {
 		}),
 		start,
 		end,
-		/** Ten stats, two to a row: cost next to gas, typical surplus after the swaps. */
+		/**
+		 * Fourteen stats, two to a row: cost next to gas, typical surplus after the swaps, filtered
+		 * out under entered and close losses under win rate.
+		 */
 		stats: [
 			{
 				key: "batches",
@@ -254,7 +267,65 @@ function useDetail(row: Row) {
 						? t("detail.stats.winRate", { percent: f.percent(row.wonShare, 1) })
 						: noData,
 			},
+			{
+				key: "filteredOut",
+				label: detailLabel(t("detail.labels.filteredOut")),
+				value: filteredText(detail?.filteredShare ?? null, f),
+				note:
+					detail === null
+						? noData
+						: detail.solutions === 0
+							? t("detail.stats.noSolutions")
+							: detail.filteredOut > 0
+								? t("detail.stats.filteredOut", {
+										filtered: f.int(detail.filteredOut),
+										solutions: f.int(detail.solutions),
+									})
+								: t("detail.stats.filteredNone", { solutions: detail.solutions }),
+			},
+			{
+				key: "closeLosses",
+				label: detailLabel(t("detail.labels.closeLosses")),
+				value: f.percent(detail?.closeLossShare ?? null),
+				note:
+					detail === null
+						? noData
+						: detail.losses === 0
+							? t("detail.stats.noLosses")
+							: t("detail.stats.closeLosses", { losses: detail.losses }),
+			},
+			{
+				key: "quotes",
+				label: detailLabel(t("detail.labels.quotes")),
+				value: detail === null ? DASH : f.int(detail.quotes),
+				note:
+					detail === null
+						? noData
+						: detail.quotes === 0
+							? t("detail.stats.noQuotes")
+							: t("detail.stats.quotes", {
+									share: f.percent(detail.quoteShare, 1),
+									verified: f.percent(detail.verifiedShare),
+								}),
+			},
+			{
+				key: "settledItself",
+				label: detailLabel(t("detail.labels.settledItself")),
+				value: f.percent(detail?.settledShare ?? null),
+				note:
+					detail === null
+						? noData
+						: detail.quotes === 0
+							? t("detail.stats.noQuotesShort")
+							: t("detail.stats.settledItself", {
+									percent: f.percent(details.network.settledShare),
+								}),
+			},
 		],
+		/** "† Covers the last 7 of 30 days." under the stats; null when details cover the window. */
+		detailCoverage: detailPartial
+			? t("detail.detailCoverage", { covered: details.coverage, days: view.days })
+			: null,
 		auctions: {
 			title: t("detail.auctions", { count: cells.length }),
 			note:
@@ -302,6 +373,8 @@ function useDetail(row: Row) {
 			const cost = f.cost(s.cost);
 			const gas = f.gas(s.gas);
 			const values = { trades: s.trades, swaps: s.swaps, volume, surplus, cost, gas };
+			// Absent (not looked up) and null (no solver's quote) both read "—".
+			const quotedBy: SolverRef | null = s.quotedBy ? quoter(s.quotedBy) : null;
 			return {
 				tx: s.tx,
 				time: view.end.time - s.time < RECENT_MS ? f.clock(s.time) : f.dayTime(s.time),
@@ -312,10 +385,24 @@ function useDetail(row: Row) {
 				surplus,
 				cost,
 				gas,
-				items: SETTLEMENT_ITEMS.map((key) => ({
-					key,
-					text: t(`detail.settlementItems.${key}`, values),
-				})),
+				quotedBy,
+				items: [
+					...SETTLEMENT_ITEMS.map((key) => ({
+						key,
+						text: t(`detail.settlementItems.${key}`, values),
+					})),
+					// The last item only when the row names a quoting solver.
+					...(quotedBy === null
+						? []
+						: [
+								{
+									key: "quotedBy",
+									text: t("detail.settlementItems.quotedBy", {
+										solver: quotedBy.label,
+									}),
+								},
+							]),
+				],
 				cow: COW_TX + s.tx,
 				scan: `${BASE.scan}/tx/${s.tx}`,
 			};
@@ -415,18 +502,25 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 						</div>
 					</div>
 				</div>
-				<div className="grid grid-cols-2 content-start gap-x-5 gap-y-[18px]">
-					{d.stats.map((stat) => (
-						<div key={stat.key} className="min-w-0">
-							<div className="label">{stat.label}</div>
-							<div className="mt-1 font-mono text-[18px] leading-[normal] font-medium tracking-[-0.03em]">
-								{stat.value}
+				<div className="min-w-0">
+					<div className="grid grid-cols-2 content-start gap-x-5 gap-y-[18px]">
+						{d.stats.map((stat) => (
+							<div key={stat.key} className="min-w-0">
+								<div className="label">{stat.label}</div>
+								<div className="mt-1 font-mono text-[18px] leading-[normal] font-medium tracking-[-0.03em]">
+									{stat.value}
+								</div>
+								<div className="mt-0.5 text-[12.5px] text-balance text-mu">
+									{stat.note}
+								</div>
 							</div>
-							<div className="mt-0.5 text-[12.5px] text-balance text-mu">
-								{stat.note}
-							</div>
+						))}
+					</div>
+					{d.detailCoverage === null ? null : (
+						<div className="mt-4 font-mono text-[11px] leading-[normal] font-medium text-fa">
+							{d.detailCoverage}
 						</div>
-					))}
+					)}
 				</div>
 				<div
 					className={`min-w-0 gap-x-9 gap-y-[18px] ${narrow ? "col-span-full grid grid-cols-3" : "flex flex-col"}`}
@@ -478,7 +572,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 				<div className="label">{t("detail.settlements")}</div>
 				{/* Narrower than the grid, the settlements scroll sideways rather than squeeze the pair. */}
 				<div className="mt-1 overflow-x-auto">
-					<div className="min-w-[860px]">
+					<div className="min-w-[980px]">
 						<div
 							className={`${SETTLEMENT_GRID} box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-fa uppercase`}
 						>
@@ -498,6 +592,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 							</span>
 							<span className="text-right">{t("detail.settlementColumns.cost")}</span>
 							<span className="text-right">{t("detail.settlementColumns.gas")}</span>
+							<span className="pl-1.5">{t("detail.settlementColumns.quotedBy")}</span>
 							<span className="text-right">
 								{t("detail.settlementColumns.links")}
 							</span>
@@ -517,6 +612,12 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 								<span className="text-right">{s.surplus}</span>
 								<span className="text-right">{s.cost}</span>
 								<span className="text-right">{s.gas}</span>
+								<span
+									title={s.quotedBy?.label}
+									className={`truncate pl-1.5 ${s.quotedBy?.unnamed ? "" : "font-sans text-[13px]"}`}
+								>
+									{s.quotedBy?.label ?? DASH}
+								</span>
 								<span className="flex justify-end gap-3.5 text-[12px]">
 									<a
 										href={s.cow}
@@ -567,16 +668,25 @@ export function DetailCompact({ row }: { row: Row }) {
 				</div>
 				<ShareChart chart={d.chart} label={d.chartLabel} className="mt-3 h-[60px]" />
 			</div>
-			<div className="grid grid-cols-2 gap-x-[18px] gap-y-4">
-				{d.stats.map((stat) => (
-					<div key={stat.key} className="min-w-0">
-						<div className={SMALL_LABEL}>{stat.label}</div>
-						<div className="mt-[3px] font-mono text-[16px] leading-[normal] font-medium">
-							{stat.value}
+			<div>
+				<div className="grid grid-cols-2 gap-x-[18px] gap-y-4">
+					{d.stats.map((stat) => (
+						<div key={stat.key} className="min-w-0">
+							<div className={SMALL_LABEL}>{stat.label}</div>
+							<div className="mt-[3px] font-mono text-[16px] leading-[normal] font-medium">
+								{stat.value}
+							</div>
+							<div className="mt-0.5 text-[12px] text-balance text-mu">
+								{stat.note}
+							</div>
 						</div>
-						<div className="mt-0.5 text-[12px] text-balance text-mu">{stat.note}</div>
+					))}
+				</div>
+				{d.detailCoverage === null ? null : (
+					<div className="mt-3 font-mono text-[11px] leading-[normal] font-medium text-fa">
+						{d.detailCoverage}
 					</div>
-				))}
+				)}
 			</div>
 			<div>
 				<div className={SMALL_LABEL}>{d.auctions.title}</div>

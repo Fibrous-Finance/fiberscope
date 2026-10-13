@@ -69,3 +69,11 @@ export function cellText(row: Row, key: SortKey, f: Format): string {
 			return f.percent(row.winRate);
 	}
 }
+
+/**
+ * A filtered-out share as the detail and Copy as Markdown show it: one decimal, as small shares
+ * need it ("2.9%"), but "0%" for none, which "0.0%" would read as rounded down.
+ */
+export function filteredText(share: number | null, f: Format): string {
+	return share === 0 ? f.percent(0) : f.percent(share, 1);
+}

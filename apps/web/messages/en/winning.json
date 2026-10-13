@@ -63,9 +63,9 @@
 			"surplus": "{share, select, none {None of its surplus is unusual} other {{share} of its surplus is unusual}}",
 			"noSurplusData": "No surplus data",
 			"filteredOut": "{filtered} of {solutions}\u00a0solutions",
-			"filteredNone": "None of its {solutions, plural, one {# solution} other {# solutions}}",
+			"filteredNone": "None of its {solutions, plural, one {#\u00a0solution} other {#\u00a0solutions}}",
 			"noSolutions": "No solutions",
-			"closeLosses": "Of the {losses, plural, one {# auction} other {# auctions}} it lost",
+			"closeLosses": "Of the {losses, plural, one {#\u00a0auction} other {#\u00a0auctions}} it lost",
 			"noLosses": "No auctions lost",
 			"quotes": "{share} of quoted trades, {verified} verified",
 			"noQuotes": "Gave no quotes",
@@ -113,7 +113,7 @@
 			"gas": "{gas}\u00a0gas",
 			"quotedBy": "quoted by {solver}"
 		},
-		"detailCoverage": "† Covers the last {covered} of {days, plural, one {# day} other {# days}}."
+		"detailCoverage": "† Covers the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}."
 	},
 	"registry": {
 		"title": "Solver registry",
@@ -139,9 +139,9 @@
 		"auction": "{covered, plural, =0 {† Volume, Entered and Win rate need auction data, and this window has none yet.} other {† Volume, Entered and Win rate cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
 		"auctionAndSurplus": "{covered, plural, =0 {† Volume, Entered, Win rate and surplus need auction data, and this window has none yet.} other {† Volume, Entered, Win rate and surplus cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
 		"surplus": "{covered, plural, =0 {‡ Surplus also needs signed order terms, and this window has none yet.} other {‡ Surplus covers the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
-		"auctionAndDetail": "{covered, plural, =0 {† Volume, Entered, Win rate, filtered out, close losses, quotes and fees need auction data, and this window has none yet.} other {† Volume, Entered, Win rate, filtered out, close losses, quotes and fees cover the last {covered} of {days, plural, one {# day} other {# days}}.}}",
-		"auctionSurplusAndDetail": "{covered, plural, =0 {† Volume, Entered, Win rate, surplus, filtered out, close losses, quotes and fees need auction data, and this window has none yet.} other {† Volume, Entered, Win rate, surplus, filtered out, close losses, quotes and fees cover the last {covered} of {days, plural, one {# day} other {# days}}.}}",
-		"surplusAndDetail": "{covered, plural, =0 {‡ Surplus, filtered out, close losses, quotes and fees also need signed order terms, and this window has none yet.} other {‡ Surplus, filtered out, close losses, quotes and fees cover the last {covered} of {days, plural, one {# day} other {# days}}.}}",
-		"detail": "{covered, plural, =0 {§ Filtered out, close losses, quotes and fees need auction details, and this window has none yet.} other {§ Filtered out, close losses, quotes and fees cover the last {covered} of {days, plural, one {# day} other {# days}}.}}"
+		"auctionAndDetail": "{covered, plural, =0 {† Volume, Entered, Win rate, filtered out, close losses, quotes and fees need auction data, and this window has none yet.} other {† Volume, Entered, Win rate, filtered out, close losses, quotes and fees cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
+		"auctionSurplusAndDetail": "{covered, plural, =0 {† Volume, Entered, Win rate, surplus, filtered out, close losses, quotes and fees need auction data, and this window has none yet.} other {† Volume, Entered, Win rate, surplus, filtered out, close losses, quotes and fees cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
+		"surplusAndDetail": "{covered, plural, =0 {‡ Surplus, filtered out, close losses, quotes and fees also need signed order terms, and this window has none yet.} other {‡ Surplus, filtered out, close losses, quotes and fees cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}",
+		"detail": "{covered, plural, =0 {§ Filtered out, close losses, quotes and fees need auction details, and this window has none yet.} other {§ Filtered out, close losses, quotes and fees cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.}}"
 	}
 }

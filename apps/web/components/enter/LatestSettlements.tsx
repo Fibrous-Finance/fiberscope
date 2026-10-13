@@ -5,9 +5,9 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { flushSync } from "react-dom";
 
-import { latestSettlements, NETWORKS } from "@fiberscope/core";
+import { auctionDetails, DASH, latestSettlements, NETWORKS } from "@fiberscope/core";
 
-import { useDashboard, useHover } from "@/components/dashboard/context";
+import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
 import { arrow, Caret, FootLine } from "@/components/ui/Section";
 
@@ -17,22 +17,47 @@ import { useFormat } from "@/lib/format";
 const SHOWN = 10;
 /** Settlements this close to the end of the data show a clock time, older ones the day too. */
 const RECENT_MS = 12 * 3_600_000;
-/** Time, solver, trades, swaps, pair, volume, surplus, cost, gas and links, in every row. */
+/**
+ * Time, solver, trades, pair, volume, surplus, cost, protocol fee, partner fee, quoted by and
+ * links, in every row.
+ */
 const GRID =
-	"grid grid-cols-[84px_minmax(110px,1fr)_52px_52px_minmax(0,1.7fr)_76px_72px_56px_64px_200px] items-center gap-x-3";
+	"grid grid-cols-[84px_minmax(100px,1fr)_52px_minmax(0,1.4fr)_76px_72px_56px_84px_78px_minmax(96px,1fr)_200px] items-center gap-x-3";
 
 /**
- * The newest settlements of every solver: a table on wide pages that scrolls sideways under
- * 1000px, rows with a wrapping figure list on compact ones. Ten rows at first; a disclosure shows
- * the rest. Hovering a row highlights its solver everywhere.
+ * The newest settlements of every solver, under the window's fee totals: a table on wide pages
+ * that scrolls sideways below about 1230px, rows with a wrapping figure list on compact ones. Ten
+ * rows at first; a disclosure shows the rest. Hovering a row highlights its solver everywhere.
  */
 export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number> }) {
 	const t = useTranslations("Enter.settlements");
 	const tc = useTranslations("Common");
+	const th = useTranslations("Hero");
 	const f = useFormat();
-	const { snapshot } = useDashboard();
+	const view = useView();
+	const { snapshot, status } = useDashboard();
 	const { hovered, setHovered } = useHover();
 	const [expanded, setExpanded] = useState(false);
+
+	// The fee totals are the window's, over its days with auction details ("the last 7 days" in
+	// a longer window); the rows below are the latest settlements and carry their own fees.
+	const { coverage, network: fees } = auctionDetails(snapshot!, view);
+	const feeSentence =
+		coverage > 0
+			? t("fees", {
+					span: status.delayed
+						? th("span.to", { days: coverage, asOf: status.asOf ?? "" })
+						: th("span.last", { days: coverage }),
+					protocol: f.usdWhole(fees.protocolFees),
+					protocolBps: f.bps1(fees.protocolFeeRate),
+					partner: f.usdWhole(fees.partnerFees),
+					partnerBps: f.bps1(fees.partnerFeeRate),
+				})
+			: t("feesEmpty", {
+					period: tc(`period.${view.period}`),
+					delayed: status.delayed ? "yes" : "no",
+					asOf: status.asOf ?? "",
+				});
 
 	const { end, network: networkId } = snapshot!;
 	const network = NETWORKS[networkId];
@@ -42,14 +67,15 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 		const volume = f.usd(s.volume);
 		const surplus = f.usdCents(s.surplus);
 		const cost = f.cost(s.cost);
-		const gas = f.gas(s.gas);
+		const protocolFee = f.cost(s.protocolFee);
+		const partnerFee = f.cost(s.partnerFee);
 		return {
 			tx: s.tx,
 			solver: s.solver,
 			hot: isHot(hovered, s.solver.id, rankIndex.get(s.solver.id) ?? -1),
 			time: end.time - s.time < RECENT_MS ? f.clock(s.time) : f.dayTime(s.time),
 			trades: f.int(s.trades),
-			swaps: f.int(s.swaps),
+			quotedBy: s.quotedBy,
 			pair: t("pair", {
 				sell: s.pair.sell,
 				buy: s.pair.buy,
@@ -58,14 +84,16 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 			volume,
 			surplus,
 			cost,
-			gas,
+			protocolFee,
+			partnerFee,
 			items: [
 				t("items.trades", { trades: s.trades }),
-				t("items.swaps", { swaps: s.swaps }),
 				t("items.volume", { volume }),
 				t("items.surplus", { surplus }),
 				t("items.cost", { cost }),
-				t("items.gas", { gas }),
+				t("items.protocolFee", { fee: protocolFee }),
+				t("items.partnerFee", { fee: partnerFee }),
+				...(s.quotedBy ? [t("items.quotedBy", { solver: s.quotedBy.label })] : []),
 			],
 			cow: `https://explorer.cow.fi/${network.explorerSlug}/tx/${s.tx}`,
 			scan: `${network.scan}/tx/${s.tx}`,
@@ -80,21 +108,25 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 					{t("scope")}
 				</span>
 			</div>
-			{/* Under 1000px the table scrolls sideways rather than squeezing the pair. */}
+			<p className="mt-2.5 max-w-[720px] text-[15px] leading-[1.55] text-pretty text-mu">
+				{feeSentence}
+			</p>
+			{/* Below about 1230px the table scrolls sideways rather than squeezing the pair. */}
 			<div className="mt-3 hidden overflow-x-auto tabular-nums wide:block">
-				<div className="min-w-[1000px]">
+				<div className="min-w-[1140px]">
 					<div
-						className={`${GRID} box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-fa uppercase`}
+						className={`${GRID} box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] whitespace-nowrap text-fa uppercase`}
 					>
 						<span>{t("columns.time")}</span>
 						<span>{t("columns.solver")}</span>
 						<span className="text-right">{t("columns.trades")}</span>
-						<span className="text-right">{t("columns.swaps")}</span>
 						<span className="pl-1.5">{t("columns.pair")}</span>
 						<span className="text-right">{t("columns.volume")}</span>
 						<span className="text-right">{t("columns.surplus")}</span>
 						<span className="text-right">{t("columns.cost")}</span>
-						<span className="text-right">{t("columns.gas")}</span>
+						<span className="text-right">{t("columns.protocolFee")}</span>
+						<span className="text-right">{t("columns.partnerFee")}</span>
+						<span className="pl-1.5">{t("columns.quotedBy")}</span>
 						<span className="text-right">{t("columns.links")}</span>
 					</div>
 					{rows.map((row) => (
@@ -111,14 +143,19 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 								{row.solver.label}
 							</span>
 							<span className="text-right">{row.trades}</span>
-							<span className="text-right">{row.swaps}</span>
 							<span className="truncate pl-1.5 font-sans text-[13px]">
 								{row.pair}
 							</span>
 							<span className="text-right">{row.volume}</span>
 							<span className="text-right">{row.surplus}</span>
 							<span className="text-right">{row.cost}</span>
-							<span className="text-right">{row.gas}</span>
+							<span className="text-right">{row.protocolFee}</span>
+							<span className="text-right">{row.partnerFee}</span>
+							<span
+								className={`truncate pl-1.5 text-[13px] ${row.quotedBy?.unnamed ? "font-mono" : "font-sans"}`}
+							>
+								{row.quotedBy?.label ?? DASH}
+							</span>
 							<span className="flex justify-end gap-3.5 text-[12px]">
 								<a
 									href={row.cow}

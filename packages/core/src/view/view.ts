@@ -155,8 +155,6 @@ interface TapeAuction {
 	time: number;
 	entered: number;
 	winners: SolverRef[];
-	/** The first winner's settlement. */
-	tx: string | null;
 }
 
 export interface TapeRow extends SolverRef {
@@ -559,7 +557,6 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 				time: a.time,
 				entered: a.entered.length,
 				winners: a.winners.map((w) => refOf(w.solver)),
-				tx: a.winners[0]?.tx ?? null,
 			})),
 			rows: tapeRows,
 		},

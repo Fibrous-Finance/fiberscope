@@ -32,7 +32,7 @@ auctions, by how much, whether that is changing, and how efficiently each solver
 <tr>
 <td width="50%" valign="top">
 <img src="docs/images/who-enters.webp" alt="Who enters, who wins: a bar per solver for the share of auctions it entered and the share it won, and a tape of the latest 48 auctions marking who entered and who won each.">
-<p><b>Who enters, who wins.</b> How often each solver enters an auction and how often it wins, and a tape of the latest 48 auctions: who entered each and who won it.</p>
+<p><b>Who enters, who wins.</b> How often each solver enters an auction, how often it wins and how many of its solutions CoW's fairness filter set aside, and a tape of the latest 48 auctions: select one to see every solution's score against the winner's. Then whose quotes orders were placed with, and the latest settlements with their protocol and partner fees.</p>
 </td>
 <td width="50%" valign="top">
 <img src="docs/images/how-efficiently.webp" alt="How efficiently: gas, transaction cost and DEX swaps per trade for each solver, as dots against a dashed network average.">
@@ -68,11 +68,12 @@ flowchart LR
     worker --> browser["Browser"]
 ```
 
-The indexer reads settlements, receipts, calldata and Chainlink's ETH/USD rate from Base, the
-auction behind each settlement from CoW's API, and solver names from CoW's registry, into SQLite.
-Every 10 minutes it catches up with the chain, writes a snapshot with every figure the page shows,
-and uploads it to R2; then it backfills history until the next run is due. The site, Next.js on a
-Cloudflare Worker, reads the snapshot from R2 and derives every window, share and rank from it.
+The indexer reads settlements, receipts, calldata and Chainlink's ETH/USD rate from Base; the
+auction behind each settlement, with every solution's score, and each traded order's quote and
+protocol fees from CoW's API; and solver names from CoW's registry, into SQLite. Every 10 minutes
+it catches up with the chain, writes a snapshot with every figure the page shows, and uploads it
+to R2; then it backfills history until the next run is due. The site, Next.js on a Cloudflare
+Worker, reads the snapshot from R2 and derives every window, share and rank from it.
 
 ## Accuracy
 

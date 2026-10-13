@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { AuctionSolution, Snapshot, SnapshotSolver } from "../snapshot.ts";
-import { auctionSolutions, trackPosition } from "./solutions.ts";
+import {
+	auctionOutcome,
+	auctionSolutions,
+	filteredOutcome,
+	solutionState,
+	trackPosition,
+} from "./solutions.ts";
+import type { SolutionPoint } from "./solutions.ts";
 
 const END = Date.UTC(2026, 9, 13, 20, 12);
 
@@ -133,6 +140,145 @@ describe("auctionSolutions", () => {
 
 	it("knows only the latest auctions", () => {
 		assert.equal(auctionSolutions(snapshot(1, []), 2), null);
+	});
+});
+
+/** A fixture solver as the solutions name it. */
+const ref = (id: string) => ({ id, label: id.toUpperCase(), unnamed: false });
+
+describe("auctionOutcome", () => {
+	const outcome = (solutions: AuctionSolution[]) =>
+		auctionOutcome(auctionSolutions(snapshot(1, solutions), 1)!);
+
+	it("measures a single winner against the best rival that passed the filter, or its tie", () => {
+		assert.equal(
+			outcome([
+				{ solver: "a", score: 4.5783, winner: true },
+				{ solver: "c", score: 4.5729 },
+				{ solver: "b", score: 4.6, filteredOut: true },
+			]),
+			"single"
+		);
+		assert.equal(
+			outcome([
+				{ solver: "a", score: 2, winner: true },
+				{ solver: "b", score: 2 },
+			]),
+			"singleTie"
+		);
+	});
+
+	it("says no rival passed the filter only when it removed all other solvers' solutions", () => {
+		assert.equal(
+			outcome([
+				{ solver: "a", score: 1, winner: true },
+				{ solver: "b", score: 3, filteredOut: true },
+				{ solver: "b", score: 2, filteredOut: true },
+			]),
+			"singleNoRival"
+		);
+		// The winner's own other solutions are not rivals.
+		assert.equal(
+			outcome([
+				{ solver: "a", score: 1, winner: true },
+				{ solver: "a", score: 0.9 },
+			]),
+			"singleOnly"
+		);
+		// A winning score of zero gives no gaps, though a rival passed the filter.
+		assert.equal(
+			outcome([
+				{ solver: "a", score: 0, winner: true },
+				{ solver: "b", score: 0 },
+			]),
+			"singleOnly"
+		);
+	});
+
+	it("tells a lone winning solution, several winners and no winner apart", () => {
+		assert.equal(outcome([{ solver: "a", score: 0.1048, winner: true }]), "oneSolution");
+		assert.equal(
+			outcome([
+				{ solver: "a", score: 0.0194, winner: true },
+				{ solver: "b", score: 0.0121, winner: true },
+				{ solver: "c", score: 0.016 },
+			]),
+			"multi"
+		);
+		assert.equal(
+			outcome([
+				{ solver: "a", score: 1 },
+				{ solver: "b", score: 0.5 },
+			]),
+			"none"
+		);
+	});
+});
+
+describe("filteredOutcome", () => {
+	const winner: AuctionSolution = { solver: "w", score: 5, winner: true };
+	const filtered = (...solutions: AuctionSolution[]) =>
+		filteredOutcome(auctionSolutions(snapshot(1, [winner, ...solutions]), 1)!);
+
+	it("names one solver's filtered-out solutions against all of its own", () => {
+		assert.equal(filtered({ solver: "b", score: 4 }), null);
+		assert.deepEqual(filtered({ solver: "b", score: 6, filteredOut: true }), {
+			kind: "filteredOne",
+			solvers: [ref("b")],
+			count: 1,
+			total: 1,
+		});
+		assert.deepEqual(
+			filtered({ solver: "b", score: 4 }, { solver: "b", score: 6, filteredOut: true }),
+			{ kind: "filteredSome", solvers: [ref("b")], count: 1, total: 2 }
+		);
+		assert.deepEqual(
+			filtered(
+				{ solver: "b", score: 6, filteredOut: true },
+				{ solver: "b", score: 5.5, filteredOut: true }
+			),
+			{ kind: "filteredBoth", solvers: [ref("b")], count: 2, total: 2 }
+		);
+		assert.deepEqual(
+			filtered(
+				{ solver: "b", score: 6, filteredOut: true },
+				{ solver: "b", score: 5.5, filteredOut: true },
+				{ solver: "b", score: 5.2, filteredOut: true }
+			),
+			{ kind: "filteredAll", solvers: [ref("b")], count: 3, total: 3 }
+		);
+	});
+
+	it("counts the solutions of several solvers together, in row order", () => {
+		assert.deepEqual(
+			filtered(
+				{ solver: "c", score: 4 },
+				{ solver: "b", score: 6, filteredOut: true },
+				{ solver: "c", score: 5.5, filteredOut: true },
+				{ solver: "b", score: 3, filteredOut: true }
+			),
+			{ kind: "filteredMany", solvers: [ref("c"), ref("b")], count: 3, total: 4 }
+		);
+	});
+});
+
+describe("solutionState", () => {
+	const point = (fields: Partial<SolutionPoint>): SolutionPoint => ({
+		score: 1,
+		filteredOut: false,
+		winner: false,
+		gap: null,
+		...fields,
+	});
+
+	it("says what a solution's Below winner shows", () => {
+		assert.equal(solutionState(point({ winner: true })), "won");
+		// A filtered-out solution can score above the winner; it still reads "Filtered out".
+		assert.equal(solutionState(point({ filteredOut: true, gap: -0.2 })), "filtered");
+		assert.equal(solutionState(point({ gap: 0 })), "same");
+		assert.equal(solutionState(point({ gap: 0.0012 })), "gap");
+		// Several winners: no gap to give.
+		assert.equal(solutionState(point({})), "none");
 	});
 });
 

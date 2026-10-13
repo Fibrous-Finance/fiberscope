@@ -1,3 +1,4 @@
+import type { AuctionDetails } from "./details.ts";
 import type { SurplusCost, SurplusCostFigures } from "./surplus.ts";
 import { DAY_MS } from "./view.ts";
 import type { Row, View } from "./view.ts";
@@ -12,8 +13,18 @@ import type { Row, View } from "./view.ts";
 
 /** A coverage footnote of the Markdown: which one, over how many of the window's days. */
 interface ExportFootnote {
-	/** "auctionAndSurplus" when surplus covers the same days as auction data: one footnote. */
-	key: "auction" | "auctionAndSurplus" | "surplus";
+	/**
+	 * One footnote per mark: a source that covers the same days as an earlier one shares its mark
+	 * and its footnote ("auctionAndSurplus", "auctionSurplusAndDetail", "surplusAndDetail" …).
+	 */
+	key:
+		| "auction"
+		| "auctionAndSurplus"
+		| "auctionAndDetail"
+		| "auctionSurplusAndDetail"
+		| "surplus"
+		| "surplusAndDetail"
+		| "detail";
 	covered: number;
 }
 
@@ -30,34 +41,62 @@ export interface ExportCoverage {
 	/** Where the surplus data starts, as `auctionFrom`: every surplus column covers it to `end`. */
 	surplusFrom: number | null;
 	/**
+	 * Where the auction details start, as `auctionFrom`: solutions, close losses, quotes and fees
+	 * cover it to `end`.
+	 */
+	detailFrom: number | null;
+	/**
 	 * The marks after the partly covered columns, empty where a source covers the whole window:
 	 * "†" after Volume, Entered and Win rate; after the surplus columns "†" as well when surplus
-	 * covers the same days, "‡" when it covers fewer.
+	 * covers the same days, "‡" when it covers fewer; after the auction-detail columns the mark of
+	 * the source that covers the same days, "§" when none does.
 	 */
-	marks: { auction: "" | "†"; surplus: "" | "†" | "‡" };
+	marks: { auction: "" | "†"; surplus: "" | "†" | "‡"; detail: "" | "†" | "‡" | "§" };
 	/** One per mark, "†" first. */
 	footnotes: ExportFootnote[];
 }
 
-export function exportCoverage(view: View, figures: SurplusCost): ExportCoverage {
+export function exportCoverage(
+	view: View,
+	figures: SurplusCost,
+	details: AuctionDetails
+): ExportCoverage {
 	const end = view.end.time;
 	const auction = view.coverage.auction;
 	const surplus = figures.coverage.surplus;
+	const detail = details.coverage;
 	const from = (days: number) => (days > 0 ? end - days * DAY_MS : null);
 	const auctionMark = auction < view.days ? "†" : "";
 	const surplusMark = surplus >= view.days ? "" : surplus === auction ? auctionMark : "‡";
+	// Partly covered details mean partly covered auction data and surplus too (they never cover
+	// more), so matching days always match a mark.
+	const detailMark =
+		detail >= view.days ? "" : detail === auction ? "†" : detail === surplus ? "‡" : "§";
 	const footnotes: ExportFootnote[] = [];
 	if (auctionMark !== "") {
-		const key = surplusMark === "†" ? "auctionAndSurplus" : "auction";
+		const withSurplus = surplusMark === "†";
+		const withDetail = detailMark === "†";
+		const key = withSurplus
+			? withDetail
+				? "auctionSurplusAndDetail"
+				: "auctionAndSurplus"
+			: withDetail
+				? "auctionAndDetail"
+				: "auction";
 		footnotes.push({ key, covered: auction });
 	}
-	if (surplusMark === "‡") footnotes.push({ key: "surplus", covered: surplus });
+	if (surplusMark === "‡") {
+		const key = detailMark === "‡" ? "surplusAndDetail" : "surplus";
+		footnotes.push({ key, covered: surplus });
+	}
+	if (detailMark === "§") footnotes.push({ key: "detail", covered: detail });
 	return {
 		start: view.start,
 		end,
 		auctionFrom: from(auction),
 		surplusFrom: from(surplus),
-		marks: { auction: auctionMark, surplus: surplusMark },
+		detailFrom: from(detail),
+		marks: { auction: auctionMark, surplus: surplusMark, detail: detailMark },
 		footnotes,
 	};
 }
@@ -91,34 +130,52 @@ const CSV_COLUMNS = [
 	"typical_surplus_per_trade_usd",
 	"typical_surplus_bps",
 	"unusual_surplus_share",
+	"solutions",
+	"filtered_out_share",
+	"close_loss_share",
+	"quotes",
+	"quotes_share",
+	"quotes_verified_share",
+	"quotes_settled_share",
+	"protocol_fees_usd",
+	"partner_fees_usd",
 	"window_start_utc",
 	"window_end_utc",
 	"auction_data_from_utc",
 	"surplus_data_from_utc",
+	"detail_data_from_utc",
 ];
 
 /**
  * The leaderboard as CSV, its rows in the given order. Money keeps its cents (cost per trade to
- * four decimals); volume, batch value and gas are whole. `_pct` columns are percentages,
- * `unusual_surplus_share` a 0–1 fraction. The last four columns say which days the others cover;
- * an empty "from" means the source has no data in the window, and the columns it feeds are empty.
+ * four decimals); volume, batch value and gas are whole. `_pct` columns are percentages, `_share`
+ * columns 0–1 fractions; solutions and quotes are counts over the detail days, and fees are on the
+ * trades the solver settled. The last five columns say which days the others cover; an empty
+ * "from" means the source has no data in the window, and the columns it feeds are empty.
  */
 export function leaderboardCsv(
 	rows: readonly Row[],
 	figures: SurplusCost,
+	details: AuctionDetails,
 	coverage: ExportCoverage
 ): string {
 	// A value to `digits` decimals once scaled (a 0.42 share is 42.00 in percent); empty if unknown.
 	const decimals = (value: number | null | undefined, digits: number, scale = 1) =>
 		value === null || value === undefined ? "" : (value * scale).toFixed(digits);
 	// ISO 8601 UTC to the second, as block times are: 2026-10-03T15:21:51Z.
-	const window = [coverage.start, coverage.end, coverage.auctionFrom, coverage.surplusFrom].map(
-		(ms) => (ms === null ? "" : new Date(ms).toISOString().replace(".000Z", "Z"))
-	);
+	const window = [
+		coverage.start,
+		coverage.end,
+		coverage.auctionFrom,
+		coverage.surplusFrom,
+		coverage.detailFrom,
+	].map((ms) => (ms === null ? "" : new Date(ms).toISOString().replace(".000Z", "Z")));
 	const lines = rows.map((row) => {
 		const own = figures.rows.get(row.id);
 		// Without surplus trades, none of the surplus figures exists.
 		const surplus = exportedSurplus(own) === null ? undefined : own;
+		// Without auction details in the window, none of their figures exists.
+		const detail = details.coverage > 0 ? details.solvers.get(row.id) : undefined;
 		return [
 			row.rank,
 			`"${row.label.replaceAll('"', '""')}"`,
@@ -140,6 +197,15 @@ export function leaderboardCsv(
 			decimals(surplus?.typicalSurplusPerTrade, 2),
 			decimals(surplus?.typicalSurplusRate, 1, 10_000),
 			decimals(surplus?.unusualShare, 3),
+			decimals(detail?.solutions, 0),
+			decimals(detail?.filteredShare, 4),
+			decimals(detail?.closeLossShare, 3),
+			decimals(detail?.quotes, 0),
+			decimals(detail?.quoteShare, 4),
+			decimals(detail?.verifiedShare, 3),
+			decimals(detail?.settledShare, 3),
+			decimals(detail?.protocolFees, 2),
+			decimals(detail?.partnerFees, 2),
 			...window,
 		].join(",");
 	});

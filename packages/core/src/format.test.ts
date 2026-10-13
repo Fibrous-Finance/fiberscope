@@ -93,6 +93,11 @@ describe("format", () => {
 		assert.equal(f.gap(null), "—");
 	});
 
+	it("lists names without a comma before the last one", () => {
+		assert.equal(f.list(["OKX", "Rosato", "Arctic Bastion"]), "OKX, Rosato and Arctic Bastion");
+		assert.equal(f.list(["Nexroute", "Sector Finance"]), "Nexroute and Sector Finance");
+	});
+
 	it("switches gas to millions before thousands would round to 1000K", () => {
 		assert.equal(f.gas(644_123), "644K");
 		assert.equal(f.gas(999_400), "999K");

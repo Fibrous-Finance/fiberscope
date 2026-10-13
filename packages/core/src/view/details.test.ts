@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { Snapshot, SnapshotSolver } from "../snapshot.ts";
-import { auctionDetails } from "./details.ts";
+import { auctionDetails, quotesAxis } from "./details.ts";
 import { buildView } from "./view.ts";
 import type { Period } from "./view.ts";
 
@@ -132,5 +132,24 @@ describe("auctionDetails", () => {
 		assert.equal(d.network.filteredShare, null);
 		assert.equal(d.network.protocolFeeRate, null);
 		assert.deepEqual(d.quoters, []);
+	});
+});
+
+describe("quotesAxis", () => {
+	it("ends at the smallest of 10…60, 80 or 100% that holds the leader", () => {
+		assert.equal(quotesAxis(0.04).max, 0.1);
+		assert.equal(quotesAxis(0.1).max, 0.1);
+		assert.equal(quotesAxis(0.26).max, 0.3);
+		assert.equal(quotesAxis(0.6).max, 0.6);
+		assert.equal(quotesAxis(0.61).max, 0.8);
+		assert.equal(quotesAxis(0.81).max, 1);
+		assert.equal(quotesAxis(1).max, 1);
+	});
+
+	it("ticks every 10% up to 60%, then every 20%", () => {
+		assert.deepEqual(quotesAxis(0.26).ticks, [0, 0.1, 0.2, 0.3]);
+		assert.deepEqual(quotesAxis(0.55).ticks, [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]);
+		assert.deepEqual(quotesAxis(0.7).ticks, [0, 0.2, 0.4, 0.6, 0.8]);
+		assert.deepEqual(quotesAxis(0.9).ticks, [0, 0.2, 0.4, 0.6, 0.8, 1]);
 	});
 });

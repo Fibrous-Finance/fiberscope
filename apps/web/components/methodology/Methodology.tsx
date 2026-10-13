@@ -21,11 +21,16 @@ const MEASURES = [
 	"batchValue",
 	"surplus",
 	"unusual",
+	"quote",
+	"fees",
 	"networkAverage",
 ] as const;
 const SOURCES = [
 	"entered",
 	"winRate",
+	"score",
+	"filteredOut",
+	"closeLosses",
 	"leadingSince",
 	"sources",
 	"dune",
@@ -67,6 +72,7 @@ export function Methodology() {
 						chain: data.coverage.chainDays,
 						auction: data.coverage.auctionDays,
 						surplus: data.coverage.surplusDays,
+						detail: data.coverage.detailDays,
 					})
 				: t("terms.coverage.noData");
 		}

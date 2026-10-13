@@ -129,3 +129,24 @@ function total(series: readonly number[], days: number): number {
 function ratio(part: number, whole: number): number | null {
 	return whole > 0 ? part / whole : null;
 }
+
+/** Ends of the quotes axis, in percent of quoted trades. */
+const QUOTES_AXIS_ENDS = [10, 20, 30, 40, 50, 60, 80, 100];
+
+export interface QuotesAxis {
+	/** The axis end as a 0–1 share of quoted trades. */
+	max: number;
+	/** Ticks from 0 to `max`, as shares: every 10% up to 60%, then every 20%. */
+	ticks: number[];
+}
+
+/** The smallest axis end that holds the leading quoter's share of quoted trades. */
+export function quotesAxis(leader: number): QuotesAxis {
+	const end =
+		QUOTES_AXIS_ENDS.find((percent) => percent / 100 >= leader) ??
+		QUOTES_AXIS_ENDS[QUOTES_AXIS_ENDS.length - 1]!;
+	const step = end <= 60 ? 10 : 20;
+	const ticks: number[] = [];
+	for (let percent = 0; percent <= end; percent += step) ticks.push(percent / 100);
+	return { max: end / 100, ticks };
+}

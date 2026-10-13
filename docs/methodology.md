@@ -8,14 +8,16 @@ windows, shares, ranks and averages in `packages/core/src/view`.
 
 Every figure comes from public data on Base and from CoW Protocol's public services.
 
-| Source                                                                                                                              | Provides                                                                                                                        |
-| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `GPv2Settlement` (`0x9008d19f58aabd9ed0d60971565aa8510560ab41`): `Settlement`, `Trade` and `Interaction` events, receipts, calldata | Batches, trades, DEX swaps, gas, transaction cost, each transaction's sender and recipient, and each trade's signed order terms |
-| CoW API `GET /api/v2/solver_competition/by_tx_hash/{tx}`                                                                            | Every solution in the auction behind a settlement (solver, ranking, winner), and the auction's native token prices              |
-| [CoW's solver registry](https://cms.cow.fi/api/solver-networks), plus overrides in `apps/indexer/src/overrides.ts`                  | Solver names and their prod and barn submission addresses; an address the registry marks inactive is retired                    |
-| `GPv2AllowListAuthentication` (`0x2c4c28ddbdac9c5e7055b4c863b72ea0149d8afe`) `isSolver`                                             | Whether a flash-loan router settlement's sender or recipient is a solver, for attribution                                       |
-| Chainlink ETH/USD on Base (`0x71041dddad3595f9ced3dccfbe3d1f4b0a16bb70`)                                                            | The dollar rate at each settlement: the latest answer at or before its block                                                    |
-| ERC-20 `symbol()`                                                                                                                   | Token symbols for the latest settlements' pairs                                                                                 |
+| Source                                                                                                                              | Provides                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GPv2Settlement` (`0x9008d19f58aabd9ed0d60971565aa8510560ab41`): `Settlement`, `Trade` and `Interaction` events, receipts, calldata | Batches, trades, DEX swaps, gas, transaction cost, each transaction's sender and recipient, and each trade's signed order terms                                   |
+| CoW API `GET /api/v2/solver_competition/by_tx_hash/{tx}`                                                                            | Every solution in the auction behind a settlement (solver, ranking, winner, score, whether the fairness filter removed it), and the auction's native token prices |
+| CoW API `POST /api/v1/orders/by_uids`                                                                                               | Each traded order's quote (the solver that gave it, whether CoW verified it) and the partner fees its app data asks for                                           |
+| CoW API `GET /api/v2/trades?orderUid={uid}`                                                                                         | The protocol fees charged on each trade, one per fee policy, in the order CoW applied them                                                                        |
+| [CoW's solver registry](https://cms.cow.fi/api/solver-networks), plus overrides in `apps/indexer/src/overrides.ts`                  | Solver names and their prod and barn submission addresses; an address the registry marks inactive is retired                                                      |
+| `GPv2AllowListAuthentication` (`0x2c4c28ddbdac9c5e7055b4c863b72ea0149d8afe`) `isSolver`                                             | Whether a flash-loan router settlement's sender or recipient is a solver, for attribution                                                                         |
+| Chainlink ETH/USD on Base (`0x71041dddad3595f9ced3dccfbe3d1f4b0a16bb70`)                                                            | The dollar rate at each settlement: the latest answer at or before its block                                                                                      |
+| ERC-20 `symbol()`                                                                                                                   | Token symbols for the latest settlements' pairs                                                                                                                   |
 
 Only the production settlement contract is read. CoW's barn (staging) environment settles through
 a separate contract, `0xf553d092b50bdcbdded1a99af2ca29fbe5e2cb13`, so barn's settlements are not
@@ -34,9 +36,10 @@ counted.
   if Ethereum reorganizes the blocks that hold its data.
 - **Coverage.** Only complete days count. Settlement history (batches, trades, gas, transaction
   cost, DEX swaps) reaches furthest back. Volume, Entered and Win rate also need auction data, and
-  surplus also needs the terms each order was signed with. In a window longer than the history
-  behind a figure, the figure covers only the days that have it, and a note says so instead of
-  extrapolating.
+  surplus also needs the terms each order was signed with. Auction details (scores, filtered-out
+  solutions, quotes and fees) are looked up in CoW's API after the auction data, so they never
+  reach further back. In a window longer than the history behind a figure, the figure covers only
+  the days that have it, and a note says so instead of extrapolating.
 - **Earlier window.** Rank changes (▲, ▼, NEW) and share changes compare the window with the window
   of the same length just before it, once the history covers both.
 - **Freshness.** New data arrives every 10 minutes, and an open page fetches it within about a
@@ -125,6 +128,30 @@ settled. **Typical surplus** excludes these trades; the unusual share is their p
 surplus. The split is decided exactly on the amounts:
 `10 × (bought × limitSell − sold × limitBuy) > bought × limitSell`.
 
+### Quotes
+
+The quote each order was placed with, as CoW's order book records it: the best of the solvers'
+quotes when the trader asked for a price, with the solver that gave it. Counted by trade, on the
+day the trade settled. A solver's share is the trades placed with its quote divided by all trades
+placed with a solver's quote; a quote that names no solver (the zero address) counts for no one.
+**Verified**: CoW checked the quote by simulating it. **Settled itself**: the solver that gave the
+quote also settled the trade, as attributed below. These figures say whose price traders signed
+against, not who earned quote rewards, which CoW pays by a different rule.
+
+### Fees
+
+The protocol fees CoW's trades API lists for each trade, one per fee policy, in the order CoW
+applied them. CoW's own fees come first; an order's partner fees, which its app data asks for on
+behalf of the app or wallet that placed it, are applied last, so the last fees, one per partner fee
+in the app data, are the partner fees. When the fees do not line up with the app data, the split
+is left open and the fee counts in neither total. Each fee is in one of the trade's two tokens and
+is valued at the trade's own exchange rate, its share of the trade's amount in that token times the
+trade's value (as in Volume), since a single token's native price can be far off. Fees count for
+the solver that settled the trade; solvers do not set them, so the page shows them per settlement
+and for the network, and per solver only in the exports. A settlement shows its fees only when the
+fees of all its trades are known. In basis points, the fees are divided by the volume of the same
+days.
+
 ### Network average
 
 Gas, transaction cost and DEX swaps per trade across all solvers, weighted by trades: all solvers'
@@ -144,6 +171,32 @@ rate rather than 0%: its auction data is missing.
 The share of the auctions a solver entered that it won, alone or with other winners. A solver's
 detail also gives its wins as a share of all the window's auctions.
 
+### Score
+
+The value CoW's protocol computes for each solution from its executed amounts and chooses winners
+by (CIP-20): roughly the surplus the solution generates for traders. CoW's API gives it in ETH; the
+page converts it to USD at Chainlink's ETH/USD rate at the auction's start block, to 6 significant
+figures. **Below winner** is (winning score − score) ÷ winning score. It is given only for auctions
+with a single winning solution: with several winners, a losing solution competed only with the
+winner whose orders it would also have settled, which the scores do not say. Each solver's row
+shows its best solution, its first in CoW's ranking: the winners, then the other solutions by
+score, then the filtered-out ones.
+
+### Filtered out
+
+Removed by the fairness filter of CoW's combinatorial auction (CIP-67). For each token pair traded
+in one direction, CoW takes the best solution with only that pair's orders as a reference; a
+solution that batches several pairs is filtered out when it gives any of them less than that
+reference. A filtered-out solution cannot win. A solver's share is its filtered-out solutions
+divided by all its solutions, in the auctions that started in the window.
+
+### Lost by 1% or less
+
+Of the auctions with a single winning solution that a solver entered and lost with at least one
+solution that passed the filter, the share in which its best such solution scored at least 99% of
+the winning score, decided exactly on the scores. Auctions with several winners count in neither
+part.
+
 ### Leading since
 
 The first day of the current unbroken run in which the same solver alone ranked #1 by daily share
@@ -153,8 +206,10 @@ reaches back to the start of the data, the page says "N+ days in a row".
 ### Latest auctions and settlements
 
 The tape shows the latest 48 auctions and, for each solver, whether it won, entered or stayed out
-of each. Latest settlements lists the 50 most recent batches across all solvers; each solver's
-detail lists its 6 most recent. A settlement's pair shows the tokens in its first trade.
+of each; selecting an auction shows all its solutions and their scores. Latest settlements lists
+the 50 most recent batches across all solvers, with their protocol and partner fees and the solver
+whose quote the first trade's order was placed with; each solver's detail lists its 6 most recent,
+with the quote but not the fees. A settlement's pair shows the tokens in its first trade.
 
 ## Attribution
 

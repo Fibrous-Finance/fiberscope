@@ -41,6 +41,14 @@
 			"term": "Unusual surplus",
 			"text": "Surplus above a tenth of the trade’s value, CoW’s own cutoff (Dune query 1368423). It comes from limits set far from the market, such as very wide slippage or stale orders. “Typical surplus” excludes these trades; the unusual share is their portion of a solver’s surplus."
 		},
+		"quote": {
+			"term": "Quote",
+			"text": "The quote an order was placed with: the best of the solvers’ quotes when the trader asked for a price, as CoW’s order book records it with the solver that gave it. Verified: CoW checked the quote by simulating it. Settled itself: the solver that gave the quote also settled the trade. Counted by trade. These figures say whose price traders signed against, not who earned quote rewards, which CoW pays by a different rule."
+		},
+		"fees": {
+			"term": "Fees",
+			"text": "Protocol fees are CoW’s: on market orders, half of the improvement over the quote; on limit orders that execute beyond the market price, half of the surplus; either capped at 0.98% of volume; then a volume fee of 2\u00a0bps, or 0.3\u00a0bps for correlated pairs such as stablecoins. Partner fees are set by the integrator in the order, up to 100\u00a0bps, and apply after CoW’s own fees; CoW keeps a quarter as a service fee. Each is charged in the trade’s surplus token, as CoW’s trades API lists it, and valued at the trade’s own exchange rate. Fees follow the orders a solver settles; solvers do not set them."
+		},
 		"networkAverage": {
 			"term": "Network average",
 			"text": "Gas, transaction cost and DEX swaps per trade across all solvers, weighted by trades. Typical surplus across all solvers, weighted by volume."
@@ -53,13 +61,25 @@
 			"term": "Win rate",
 			"text": "Share of the auctions a solver entered that it won, alone or with other winners."
 		},
+		"score": {
+			"term": "Score",
+			"text": "The value CoW’s protocol computes for each solution from its executed amounts and chooses winners by: roughly the surplus the solution generates for traders. It is in ETH; the page shows it in USD at Chainlink’s ETH/USD rate when the auction started. Below winner: how much lower a solution scored than the winning one, given only for auctions with a single winner, since in the others a solution competes with only one of the winners."
+		},
+		"filteredOut": {
+			"term": "Filtered out",
+			"text": "Removed by the fairness filter of CoW’s combinatorial auction (CIP-67). For each token pair traded in one direction, CoW takes the best solution with only that pair’s orders as a reference; a solution that batches several pairs is filtered out when it gives any of them less than that reference. A filtered-out solution cannot win. A solver’s share: its filtered-out solutions divided by all its solutions."
+		},
+		"closeLosses": {
+			"term": "Lost by 1% or less",
+			"text": "Of the auctions with one winner that a solver entered and lost with a solution that passed the filter, the share in which its best solution scored at most 1% below the winning score."
+		},
 		"leadingSince": {
 			"term": "Leading since",
 			"text": "First day of the current unbroken run in which the same solver alone ranked #1 by daily share of the selected measure."
 		},
 		"sources": {
 			"term": "Sources",
-			"text": "Settlement events, calldata, receipts and token symbols on Base, the settlement contract’s on-chain solver allow-list, CoW Protocol’s solver-competition API, CoW’s solver registry and Chainlink’s ETH/USD feed."
+			"text": "Settlement events, calldata, receipts and token symbols on Base, the settlement contract’s on-chain solver allow-list, CoW Protocol’s solver-competition API, order book and trades API, CoW’s solver registry and Chainlink’s ETH/USD feed."
 		},
 		"dune": {
 			"term": "Dune",
@@ -85,7 +105,7 @@
 		},
 		"coverage": {
 			"term": "Coverage",
-			"text": "Settlement history goes back {chain, plural, one {#\u00a0day} other {#\u00a0days}}, auction history {auction, plural, one {#\u00a0day} other {#\u00a0days}} and surplus history {surplus, plural, one {#\u00a0day} other {#\u00a0days}}. Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page.",
+			"text": "Settlement history goes back {chain, plural, one {# day} other {# days}}, auction history {auction, plural, one {# day} other {# days}}, surplus history {surplus, plural, one {# day} other {# days}} and auction details, the solutions, quotes and fees, {detail, plural, one {# day} other {# days}}. Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page.",
 			"noData": "Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page."
 		},
 		"names": {

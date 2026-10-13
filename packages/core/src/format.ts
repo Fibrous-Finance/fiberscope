@@ -26,6 +26,12 @@ export interface Format {
 	cost(value: number | null): string;
 	/** A 0–1 ratio in basis points, whole and separated: 65 · 4,201 */
 	bps(ratio: number | null): string;
+	/** A 0–1 ratio in basis points with one decimal, for fees: 3.7 · <0.1 */
+	bps1(ratio: number | null): string;
+	/** A solution's score in USD: $4.5783 under $100, $165.47 under $10,000, then $12,345 */
+	score(value: number | null): string;
+	/** How far below the winning score, from a 0–1 ratio: 0.12% · 5.4% · 18% · <0.01% · >99% */
+	gap(ratio: number | null): string;
 	/** Gas units: 644K · 1.37M */
 	gas(units: number | null): string;
 	/** A 0–1 ratio as a percentage: 46.9%. Only 0 and 1 show as 0% and 100%: <1%, >99%. */
@@ -99,6 +105,12 @@ export function createFormat(locale: string): Format {
 		minimumFractionDigits: 2,
 		maximumFractionDigits: 2,
 	});
+	const scoreUsd = number({
+		style: "currency",
+		currency: "USD",
+		minimumFractionDigits: 4,
+		maximumFractionDigits: 4,
+	});
 	const gasK = number({ notation: "compact", maximumFractionDigits: 0 });
 	const gasM = number({
 		notation: "compact",
@@ -118,6 +130,18 @@ export function createFormat(locale: string): Format {
 			decimals.set(digits, f);
 		}
 		return f.format(value);
+	};
+	const percentFormat = (digits: number) => {
+		let f = percents.get(digits);
+		if (!f) {
+			f = number({
+				style: "percent",
+				minimumFractionDigits: digits,
+				maximumFractionDigits: digits,
+			});
+			percents.set(digits, f);
+		}
+		return f;
 	};
 	// "13 Sep" never splits across lines: a no-break space joins the day and the month.
 	const day = (ms: number) => {
@@ -165,6 +189,32 @@ export function createFormat(locale: string): Format {
 			return usdCents(value);
 		},
 		bps: (ratio) => (ratio === null ? DASH : integer.format(Math.round(ratio * 10_000))),
+		bps1(ratio) {
+			if (ratio === null) return DASH;
+			const bps = ratio * 10_000;
+			// A fee of a few hundredths of a basis point is not "0.0".
+			return bps > 0 && bps < 0.05 ? `<${fixed(0.1, 1)}` : fixed(bps, 1);
+		},
+		score(value) {
+			if (value === null) return DASH;
+			if (value <= 0) return wholeUsd.format(0);
+			if (value < 0.00005) return `<${scoreUsd.format(0.0001)}`;
+			// Four decimals tell apart scores 0.1% apart, as the solutions compare them; each
+			// step starts where the one below would round up into it.
+			if (Number(value.toFixed(4)) < 100) return scoreUsd.format(value);
+			if (Number(value.toFixed(2)) < 10_000) return centsUsd.format(value);
+			return wholeUsd.format(value);
+		},
+		gap(ratio) {
+			if (ratio === null) return DASH;
+			if (ratio <= 0) return percentFormat(0).format(0);
+			if (ratio < 0.00005) return `<${percentFormat(2).format(0.0001)}`;
+			if (Number((ratio * 100).toFixed(2)) < 1) return percentFormat(2).format(ratio);
+			if (Number((ratio * 100).toFixed(1)) < 10) return percentFormat(1).format(ratio);
+			// A solution that scored a little above zero is not "100%" below the winner.
+			if (ratio < 1 && ratio >= 0.995) return `>${percentFormat(0).format(0.99)}`;
+			return percentFormat(0).format(ratio);
+		},
 		gas(units) {
 			if (units === null) return DASH;
 			// From 999.5K on, rounding to whole thousands would print "1000K".
@@ -172,15 +222,7 @@ export function createFormat(locale: string): Format {
 		},
 		percent(ratio, digits = 0) {
 			if (ratio === null) return DASH;
-			let f = percents.get(digits);
-			if (!f) {
-				f = number({
-					style: "percent",
-					minimumFractionDigits: digits,
-					maximumFractionDigits: digits,
-				});
-				percents.set(digits, f);
-			}
+			const f = percentFormat(digits);
 			// A solver that won a few auctions did not win "0%" of them, and one that missed a
 			// few did not enter "100%".
 			const step = 10 ** -(digits + 2);

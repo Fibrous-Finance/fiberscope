@@ -63,6 +63,36 @@ describe("format", () => {
 		assert.equal(f.bps(null), "—");
 	});
 
+	it("writes fees in basis points with one decimal, never as 0.0 above zero", () => {
+		assert.equal(f.bps1(0.000_371), "3.7");
+		assert.equal(f.bps1(0.000_004), "<0.1");
+		assert.equal(f.bps1(0), "0.0");
+		assert.equal(f.bps1(null), "—");
+	});
+
+	it("writes scores with four decimals under $100, cents under $10,000, then whole dollars", () => {
+		assert.equal(f.score(4.578_293), "$4.5783");
+		assert.equal(f.score(0.019_4), "$0.0194");
+		assert.equal(f.score(0.000_04), "<$0.0001");
+		assert.equal(f.score(99.999_96), "$100.00");
+		assert.equal(f.score(165.47), "$165.47");
+		assert.equal(f.score(9_999.996), "$10,000");
+		assert.equal(f.score(0), "$0");
+		assert.equal(f.score(null), "—");
+	});
+
+	it("writes gaps below the winner with fewer decimals as they grow", () => {
+		assert.equal(f.gap(0.001_17), "0.12%");
+		assert.equal(f.gap(0.000_04), "<0.01%");
+		assert.equal(f.gap(0.009_96), "1.0%");
+		assert.equal(f.gap(0.053_8), "5.4%");
+		assert.equal(f.gap(0.099_96), "10%");
+		assert.equal(f.gap(0.180_4), "18%");
+		assert.equal(f.gap(0.996), ">99%");
+		assert.equal(f.gap(1), "100%");
+		assert.equal(f.gap(null), "—");
+	});
+
 	it("switches gas to millions before thousands would round to 1000K", () => {
 		assert.equal(f.gas(644_123), "644K");
 		assert.equal(f.gas(999_400), "999K");

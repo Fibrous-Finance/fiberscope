@@ -8,6 +8,11 @@ import { arrow } from "@/components/ui/Section";
 const SOURCE_URL = "https://github.com/Fibrous-Finance/fiberscope";
 /** The commit this build comes from (see `env` in next.config.ts); empty outside deploys. */
 const SITE_COMMIT = process.env.SITE_COMMIT ?? "";
+/**
+ * A sentence of the code-version line: wide pages keep both on one line; in compact mode each is
+ * its own 44px line, so the two links' 44px targets never overlap.
+ */
+const SENTENCE = "max-wide:block max-wide:leading-11";
 
 /**
  * The same footer on every page. The Fibrous credit sits in the small print, the one place the
@@ -61,12 +66,23 @@ export function Footer({
 					<span>{t("independent")}</span>
 					{SITE_COMMIT && (
 						<span>
-							{t.rich(dataCommit ? "commits" : "commit", {
-								site: SITE_COMMIT.slice(0, 7),
-								data: dataCommit?.slice(0, 7) ?? "",
-								siteLink: (chunks) => commitLink(SITE_COMMIT, chunks),
-								dataLink: (chunks) => commitLink(dataCommit ?? "", chunks),
-							})}
+							<span className={SENTENCE}>
+								{t.rich("commit", {
+									site: SITE_COMMIT.slice(0, 7),
+									siteLink: (chunks) => commitLink(SITE_COMMIT, chunks),
+								})}
+							</span>
+							{dataCommit && (
+								<>
+									{" "}
+									<span className={SENTENCE}>
+										{t.rich("dataCommit", {
+											data: dataCommit.slice(0, 7),
+											dataLink: (chunks) => commitLink(dataCommit, chunks),
+										})}
+									</span>
+								</>
+							)}
 						</span>
 					)}
 				</p>
@@ -89,14 +105,17 @@ export function Footer({
 	);
 }
 
-/** A short hash linked to its commit; the padding makes it a 44px target without moving the line. */
+/**
+ * A short hash linked to its commit. Its hit area moves nothing: 4px of vertical padding on wide
+ * pages (24px), and in compact mode its sentence's whole 44px line.
+ */
 function commitLink(commit: string, chunks: ReactNode) {
 	return (
 		<a
 			href={`${SOURCE_URL}/commit/${commit}`}
 			target="_blank"
 			rel="noopener"
-			className="py-3.5 font-mono quiet"
+			className="py-1 font-mono quiet max-wide:inline-block max-wide:py-0 max-wide:leading-11"
 		>
 			{chunks}
 		</a>

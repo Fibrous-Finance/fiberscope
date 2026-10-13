@@ -82,6 +82,20 @@ export interface TradeValueRow {
 	auctionId: number | null;
 }
 
+/** A trade with its order terms and its transaction's recipient, for checking the terms. */
+export interface TermRow {
+	tx: string;
+	block: number;
+	logIndex: number;
+	/** The transaction's recipient (`tx.to`); null in rows stored before it was kept. */
+	recipient: string | null;
+	sellToken: string;
+	buyToken: string;
+	limitSellAmount: string | null;
+	limitBuyAmount: string | null;
+	feeAmount: string | null;
+}
+
 export interface SolutionRow {
 	auctionId: number;
 	startBlock: number;
@@ -500,6 +514,25 @@ export class Store {
 			`${TRADE_ROWS} WHERE tr.block = ? AND tr.settlement_log_index = ? ORDER BY tr.log_index`,
 			block,
 			logIndex
+		);
+	}
+
+	/** Trades in a block range with their order terms and their transaction's recipient. */
+	termRows(range: BlockRange): IterableIterator<TermRow> {
+		return this.#iterate(
+			`SELECT ${hexOf("s.tx")} AS tx, tr.block, tr.log_index AS logIndex,
+				re.address AS recipient, st.address AS sellToken, bt.address AS buyToken,
+				tr.limit_sell_amount AS limitSellAmount, tr.limit_buy_amount AS limitBuyAmount,
+				tr.fee_amount AS feeAmount
+			FROM trades tr
+				JOIN settlements s ON s.block = tr.block AND s.log_index = tr.settlement_log_index
+				LEFT JOIN addresses re ON re.id = s.recipient
+				JOIN addresses st ON st.id = tr.sell_token
+				JOIN addresses bt ON bt.id = tr.buy_token
+			WHERE tr.block BETWEEN ? AND ?
+			ORDER BY tr.block, tr.log_index`,
+			range.from,
+			range.to
 		);
 	}
 

@@ -187,56 +187,77 @@ describe("attribution", () => {
 			isRegistered,
 			() => nexroute
 		);
-		assert.equal(credited, rizzolver);
+		assert.deepEqual(credited, { address: rizzolver, source: "event" });
 	});
 
 	test("credits the router settlement's recipient when it is registered", () => {
 		const parties = routed({ sender: nexroute, recipient: rizzolver });
-		assert.equal(
+		assert.deepEqual(
 			creditedAddress(parties, isRegistered, () => nexroute),
-			rizzolver
+			{
+				address: rizzolver,
+				source: "recipient",
+			}
 		);
 	});
 
 	test("credits the router settlement's recipient when it is allow-listed", () => {
 		const parties = routed({ sender: nexroute, recipient: operator, recipientIsSolver: true });
-		assert.equal(
+		assert.deepEqual(
 			creditedAddress(parties, isRegistered, () => nexroute),
-			operator
+			{
+				address: operator,
+				source: "recipient",
+			}
 		);
 	});
 
 	test("never credits the router itself as the recipient, but the sender", () => {
 		const parties = routed({ sender: nexroute, recipientIsSolver: true });
-		assert.equal(
+		assert.deepEqual(
 			creditedAddress(parties, isRegistered, () => rizzolver),
-			nexroute
+			{
+				address: nexroute,
+				source: "sender",
+			}
 		);
 		const allowListed = routed({ sender: operator, senderIsSolver: true });
-		assert.equal(
+		assert.deepEqual(
 			creditedAddress(allowListed, isRegistered, () => rizzolver),
-			operator
+			{
+				address: operator,
+				source: "sender",
+			}
 		);
 	});
 
 	test("falls back to the API's winner when neither recipient nor sender is a solver", () => {
 		const parties = routed({ recipient: operator });
-		assert.equal(
+		assert.deepEqual(
 			creditedAddress(parties, isRegistered, () => rizzolver),
-			rizzolver
+			{
+				address: rizzolver,
+				source: "winner",
+			}
 		);
 	});
 
-	test("keeps the sender when nothing else is known", () => {
+	test("keeps the sender, unverified, when nothing else is known", () => {
 		const unknown = routed({ recipient: null });
-		assert.equal(
+		assert.deepEqual(
 			creditedAddress(unknown, isRegistered, () => null),
-			helper
+			{
+				address: helper,
+				source: "unverified",
+			}
 		);
 		const unregistered = routed({ recipient: operator });
-		assert.equal(
+		assert.deepEqual(
 			creditedAddress(unregistered, isRegistered, () => null),
-			helper
+			{
+				address: helper,
+				source: "unverified",
+			}
 		);
 	});
 });

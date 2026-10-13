@@ -21,6 +21,18 @@ export interface Competition {
 	solutions: Solution[];
 }
 
+/** A signed order as CoW's order book holds it; addresses lowercase. */
+export interface BookOrder {
+	sellToken: string;
+	buyToken: string;
+	sellAmount: string;
+	buyAmount: string;
+	/** The signed fee, in sell-token atoms. */
+	feeAmount: string;
+	kind: "sell" | "buy";
+	partiallyFillable: boolean;
+}
+
 const ATTEMPTS = 10;
 const TIMEOUT_MS = 60_000;
 
@@ -40,6 +52,34 @@ export class CowApi {
 	async competitionByTx(tx: string): Promise<Competition | null> {
 		const json = await this.#get(`/api/v2/solver_competition/by_tx_hash/${tx}`);
 		return json === null ? null : parseCompetition(json);
+	}
+
+	/** An order from CoW's order book, by its uid; null when the API has none. */
+	async order(uid: string): Promise<BookOrder | null> {
+		const json = await this.#get(`/api/v1/orders/${uid}`);
+		if (json === null) return null;
+		const { sellToken, buyToken, sellAmount, buyAmount, feeAmount, kind, partiallyFillable } =
+			json as Partial<Record<keyof BookOrder, unknown>>;
+		if (
+			typeof sellToken !== "string" ||
+			typeof buyToken !== "string" ||
+			typeof sellAmount !== "string" ||
+			typeof buyAmount !== "string" ||
+			typeof feeAmount !== "string" ||
+			(kind !== "sell" && kind !== "buy") ||
+			typeof partiallyFillable !== "boolean"
+		) {
+			throw new Error(`unexpected order ${uid}: ${JSON.stringify(json).slice(0, 200)}`);
+		}
+		return {
+			sellToken: sellToken.toLowerCase(),
+			buyToken: buyToken.toLowerCase(),
+			sellAmount,
+			buyAmount,
+			feeAmount,
+			kind,
+			partiallyFillable,
+		};
 	}
 
 	async #get(path: string): Promise<unknown> {

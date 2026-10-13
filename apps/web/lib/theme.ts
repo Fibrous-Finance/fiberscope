@@ -1,6 +1,7 @@
 /**
  * Appearance: Auto follows the system; Light and Dark pin a theme. The choice is saved and applied
- * before first paint by `themeScript`, so the page never flashes the wrong theme.
+ * before first paint by `themeScript`, so the page never flashes the wrong theme. A change recolors
+ * the whole page in one frame (see `applyAppearance`).
  */
 
 export type Appearance = "auto" | "light" | "dark";
@@ -12,6 +13,13 @@ const DARK_QUERY = "(prefers-color-scheme: dark)";
 /** `<meta name="theme-color">` follows the active background. */
 const BACKGROUND: Record<Theme, string> = { light: "#F7F8F8", dark: "#1B1F2C" };
 const CHANGE_EVENT = "fiberscope:appearance";
+/**
+ * Holds every transition while the theme changes. Rows, bars, dots and links fade their colors on
+ * hover; without this, those fades would also run on a theme change, each at its own speed, while
+ * the rest of the page switched at once. Running transitions, such as the mosaic's intro, go on.
+ */
+const HOLD_TRANSITIONS =
+	"*,*::before,*::after{transition-duration:0s!important;transition-delay:0s!important}";
 
 /** Inline in `<head>`: mirrors `applyAppearance` for the saved choice, before React loads. */
 export const themeScript = `(()=>{try{var p=localStorage.getItem(${JSON.stringify(STORAGE_KEY)}),d=document.documentElement;if(p==="light"||p==="dark")d.dataset.theme=p;var t=p==="light"||p==="dark"?p:matchMedia(${JSON.stringify(DARK_QUERY)}).matches?"dark":"light";var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?${JSON.stringify(BACKGROUND.dark)}:${JSON.stringify(BACKGROUND.light)})}catch(e){}})()`;
@@ -31,10 +39,15 @@ export function systemTheme(): Theme {
 
 function applyAppearance(appearance: Appearance): void {
 	const root = document.documentElement;
+	const hold = document.createElement("style");
+	hold.textContent = HOLD_TRANSITIONS;
+	document.head.append(hold);
 	if (appearance === "auto") delete root.dataset.theme;
 	else root.dataset.theme = appearance;
 	const theme = appearance === "auto" ? systemTheme() : appearance;
 	document.querySelector('meta[name="theme-color"]')?.setAttribute("content", BACKGROUND[theme]);
+	// The next frame recolors the page with transitions held; the one after releases them.
+	requestAnimationFrame(() => requestAnimationFrame(() => hold.remove()));
 }
 
 export function saveAppearance(appearance: Appearance): void {

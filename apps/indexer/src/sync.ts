@@ -42,12 +42,12 @@ export interface SyncStats {
 const CATCH_UP_SLACK = 150;
 
 /**
- * Brings the database up to date. Chain and auction data catch up with Base's safe block, and so
- * do the details: the auctions' scores, and the quotes and protocol fees of the orders traded.
- * That makes the data current (the last run time) and is when the snapshot is written. Then
- * chain, auction and detail history are backfilled to the requested depths, within the budget if
- * there is one; the snapshot is written again if history grew. Every step resumes where an
- * interrupted or stopped run left off.
+ * Brings the database up to date. Chain and auction data catch up with Base's safe block, which
+ * makes the data current (the last run time) and is when the snapshot is written. Then the
+ * details (the auctions' scores, and the quotes and protocol fees of the orders traded) catch up
+ * with the auctions, and chain, auction and detail history are backfilled to the requested
+ * depths, within the budget if there is one; the snapshot is written again if history grew. Every
+ * step resumes where an interrupted or stopped run left off.
  */
 export async function sync(
 	store: Store,
@@ -81,7 +81,6 @@ export async function sync(
 			if ((await safeHead(rpc)) - store.chainRange()!.to <= CATCH_UP_SLACK) break;
 		}
 		await resolveRouterSenders(store, cow, registry, stats.auctions);
-		await catchUpDetails(store, cow, stats.details);
 		if (options.prune && chainDays > 0) {
 			const end = store.chainRange()!.to;
 			store.prune(
@@ -96,8 +95,9 @@ export async function sync(
 	// Backfill. The chain runs newest first and the auction backfill trails it, so the RPC and
 	// the CoW API rate limits are spent at the same time, and the chain reaches the auction depth
 	// before it goes deeper: auction history never waits for the full chain depth. The details
-	// trail the auctions in turn, and the trades stored before the schema held order uids get
-	// them from the RPC.
+	// first catch up with the auctions, then trail the auction backfill; the page does not show
+	// them yet, so they come after the snapshot and cannot hold it up. The trades stored before
+	// the schema held order uids get them from the RPC.
 	const head = empty ? await safeHead(rpc) : store.chainRange()!.to;
 	const chainFrom = store.chainRange()?.from;
 	const auctionFrom = store.auctionRange()?.from;
@@ -146,6 +146,7 @@ export async function sync(
 		}
 	})();
 	const detailWork = (async () => {
+		await catchUpDetails(store, cow, stats.details);
 		if (options.auctionDays > 0) {
 			const low = windowStart(head, options.auctionDays);
 			await backfillDetails(store, cow, low, details, stats.details, stop);

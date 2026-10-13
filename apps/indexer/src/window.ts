@@ -3,6 +3,7 @@ import { timeOf } from "./config.ts";
 import { auctionOutcomes, creditedBatches, TradeValuer } from "./facts.ts";
 import { fmt, shortAddress } from "./log.ts";
 import type { Registry, SolverIdentity } from "./registry.ts";
+import { feeUsd } from "./rules.ts";
 import type { BlockRange } from "./rules.ts";
 import type { Store } from "./store.ts";
 
@@ -159,9 +160,10 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		if (trade.feesChecked === null) fees.pending++;
 		else if (trade.feesChecked === 0) fees.unknown++;
 		else fees.checked++;
+		const tradeUsd = trade.fees === null ? null : valuer.usd(trade);
 		for (const item of trade.fees?.split(",") ?? []) {
 			const [partner, amount, token] = item.split(" ");
-			const usd = valuer.amountUsd(trade.auctionId, trade.block, token, amount);
+			const usd = tradeUsd === null ? null : feeUsd({ token, amount }, trade, tradeUsd);
 			if (usd === null) unpricedFees++;
 			else if (partner === "?") unclearFees += usd;
 			else if (partner === "1") {

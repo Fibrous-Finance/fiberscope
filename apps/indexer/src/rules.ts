@@ -106,12 +106,25 @@ export function tradeVolumeUsd(
 }
 
 /**
- * A token amount's USD value at a native price, as each side of tradeVolumeUsd is valued; null
- * without a price or with a zero price.
+ * A fee's USD value at its trade's own exchange rate: its share of the trade's amount in the fee's
+ * token, times the trade's value. A single token's native price can be far off, which the trade's
+ * value guards against by taking the lower of its two sides. Null when the fee is in neither of
+ * the trade's tokens, or the trade's amount in it is zero.
  */
-export function tokenUsd(amount: string, price: string | null, ethUsd: number): number | null {
-	const native = price === null ? 0n : BigInt(price);
-	return native > 0n ? (Number(BigInt(amount) * native) / 1e36) * ethUsd : null;
+export function feeUsd(
+	fee: { token: string; amount: string },
+	trade: { sellToken: string; buyToken: string; sellAmount: string; buyAmount: string },
+	tradeUsd: number
+): number | null {
+	const token = priceToken(fee.token);
+	const side =
+		token === priceToken(trade.buyToken)
+			? trade.buyAmount
+			: token === priceToken(trade.sellToken)
+				? trade.sellAmount
+				: null;
+	if (side === null || BigInt(side) === 0n) return null;
+	return (Number(BigInt(fee.amount)) / Number(BigInt(side))) * tradeUsd;
 }
 
 /** What surplus needs from a trade: its executed amounts and its order terms (see OrderTerms). */

@@ -131,6 +131,10 @@ export interface TradeDetailRow {
 	/** The address that called `settle` for the trade's settlement. */
 	solver: string;
 	auctionId: number | null;
+	sellToken: string;
+	buyToken: string;
+	sellAmount: string;
+	buyAmount: string;
 	/** 1 when CoW's order book has the order, 0 when it lacks it, null when not looked up. */
 	found: number | null;
 	quoteSolver: string | null;
@@ -1048,14 +1052,18 @@ export class Store {
 	tradeDetails(range: BlockRange): IterableIterator<TradeDetailRow> {
 		return this.#iterate(
 			`SELECT tr.block, tr.log_index AS logIndex, tr.settlement_log_index AS settlementLogIndex,
-				so.address AS solver, a.auction_id AS auctionId, o.found, qs.address AS quoteSolver,
-				o.quote_verified AS quoteVerified, tr.fees_checked AS feesChecked,
+				so.address AS solver, a.auction_id AS auctionId, st.address AS sellToken,
+				bt.address AS buyToken, tr.sell_amount AS sellAmount, tr.buy_amount AS buyAmount,
+				o.found, qs.address AS quoteSolver, o.quote_verified AS quoteVerified,
+				tr.fees_checked AS feesChecked,
 				(SELECT GROUP_CONCAT(COALESCE(f.partner, '?') || ' ' || f.amount || ' ' || fa.address, ',')
 					FROM trade_fees f JOIN addresses fa ON fa.id = f.token
 					WHERE f.block = tr.block AND f.log_index = tr.log_index) AS fees
 			FROM trades tr
 				JOIN settlements s ON s.block = tr.block AND s.log_index = tr.settlement_log_index
 				JOIN addresses so ON so.id = s.solver
+				JOIN addresses st ON st.id = tr.sell_token
+				JOIN addresses bt ON bt.id = tr.buy_token
 				LEFT JOIN auction_txs a ON a.tx = s.tx
 				LEFT JOIN orders o ON o.uid = tr.order_uid
 				LEFT JOIN addresses qs ON qs.id = o.quote_solver

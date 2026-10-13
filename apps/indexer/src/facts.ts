@@ -6,7 +6,6 @@ import {
 	batchCostUsd,
 	creditedAddress,
 	priceToken,
-	tokenUsd,
 	tradeSurplus,
 	tradeVolumeUsd,
 } from "./rules.ts";
@@ -80,6 +79,12 @@ export interface TradeValue {
 	surplus: TradeSurplus | null;
 }
 
+/** What valuing a trade needs: its auction, its block and its two sides. */
+export type PricedTrade = Pick<
+	TradeValueRow,
+	"auctionId" | "block" | "sellToken" | "buyToken" | "sellAmount" | "buyAmount"
+>;
+
 /** Values trades with their own auction's native prices and ETH/USD at their block. */
 export class TradeValuer {
 	readonly #store: Store;
@@ -92,7 +97,25 @@ export class TradeValuer {
 	}
 
 	value(trade: TradeValueRow): TradeValue {
-		if (trade.auctionId === null) return { usd: null, pricedSides: 0, surplus: null };
+		const { usd, sellPrice, buyPrice } = this.#priced(trade);
+		return {
+			usd,
+			pricedSides: usd === null ? 0 : Number(sellPrice !== null) + Number(buyPrice !== null),
+			surplus: tradeSurplus(usd, trade),
+		};
+	}
+
+	/** A trade's USD value alone (see value). */
+	usd(trade: PricedTrade): number | null {
+		return this.#priced(trade).usd;
+	}
+
+	#priced(trade: PricedTrade): {
+		usd: number | null;
+		sellPrice: string | null;
+		buyPrice: string | null;
+	} {
+		if (trade.auctionId === null) return { usd: null, sellPrice: null, buyPrice: null };
 		const prices = this.#pricesOf(trade.auctionId);
 		const sellPrice = prices.get(priceToken(trade.sellToken)) ?? null;
 		const buyPrice = prices.get(priceToken(trade.buyToken)) ?? null;
@@ -101,27 +124,7 @@ export class TradeValuer {
 			ethUsd === null
 				? null
 				: tradeVolumeUsd(trade.sellAmount, sellPrice, trade.buyAmount, buyPrice, ethUsd);
-		return {
-			usd,
-			pricedSides: usd === null ? 0 : Number(sellPrice !== null) + Number(buyPrice !== null),
-			surplus: tradeSurplus(usd, trade),
-		};
-	}
-
-	/**
-	 * An amount of one of a trade's tokens in USD, such as a protocol fee: at the native price its
-	 * auction gave the token and ETH/USD at its block. Null when either is missing.
-	 */
-	amountUsd(
-		auctionId: number | null,
-		block: number,
-		token: string,
-		amount: string
-	): number | null {
-		if (auctionId === null) return null;
-		const ethUsd = ethUsdAt(this.#points, block);
-		const price = this.#pricesOf(auctionId).get(priceToken(token)) ?? null;
-		return ethUsd === null ? null : tokenUsd(amount, price, ethUsd);
+		return { usd, sellPrice, buyPrice };
 	}
 
 	#pricesOf(auctionId: number): Map<string, string> {

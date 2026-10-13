@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import type { KeyboardEvent } from "react";
+
 import { useTranslations } from "next-intl";
 
 import {
@@ -430,7 +433,11 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 				>
 					<div>
 						<div className="label">{d.auctions.title}</div>
-						<AuctionStrip cells={d.auctions.cells} className="mt-2.5" />
+						<AuctionStrip
+							cells={d.auctions.cells}
+							label={d.auctions.title}
+							className="mt-2.5"
+						/>
 						<div className="mt-1.5 text-[12.5px] text-mu">{d.auctions.note}</div>
 					</div>
 					<div>
@@ -718,44 +725,78 @@ function ShareChart({
 }
 
 /**
- * The latest auctions, oldest first; a click on a cell opens that auction's settlement. As on the
- * auction tape, the cells are a picture to keyboards and screen readers, and the line under the
- * strip says what it shows. Only the latest auction with a settlement keeps its link in the tab
- * order, named in full.
+ * The latest auctions, oldest first; a click on a cell opens that auction's settlement. The strip
+ * is one tab stop, as the auction tape is: it starts on the latest auction with a settlement, ← →
+ * move between the cells, Home and End jump to the first and last, and Enter opens a cell's
+ * settlement. Each cell is named in full; the line under the strip says what it shows.
  */
-function AuctionStrip({ cells, className }: { cells: AuctionCell[]; className: string }) {
-	const latest = cells.findLast((cell) => cell.href !== null);
+function AuctionStrip({
+	cells,
+	label,
+	className,
+}: {
+	cells: AuctionCell[];
+	label: string;
+	className: string;
+}) {
+	// The cell that holds the tab stop, by auction id, so new data keeps it on its auction.
+	const [current, setCurrent] = useState<number | null>(null);
+	const picked = cells.findIndex((cell) => cell.id === current);
+	const latest = cells.findLastIndex((cell) => cell.href !== null);
+	const active = picked !== -1 ? picked : latest !== -1 ? latest : cells.length - 1;
+
+	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+		if (event.altKey || event.ctrlKey || event.metaKey) return;
+		const moves: Partial<Record<string, number>> = {
+			ArrowLeft: active - 1,
+			ArrowRight: active + 1,
+			Home: 0,
+			End: cells.length - 1,
+		};
+		const next = moves[event.key];
+		if (next === undefined) return;
+		event.preventDefault();
+		const index = Math.min(cells.length - 1, Math.max(0, next));
+		setCurrent(cells[index].id);
+		event.currentTarget.querySelectorAll<HTMLElement>("[data-cell]")[index]?.focus();
+	};
+
 	return (
-		<div className={`flex h-4 ${className}`}>
-			{cells.map((cell) => {
-				if (cell.href === null)
-					return (
-						<span
-							key={cell.id}
-							aria-hidden="true"
-							title={cell.title}
-							className="grid h-full flex-1 place-items-center"
-						>
-							<span className={DOT[cell.state]} />
-						</span>
-					);
-				const kept = cell === latest;
-				return (
+		<div
+			role="group"
+			aria-label={label}
+			onKeyDown={onKeyDown}
+			className={`flex h-4 ${className}`}
+		>
+			{cells.map((cell, index) =>
+				cell.href === null ? (
+					<span
+						key={cell.id}
+						data-cell=""
+						role="img"
+						aria-label={cell.title}
+						title={cell.title}
+						tabIndex={index === active ? 0 : -1}
+						className="grid h-full flex-1 place-items-center rounded-[3px]"
+					>
+						<span className={DOT[cell.state]} />
+					</span>
+				) : (
 					<a
 						key={cell.id}
+						data-cell=""
 						href={cell.href}
 						target="_blank"
 						rel="noopener"
+						aria-label={cell.title}
 						title={cell.title}
-						aria-label={kept ? cell.title : undefined}
-						aria-hidden={kept ? undefined : true}
-						tabIndex={kept ? undefined : -1}
+						tabIndex={index === active ? 0 : -1}
 						className="grid h-full flex-1 place-items-center rounded-[3px] hover:bg-[color-mix(in_oklab,var(--fg)_14%,transparent)]"
 					>
 						<span className={DOT[cell.state]} />
 					</a>
-				);
-			})}
+				)
+			)}
 		</div>
 	);
 }

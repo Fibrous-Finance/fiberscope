@@ -40,6 +40,8 @@ export interface SyncStats {
 
 /** Blocks the end may trail the head after a catch-up round before another round runs (5 min). */
 const CATCH_UP_SLACK = 150;
+/** The longest the details' catch-up may hold up the snapshot before it stops (2 minutes). */
+const DETAIL_CATCH_UP_MS = 120_000;
 
 /**
  * Brings the database up to date. Chain and auction data catch up with Base's safe block, and
@@ -88,7 +90,18 @@ export async function sync(
 				options.auctionDays > 0 ? windowStart(end, options.auctionDays) : null
 			);
 		}
-		await catchUpDetails(store, cow, stats.details);
+		// The details of the new blocks, for the snapshot. Their lookups must not hold it up: if
+		// one fails, or they run long, the snapshot goes without them and the next run catches up.
+		try {
+			await catchUpDetails(
+				store,
+				cow,
+				stats.details,
+				AbortSignal.timeout(DETAIL_CATCH_UP_MS)
+			);
+		} catch (error) {
+			log(`details catch-up failed: ${describeError(error)}; the next run catches up`);
+		}
 		store.setLastRunAt(Date.now());
 		await writeSnapshot?.();
 	}
@@ -147,6 +160,8 @@ export async function sync(
 		}
 	})();
 	const detailWork = (async () => {
+		// Whatever the catch-up before the snapshot left, if it stopped early.
+		await catchUpDetails(store, cow, stats.details);
 		if (options.auctionDays > 0) {
 			const low = windowStart(head, options.auctionDays);
 			await backfillDetails(store, cow, low, details, stats.details, stop);

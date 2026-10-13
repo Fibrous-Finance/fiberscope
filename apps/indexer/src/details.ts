@@ -175,12 +175,15 @@ export async function backfillDetails(
 
 /**
  * Extends the detail range up to the end of the auction data. It starts a little below the
- * previous end, to look again for the fees of recent trades the API had not listed yet.
+ * previous end, to look again for the fees of recent trades the API had not listed yet. When
+ * `signal` aborts it stops after the lookups in flight, and the detail range ends at the last
+ * whole block range.
  */
 export async function catchUpDetails(
 	store: Store,
 	source: DetailSource,
-	stats: DetailStats
+	stats: DetailStats,
+	signal?: AbortSignal
 ): Promise<void> {
 	const range = store.detailRange();
 	const auctions = store.auctionRange();
@@ -194,7 +197,7 @@ export async function catchUpDetails(
 		from += LOG_RANGE
 	) {
 		const to = Math.min(auctions.to, from + LOG_RANGE - 1);
-		if (!(await processDetailRange(store, source, { from, to }, stats))) break;
+		if (!(await processDetailRange(store, source, { from, to }, stats, signal))) break;
 		store.setDetailRange({ from: range.from, to: Math.max(range.to, to) });
 	}
 	const seconds = (performance.now() - started) / 1000;

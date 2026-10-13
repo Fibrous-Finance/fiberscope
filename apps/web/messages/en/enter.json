@@ -17,7 +17,7 @@
 	},
 	"tape": {
 		"title": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}",
-		"label": "{count, plural, one {Latest auction} other {Latest # auctions}}. Left and right arrow keys move between auctions, Home and End jump to the first and last, and Enter shows the selected auction’s solutions.",
+		"label": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}. Left and right arrow keys move between auctions, Home and End jump to the first and last, and Enter shows the selected auction’s solutions.",
 		"readout": "#{id} · {time}\u00a0UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
 	},
 	"note": "Click an auction to see its solutions. Filtered out: the share of a solver’s solutions that CoW’s fairness filter set aside; a filtered-out solution cannot win.",

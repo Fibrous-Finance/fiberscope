@@ -177,12 +177,13 @@ async function writeSnapshot(store: Store, rpc: Rpc, env: Env, out: string): Pro
 	const temporary = `${out}.${process.pid}.tmp`;
 	writeFileSync(temporary, json);
 	renameSync(temporary, out);
-	const { chainDays, auctionDays, surplusDays } = snapshot.coverage;
+	const { chainDays, auctionDays, surplusDays, detailDays } = snapshot.coverage;
 	const seconds = (performance.now() - started) / 1000;
 	log(
 		`snapshot: ${out} (${fmt(json.length / 1024)} KB) in ${duration(seconds)}, ` +
 			`end block ${snapshot.end.block}, ${chainDays} chain days, ${auctionDays} auction days, ` +
-			`${surplusDays} surplus days, ${snapshot.solvers.length} solvers`
+			`${surplusDays} surplus days, ${detailDays} detail days, ` +
+			`${snapshot.solvers.length} solvers`
 	);
 	log(
 		`  trades in the auction days: ${fmt(stats.trades)}, ${fmt(stats.unpriced)} unpriced, ` +
@@ -192,6 +193,12 @@ async function writeSnapshot(store: Store, rpc: Rpc, env: Env, out: string): Pro
 		`  priced trades in the surplus days: ${fmt(stats.surplusPriced)}, ` +
 			`${fmt(stats.noSurplus)} without order terms, ${fmt(stats.unusual)} with unusual ` +
 			`surplus; batches without an ETH/USD rate: ${fmt(stats.uncosted)}`
+	);
+	log(
+		`  trades in the detail days: ${fmt(stats.detailTrades)}, ${fmt(stats.unknownFees)} ` +
+			`without fee data, ${fmt(stats.unnamedQuotes)} with a quote that names no solver; ` +
+			`fees not valued: ${fmt(stats.unvaluedFees)}, not marked CoW's or a partner's: ` +
+			`${fmt(stats.unsplitFees)}`
 	);
 	if (env.upload) {
 		const { bucket, key } = env.upload;

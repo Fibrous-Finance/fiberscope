@@ -53,8 +53,7 @@ refuses a database written by an older version: delete it to index again, or `se
 copy. The snapshot is built while the rows are read, one at a time, so the indexer's memory does
 not grow with the depth of the history.
 
-Besides each settlement's auction, the indexer keeps from CoW's API what the page does not show
-yet:
+Besides each settlement's auction, the indexer keeps from CoW's API:
 
 - each solution's score, reference score and whether CIP-67's filter removed it
   (`GET /api/v2/solver_competition/{auction_id}`, for auctions stored before the schema held them);
@@ -94,10 +93,11 @@ same options) also read `apps/indexer/.env` when it exists.
    their auction data, and the auction data, orders and fees of settlements older than M days. A
    flash-loan router settlement keeps its auction while it is in the chain data, since its
    attribution may need the auction's winner.
-4. Marks the data current and, with `--snapshot`, writes the snapshot.
-5. Catches up the details of the new blocks: the orders traded and their trades' protocol fees,
-   looking again at the last 10 minutes of trades whose fees the API did not list yet. The page
-   does not show the details yet, so they come after the snapshot and never hold it up.
+4. Catches up the details of the new blocks: the orders traded and their trades' protocol fees,
+   looking again at the last 10 minutes of trades whose fees the API did not list yet. If one of
+   these lookups fails, or they take more than 2 minutes, the snapshot is written without the
+   auction-detail figures, and the rest is caught up after it.
+5. Marks the data current and, with `--snapshot`, writes the snapshot.
 6. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
    settlements, followed by their auction lookups, followed by their details. Settlement history
    is kept at least as deep as auction history. Trades stored before the schema held order uids
@@ -159,7 +159,8 @@ site; the indexer writes it and the site derives every view from it with the vie
 - Time is cut into rolling days that end at the newest block (`end`). Daily series are newest first
   and zero-filled, so index `d` is always the day `d` days back.
 - `coverage` says how many days hold complete data: `chainDays` for batches, trades, DEX swaps,
-  gas and transaction cost; `auctionDays` for volume, entries and wins; `surplusDays` for surplus.
+  gas and transaction cost; `auctionDays` for volume, entries and wins; `surplusDays` for surplus;
+  `detailDays` for solutions, filtered-out solutions, losses, quotes and protocol fees.
 - `solvers` holds each solver's identity, addresses and daily series, and its latest settlements;
   `auctions`, `latestAuctions`, `latestSettlements` and `registry` hold the rest of the page.
 - When `GIT_COMMIT` is set, `commit` records the commit hash for the indexer's code. The page's

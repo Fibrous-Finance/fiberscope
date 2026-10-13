@@ -105,6 +105,8 @@ export interface SolutionRow {
 	tx: string | null;
 	/** 1 when CIP-67's filter removed the solution; null until its auction is scored. */
 	filteredOut: number | null;
+	/** Its score in wei of the native token (see Solution); null until its auction is scored. */
+	score: string | null;
 }
 
 /** A trade whose protocol fees were never looked up, with what its order's lookup found. */
@@ -1051,26 +1053,18 @@ export class Store {
 	/** Trades in a block range with their order's quote and their protocol fees, read one at a time. */
 	tradeDetails(range: BlockRange): IterableIterator<TradeDetailRow> {
 		return this.#iterate(
-			`SELECT tr.block, tr.log_index AS logIndex, tr.settlement_log_index AS settlementLogIndex,
-				so.address AS solver, a.auction_id AS auctionId, st.address AS sellToken,
-				bt.address AS buyToken, tr.sell_amount AS sellAmount, tr.buy_amount AS buyAmount,
-				o.found, qs.address AS quoteSolver, o.quote_verified AS quoteVerified,
-				tr.fees_checked AS feesChecked,
-				(SELECT GROUP_CONCAT(COALESCE(f.partner, '?') || ' ' || f.amount || ' ' || fa.address, ',')
-					FROM trade_fees f JOIN addresses fa ON fa.id = f.token
-					WHERE f.block = tr.block AND f.log_index = tr.log_index) AS fees
-			FROM trades tr
-				JOIN settlements s ON s.block = tr.block AND s.log_index = tr.settlement_log_index
-				JOIN addresses so ON so.id = s.solver
-				JOIN addresses st ON st.id = tr.sell_token
-				JOIN addresses bt ON bt.id = tr.buy_token
-				LEFT JOIN auction_txs a ON a.tx = s.tx
-				LEFT JOIN orders o ON o.uid = tr.order_uid
-				LEFT JOIN addresses qs ON qs.id = o.quote_solver
-			WHERE tr.block BETWEEN ? AND ?
-			ORDER BY tr.block, tr.log_index`,
+			`${TRADE_DETAIL_ROWS} WHERE tr.block BETWEEN ? AND ? ORDER BY tr.block, tr.log_index`,
 			range.from,
 			range.to
+		);
+	}
+
+	/** The trades of the settlement at `logIndex` in `block`, as tradeDetails reads them, in log order. */
+	settlementDetails(block: number, logIndex: number): TradeDetailRow[] {
+		return this.#all(
+			`${TRADE_DETAIL_ROWS} WHERE tr.block = ? AND tr.settlement_log_index = ? ORDER BY tr.log_index`,
+			block,
+			logIndex
 		);
 	}
 
@@ -1233,5 +1227,22 @@ const TRADE_ROWS = `SELECT ${hexOf("s.tx")} AS tx, so.address AS solver,
 
 const SOLUTION_ROWS = `SELECT a.id AS auctionId, a.start_block AS startBlock, ad.address AS solver,
 	s.winner, CASE WHEN s.tx IS NULL THEN NULL ELSE ${hexOf("s.tx")} END AS tx,
-	s.filtered_out AS filteredOut
+	s.filtered_out AS filteredOut, s.score
 	FROM auctions a JOIN solutions s ON s.auction_id = a.id JOIN addresses ad ON ad.id = s.solver`;
+
+const TRADE_DETAIL_ROWS = `SELECT tr.block, tr.log_index AS logIndex,
+	tr.settlement_log_index AS settlementLogIndex, so.address AS solver, a.auction_id AS auctionId,
+	st.address AS sellToken, bt.address AS buyToken, tr.sell_amount AS sellAmount,
+	tr.buy_amount AS buyAmount, o.found, qs.address AS quoteSolver,
+	o.quote_verified AS quoteVerified, tr.fees_checked AS feesChecked,
+	(SELECT GROUP_CONCAT(COALESCE(f.partner, '?') || ' ' || f.amount || ' ' || fa.address, ',')
+		FROM trade_fees f JOIN addresses fa ON fa.id = f.token
+		WHERE f.block = tr.block AND f.log_index = tr.log_index) AS fees
+	FROM trades tr
+	JOIN settlements s ON s.block = tr.block AND s.log_index = tr.settlement_log_index
+	JOIN addresses so ON so.id = s.solver
+	JOIN addresses st ON st.id = tr.sell_token
+	JOIN addresses bt ON bt.id = tr.buy_token
+	LEFT JOIN auction_txs a ON a.tx = s.tx
+	LEFT JOIN orders o ON o.uid = tr.order_uid
+	LEFT JOIN addresses qs ON qs.id = o.quote_solver`;

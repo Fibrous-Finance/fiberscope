@@ -40,14 +40,16 @@ export interface SyncStats {
 
 /** Blocks the end may trail the head after a catch-up round before another round runs (5 min). */
 const CATCH_UP_SLACK = 150;
+/** The longest the details' catch-up may hold up the snapshot before it stops (2 minutes). */
+const DETAIL_CATCH_UP_MS = 120_000;
 
 /**
- * Brings the database up to date. Chain and auction data catch up with Base's safe block, which
- * makes the data current (the last run time) and is when the snapshot is written. Then the
- * details (the auctions' scores, and the quotes and protocol fees of the orders traded) catch up
- * with the auctions, and chain, auction and detail history are backfilled to the requested
- * depths, within the budget if there is one; the snapshot is written again if history grew. Every
- * step resumes where an interrupted or stopped run left off.
+ * Brings the database up to date. Chain and auction data catch up with Base's safe block, and
+ * the details (the auctions' scores, and the quotes and protocol fees of the orders traded) with
+ * the auctions; that makes the data current (the last run time) and is when the snapshot is
+ * written. Then chain, auction and detail history are backfilled to the requested depths, within
+ * the budget if there is one; the snapshot is written again if history grew. Every step resumes
+ * where an interrupted or stopped run left off.
  */
 export async function sync(
 	store: Store,
@@ -88,6 +90,18 @@ export async function sync(
 				options.auctionDays > 0 ? windowStart(end, options.auctionDays) : null
 			);
 		}
+		// The details of the new blocks, for the snapshot. Their lookups must not hold it up: if
+		// one fails, or they run long, the snapshot goes without them and the next run catches up.
+		try {
+			await catchUpDetails(
+				store,
+				cow,
+				stats.details,
+				AbortSignal.timeout(DETAIL_CATCH_UP_MS)
+			);
+		} catch (error) {
+			log(`details catch-up failed: ${describeError(error)}; the next run catches up`);
+		}
 		store.setLastRunAt(Date.now());
 		await writeSnapshot?.();
 	}
@@ -95,12 +109,12 @@ export async function sync(
 	// Backfill. The chain runs newest first and the auction backfill trails it, so the RPC and
 	// the CoW API rate limits are spent at the same time, and the chain reaches the auction depth
 	// before it goes deeper: auction history never waits for the full chain depth. The details
-	// first catch up with the auctions, then trail the auction backfill; the page does not show
-	// them yet, so they come after the snapshot and cannot hold it up. The trades stored before
-	// the schema held order uids get them from the RPC.
+	// trail the auction backfill. The trades stored before the schema held order uids get them
+	// from the RPC.
 	const head = empty ? await safeHead(rpc) : store.chainRange()!.to;
 	const chainFrom = store.chainRange()?.from;
 	const auctionFrom = store.auctionRange()?.from;
+	const detailFrom = store.detailRange()?.from;
 	const chain: ChainWatch = { done: false };
 	const details: DetailWatch = { auctionsDone: false, uidsDone: false };
 	const abort = new AbortController();
@@ -146,6 +160,7 @@ export async function sync(
 		}
 	})();
 	const detailWork = (async () => {
+		// Whatever the catch-up before the snapshot left, if it stopped early.
 		await catchUpDetails(store, cow, stats.details);
 		if (options.auctionDays > 0) {
 			const low = windowStart(head, options.auctionDays);
@@ -161,7 +176,9 @@ export async function sync(
 
 	if (empty && store.chainRange() !== null) store.setLastRunAt(Date.now());
 	const grew =
-		store.chainRange()?.from !== chainFrom || store.auctionRange()?.from !== auctionFrom;
+		store.chainRange()?.from !== chainFrom ||
+		store.auctionRange()?.from !== auctionFrom ||
+		store.detailRange()?.from !== detailFrom;
 	if (grew && store.lastRunAt() !== null) await writeSnapshot?.();
 	return stats;
 }

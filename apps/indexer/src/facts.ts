@@ -5,12 +5,13 @@ import type { Registry, SolverIdentity } from "./registry.ts";
 import {
 	batchCostUsd,
 	creditedAddress,
+	feeUsd,
 	priceToken,
 	tradeSurplus,
 	tradeVolumeUsd,
 } from "./rules.ts";
-import type { BlockRange, CreditSource, TradeSurplus } from "./rules.ts";
-import type { SolutionRow, Store, TradeValueRow } from "./store.ts";
+import type { BlockRange, CreditSource, RankedSolution, TradeSurplus } from "./rules.ts";
+import type { SolutionRow, Store, TradeDetailRow, TradeValueRow } from "./store.ts";
 
 /** Stored rows turned into methodology facts, shared by the snapshot and the window report. */
 
@@ -138,6 +139,27 @@ export class TradeValuer {
 	}
 }
 
+/** A protocol fee of a trade: whether it is a partner fee, and its USD value. */
+export interface TradeFee {
+	/** Null when it is unclear whether it is a partner fee or CoW's own. */
+	partner: boolean | null;
+	/** At the trade's exchange rate (see feeUsd); null when it cannot be valued. */
+	usd: number | null;
+}
+
+/** The protocol fees stored for a trade (see Store.tradeDetails), valued. */
+export function tradeFees(trade: TradeDetailRow, valuer: TradeValuer): TradeFee[] {
+	if (trade.fees === null) return [];
+	const tradeUsd = valuer.usd(trade);
+	return trade.fees.split(",").map((item) => {
+		const [partner, amount, token] = item.split(" ");
+		return {
+			partner: partner === "?" ? null : partner === "1",
+			usd: tradeUsd === null ? null : feeUsd({ token, amount }, trade, tradeUsd),
+		};
+	});
+}
+
 /** A solver that submitted at least one solution to an auction (filtered-out ones included). */
 interface Entrant {
 	identity: SolverIdentity;
@@ -158,6 +180,8 @@ export interface AuctionOutcome {
 	entrants: Map<string, Entrant>;
 	/** One entry per winning solver id, best rank first. */
 	winners: { solver: string; tx: string | null }[];
+	/** Every solution in CoW's ranking, with its solver's id. */
+	ranked: RankedSolution[];
 }
 
 /**
@@ -179,6 +203,7 @@ export function* auctionOutcomes(
 				scored: row.filteredOut !== null,
 				entrants: new Map(),
 				winners: [],
+				ranked: [],
 			};
 		}
 		const identity = registry.identify(row.solver);
@@ -191,6 +216,12 @@ export function* auctionOutcomes(
 		entrant.addresses.add(row.solver);
 		entrant.solutions++;
 		if (row.filteredOut === 1) entrant.filteredOut++;
+		current.ranked.push({
+			solver: identity.id,
+			score: row.score,
+			filteredOut: row.filteredOut === 1,
+			winner: row.winner === 1,
+		});
 		if (row.winner === 1 && !current.winners.some((winner) => winner.solver === identity.id)) {
 			current.winners.push({ solver: identity.id, tx: row.tx });
 		}

@@ -184,3 +184,47 @@ export function tradeSurplus(usd: number | null, trade: SurplusFacts): TradeSurp
 export function batchCostUsd(tx: { fee: string; txBatches: number }, ethUsd: number): number {
 	return (Number(BigInt(tx.fee)) / 1e18 / tx.txBatches) * ethUsd;
 }
+
+/** A solution of an auction, as the loss rules read it. */
+export interface RankedSolution {
+	/** Id of the solver that submitted it. */
+	solver: string;
+	/** Its score (CIP-20) in wei of the native token; null when CoW's API gave none. */
+	score: string | null;
+	/** Whether CIP-67's fairness filter removed it. */
+	filteredOut: boolean;
+	winner: boolean;
+}
+
+/**
+ * The solvers that lost an auction with a single winning solution, each with whether it lost by
+ * 1% or less: whether its best solution that passed CIP-67's filter scored at least 99% of the
+ * winning score, decided exactly on the scores. A solver none of whose solutions passed the
+ * filter did not compete, and the winning solver did not lose. Empty when the auction has
+ * several winning solutions, since which winner a losing solution competed with is unknown, or
+ * when the winning score is missing or zero.
+ */
+export function auctionLosses(solutions: RankedSolution[]): Map<string, boolean> {
+	const losses = new Map<string, boolean>();
+	const winners = solutions.filter((solution) => solution.winner);
+	const won = winners.length === 1 ? winners[0] : null;
+	if (won === null || won.score === null) return losses;
+	const best = BigInt(won.score);
+	if (best <= 0n) return losses;
+	for (const solution of solutions) {
+		if (solution.solver === won.solver || solution.filteredOut || solution.score === null) {
+			continue;
+		}
+		const close = (best - BigInt(solution.score)) * 100n <= best;
+		losses.set(solution.solver, (losses.get(solution.solver) ?? false) || close);
+	}
+	return losses;
+}
+
+/** The zero address, which some quotes give as their solver. */
+const NO_SOLVER = "0x0000000000000000000000000000000000000000";
+
+/** The solver an order's quote names; null for a quote that names none (the zero address). */
+export function quoteSolver(address: string | null): string | null {
+	return address === NO_SOLVER ? null : address;
+}

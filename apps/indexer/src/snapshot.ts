@@ -1,4 +1,5 @@
 import type {
+	AuctionSolution,
 	AuctionSummary,
 	CreditedSettlement,
 	RegisteredSolver,
@@ -10,12 +11,14 @@ import type {
 
 import { ROUTER } from "./chain.ts";
 import { NETWORK, timeOf } from "./config.ts";
-import { auctionOutcomes, creditedBatches, TradeValuer } from "./facts.ts";
+import { auctionOutcomes, creditedBatches, tradeFees, TradeValuer } from "./facts.ts";
 import type { Batch } from "./facts.ts";
 import { shortAddress } from "./log.ts";
+import { ethUsdAt } from "./prices.ts";
 import type { Registry, RegistryEntry, SolverIdentity } from "./registry.ts";
-import { bucketOf, completeBuckets, windowStart } from "./rules.ts";
-import type { Store, TradeValueRow } from "./store.ts";
+import { auctionLosses, bucketOf, completeBuckets, quoteSolver, windowStart } from "./rules.ts";
+import type { RankedSolution } from "./rules.ts";
+import type { Store, TradeDetailRow, TradeValueRow } from "./store.ts";
 
 const LATEST_AUCTIONS = 48;
 const LATEST_SETTLEMENTS = 6;
@@ -46,6 +49,16 @@ export interface SnapshotStats {
 	unusual: number;
 	/** Batches in the chain coverage without an ETH/USD rate, so without a cost. */
 	uncosted: number;
+	/** Trades in the detail coverage. */
+	detailTrades: number;
+	/** Of those, trades whose order's quote names no solver. */
+	unnamedQuotes: number;
+	/** Of those, trades whose protocol fees are unknown. */
+	unknownFees: number;
+	/** Fees on those trades that could not be valued. */
+	unvaluedFees: number;
+	/** Fees on those trades not marked as either CoW's own or a partner's. */
+	unsplitFees: number;
 }
 
 interface Tally {
@@ -66,6 +79,15 @@ interface Tally {
 	unusualVolume: number[];
 	entered: number[];
 	won: number[];
+	solutions: number[];
+	filteredOut: number[];
+	losses: number[];
+	closeLosses: number[];
+	quotes: number[];
+	quotesVerified: number[];
+	quotesSettled: number[];
+	protocolFees: number[];
+	partnerFees: number[];
 	/** The latest batches, oldest first. */
 	latest: Batch[];
 }
@@ -83,6 +105,8 @@ export async function buildSnapshot(
 	const auctionDays = Math.min(chainDays, completeBuckets(end, auctionRange));
 	// Surplus also needs order terms, read from each trade's calldata as it is stored.
 	const surplusDays = auctionDays;
+	// Scores, quotes and fees are looked up in CoW's API after the auction data.
+	const detailDays = Math.min(auctionDays, completeBuckets(end, store.detailRange()));
 	const lastRunAt = store.lastRunAt();
 	if (lastRunAt === null) throw new Error("No sync has completed yet");
 
@@ -107,6 +131,15 @@ export async function buildSnapshot(
 				unusualVolume: zeros(surplusDays),
 				entered: zeros(auctionDays),
 				won: zeros(auctionDays),
+				solutions: zeros(detailDays),
+				filteredOut: zeros(detailDays),
+				losses: zeros(detailDays),
+				closeLosses: zeros(detailDays),
+				quotes: zeros(detailDays),
+				quotesVerified: zeros(detailDays),
+				quotesSettled: zeros(detailDays),
+				protocolFees: zeros(detailDays),
+				partnerFees: zeros(detailDays),
 				latest: [],
 			};
 			tallies.set(identity.id, entry);
@@ -122,6 +155,11 @@ export async function buildSnapshot(
 		noSurplus: 0,
 		unusual: 0,
 		uncosted: 0,
+		detailTrades: 0,
+		unnamedQuotes: 0,
+		unknownFees: 0,
+		unvaluedFees: 0,
+		unsplitFees: 0,
 	};
 
 	// Trades follow their batch's credit: a router batch's by its block and log index, any other
@@ -150,6 +188,11 @@ export async function buildSnapshot(
 			if (batch.viaRouter) routed.set(`${batch.block}:${batch.logIndex}`, entry);
 		}
 	}
+	// The tally a trade's batch is credited to.
+	const creditOf = (trade: { solver: string; block: number; settlementLogIndex: number }) =>
+		trade.solver === ROUTER
+			? routed.get(`${trade.block}:${trade.settlementLogIndex}`)
+			: tallies.get(registry.identify(trade.solver).id);
 
 	const valuer = new TradeValuer(store);
 	const count = zeros(auctionDays);
@@ -162,10 +205,7 @@ export async function buildSnapshot(
 			if (usd === null) stats.unpriced++;
 			else if (pricedSides === 1) stats.oneSided++;
 			const d = bucketOf(end, trade.block);
-			const entry =
-				trade.solver === ROUTER
-					? routed.get(`${trade.block}:${trade.settlementLogIndex}`)
-					: tallies.get(registry.identify(trade.solver).id);
+			const entry = creditOf(trade);
 			if (usd === null || !entry) continue;
 			entry.volume[d] += usd;
 			if (d >= surplusDays) continue;
@@ -189,21 +229,58 @@ export async function buildSnapshot(
 			if (d < 0) continue;
 			count[d]++;
 			solutions[d] += auction.solutions;
-			for (const { identity, addresses } of auction.entrants.values()) {
-				const entry = tally(identity);
+			const detailed = d < detailDays && auction.scored;
+			for (const entrant of auction.entrants.values()) {
+				const entry = tally(entrant.identity);
 				entry.entered[d]++;
-				for (const address of addresses) entry.seen.add(address);
+				for (const address of entrant.addresses) entry.seen.add(address);
+				if (!detailed) continue;
+				entry.solutions[d] += entrant.solutions;
+				entry.filteredOut[d] += entrant.filteredOut;
 			}
 			for (const winner of auction.winners) tallies.get(winner.solver)!.won[d]++;
+			if (!detailed) continue;
+			for (const [solver, close] of auctionLosses(auction.ranked)) {
+				const entry = tallies.get(solver)!;
+				entry.losses[d]++;
+				if (close) entry.closeLosses[d]++;
+			}
+		}
+	}
+
+	// Quotes count for the solver that gave them, fees for the solver that settled the trade.
+	if (detailDays > 0) {
+		const range = { from: windowStart(end, detailDays), to: end };
+		for (const trade of store.tradeDetails(range)) {
+			stats.detailTrades++;
+			const d = bucketOf(end, trade.block);
+			const settler = creditOf(trade);
+			const quoter = quoteSolver(trade.quoteSolver);
+			if (quoter !== null) {
+				const entry = tally(registry.identify(quoter));
+				entry.quotes[d]++;
+				if (trade.quoteVerified === 1) entry.quotesVerified[d]++;
+				if (entry === settler) entry.quotesSettled[d]++;
+			} else if (trade.quoteSolver !== null) stats.unnamedQuotes++;
+			if (trade.feesChecked !== 1) stats.unknownFees++;
+			if (!settler) continue;
+			for (const fee of tradeFees(trade, valuer)) {
+				if (fee.usd === null) stats.unvaluedFees++;
+				else if (fee.partner === null) stats.unsplitFees++;
+				else if (fee.partner) settler.partnerFees[d] += fee.usd;
+				else settler.protocolFees[d] += fee.usd;
+			}
 		}
 	}
 
 	// The trades of every listed settlement: the network's latest and each solver's latest.
 	const listed = [...networkLatest, ...[...tallies.values()].flatMap((entry) => entry.latest)];
 	const tradesOf = new Map<Batch, TradeValueRow[]>();
+	const detailsOf = new Map<Batch, TradeDetailRow[]>();
 	for (const batch of listed) {
 		if (!tradesOf.has(batch)) {
 			tradesOf.set(batch, store.settlementTrades(batch.block, batch.logIndex));
+			detailsOf.set(batch, store.settlementDetails(batch.block, batch.logIndex));
 		}
 	}
 	const symbols = await options.symbols(
@@ -215,7 +292,7 @@ export async function buildSnapshot(
 		const values = trades.map((trade) => valuer.value(trade));
 		const priced = values.flatMap(({ usd }) => (usd === null ? [] : [usd]));
 		const surpluses = values.flatMap(({ surplus }) => (surplus === null ? [] : [surplus.usd]));
-		return {
+		const row: SettlementSummary = {
 			tx: batch.tx,
 			block: batch.block,
 			time: timeOf(batch.block) * 1000,
@@ -227,6 +304,28 @@ export async function buildSnapshot(
 			gas: Math.round(batch.gas),
 			cost: batch.cost === null ? null : subCents(batch.cost),
 		};
+		// The quote of the first trade's order, once the order was looked up.
+		const [first] = detailsOf.get(batch)!;
+		if (first.found !== null) {
+			const quoter = quoteSolver(first.quoteSolver);
+			row.quotedBy = quoter === null ? null : registry.identify(quoter).id;
+		}
+		return row;
+	};
+	// A settlement's fees by kind, when every trade's fees are known, valued and marked.
+	const feesOf = (batch: Batch): Pick<CreditedSettlement, "protocolFee" | "partnerFee"> => {
+		const unknown = { protocolFee: null, partnerFee: null };
+		let protocolFee = 0;
+		let partnerFee = 0;
+		for (const trade of detailsOf.get(batch)!) {
+			if (trade.feesChecked !== 1) return unknown;
+			for (const fee of tradeFees(trade, valuer)) {
+				if (fee.usd === null || fee.partner === null) return unknown;
+				if (fee.partner) partnerFee += fee.usd;
+				else protocolFee += fee.usd;
+			}
+		}
+		return { protocolFee: subCents(protocolFee), partnerFee: subCents(partnerFee) };
 	};
 
 	const solvers: SnapshotSolver[] = [...tallies.values()]
@@ -254,12 +353,21 @@ export async function buildSnapshot(
 			cost: entry.cost.map(subCents),
 			entered: entry.entered,
 			won: entry.won,
+			solutions: entry.solutions,
+			filteredOut: entry.filteredOut,
+			losses: entry.losses,
+			closeLosses: entry.closeLosses,
+			quotes: entry.quotes,
+			quotesVerified: entry.quotesVerified,
+			quotesSettled: entry.quotesSettled,
+			protocolFees: entry.protocolFees.map(subCents),
+			partnerFees: entry.partnerFees.map(subCents),
 			latestSettlements: entry.latest.toReversed().map(summary),
 		}));
 
 	const latestSettlements: CreditedSettlement[] = networkLatest
 		.toReversed()
-		.map((batch) => ({ ...summary(batch), solver: batch.solver.id }));
+		.map((batch) => ({ ...summary(batch), solver: batch.solver.id, ...feesOf(batch) }));
 
 	const registered: RegisteredSolver[] = registry
 		.solvers()
@@ -287,17 +395,22 @@ export async function buildSnapshot(
 				a.id.localeCompare(b.id)
 		);
 
+	const points = store.ethUsdPoints();
 	const latestAuctions: AuctionSummary[] = [
 		...auctionOutcomes(
 			auctionRange ? store.latestSolutions(auctionRange, LATEST_AUCTIONS) : [],
 			registry
 		),
-	].map((auction) => ({
-		id: auction.id,
-		time: timeOf(auction.startBlock) * 1000,
-		entered: [...auction.entrants.keys()],
-		winners: auction.winners,
-	}));
+	].map((auction) => {
+		const ethUsd = ethUsdAt(points, auction.startBlock);
+		return {
+			id: auction.id,
+			time: timeOf(auction.startBlock) * 1000,
+			entered: [...auction.entrants.keys()],
+			winners: auction.winners,
+			solutions: auction.ranked.map((solution) => listedSolution(solution, ethUsd)),
+		};
+	});
 
 	const snapshot = {
 		schema: 1,
@@ -307,7 +420,7 @@ export async function buildSnapshot(
 		end: { block: end, time: timeOf(end) * 1000 },
 		lastRunAt,
 		refreshMinutes: options.refreshMinutes,
-		coverage: { chainDays, auctionDays, surplusDays },
+		coverage: { chainDays, auctionDays, surplusDays, detailDays },
 		auctions: { count, solutions },
 		solvers,
 		latestAuctions,
@@ -315,6 +428,21 @@ export async function buildSnapshot(
 		registry: registered,
 	} satisfies Snapshot;
 	return { snapshot, stats };
+}
+
+/**
+ * A solution as the snapshot lists it: its score in USD at the auction's ETH/USD rate, to 6
+ * significant figures (enough to tell scores 0.001% apart), and its flags only when set.
+ */
+function listedSolution(solution: RankedSolution, ethUsd: number | null): AuctionSolution {
+	const score =
+		solution.score === null || ethUsd === null
+			? null
+			: Number(((Number(solution.score) / 1e18) * ethUsd).toPrecision(6));
+	const listed: AuctionSolution = { solver: solution.solver, score };
+	if (solution.filteredOut) listed.filteredOut = true;
+	if (solution.winner) listed.winner = true;
+	return listed;
 }
 
 /**

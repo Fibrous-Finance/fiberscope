@@ -38,8 +38,12 @@ export interface Snapshot {
 	 * - `surplusDays`: surplus. It is priced like volume and needs each trade's signed order
 	 *   terms, read from its settlement's calldata, so it is never more than `auctionDays`. The
 	 *   indexer reads the calldata as it stores each settlement, so it covers the same days.
+	 * - `detailDays`: what CoW's API tells about each auction's solutions and each trade's order:
+	 *   every solution's score and whether CIP-67's fairness filter removed it, the quote each
+	 *   order was placed with, and the protocol fees charged on each trade. The indexer looks it
+	 *   up after the auction data, so it is never more than `auctionDays`.
 	 */
-	coverage: { chainDays: number; auctionDays: number; surplusDays: number };
+	coverage: { chainDays: number; auctionDays: number; surplusDays: number; detailDays: number };
 	/** Auction totals per bucket; length `coverage.auctionDays`. */
 	auctions: {
 		/** Auctions that produced at least one settlement. */
@@ -47,7 +51,10 @@ export interface Snapshot {
 		/** Solutions submitted in those auctions, all solvers together. */
 		solutions: number[];
 	};
-	/** Every solver with a batch in `chainDays` or an entered auction in `auctionDays`. */
+	/**
+	 * Every solver with a batch in `chainDays`, an entered auction in `auctionDays` or a quote in
+	 * `detailDays`.
+	 */
 	solvers: SnapshotSolver[];
 	/** The latest auctions (at most 48), oldest first. */
 	latestAuctions: AuctionSummary[];
@@ -124,6 +131,49 @@ export interface SnapshotSolver {
 	entered: number[];
 	/** Auctions the solver won, alone or with other winners. Length `coverage.auctionDays`. */
 	won: number[];
+	/**
+	 * Solutions it submitted to the auctions that started in each bucket, filtered-out ones
+	 * included. Length `coverage.detailDays`.
+	 */
+	solutions: number[];
+	/**
+	 * Of those, the ones CIP-67's fairness filter removed; a filtered-out solution cannot win.
+	 * Length `coverage.detailDays`.
+	 */
+	filteredOut: number[];
+	/**
+	 * Auctions it lost that had a single winning solution: auctions in which another solver's
+	 * solution won and at least one of its own solutions passed the filter. In an auction with
+	 * several winning solutions, which winner a losing solution competed with is unknown, so it
+	 * counts in neither this nor `closeLosses`. Length `coverage.detailDays`.
+	 */
+	losses: number[];
+	/**
+	 * Of those, the ones it lost by 1% or less: its best solution that passed the filter scored
+	 * at least 99% of the winning score. Length `coverage.detailDays`.
+	 */
+	closeLosses: number[];
+	/**
+	 * Trades settled in each bucket, by any solver, whose order was placed with this solver's
+	 * quote. Length `coverage.detailDays`.
+	 */
+	quotes: number[];
+	/** Of those, the ones whose quote CoW verified by simulating it. Length `coverage.detailDays`. */
+	quotesVerified: number[];
+	/** Of those `quotes`, the trades this solver settled itself. Length `coverage.detailDays`. */
+	quotesSettled: number[];
+	/**
+	 * USD of CoW's protocol fees on the trades it settled. Each fee is valued at its trade's own
+	 * exchange rate: its share of the trade's amount in the fee's token, times the trade's value
+	 * (as in `volume`). To a hundredth of a cent. Length `coverage.detailDays`.
+	 */
+	protocolFees: number[];
+	/**
+	 * USD of the partner fees on the trades it settled: the fees an order's app data asks for on
+	 * behalf of the app or wallet that placed it, valued like `protocolFees`. A fee CoW's API
+	 * does not mark as either kind counts in neither. Length `coverage.detailDays`.
+	 */
+	partnerFees: number[];
 	/** The most recent settlements (at most 6), newest first. */
 	latestSettlements: SettlementSummary[];
 }
@@ -142,6 +192,25 @@ export interface AuctionSummary {
 	entered: string[];
 	/** Winning solvers and the settlement each produced (null when it never settled). */
 	winners: { solver: string; tx: string | null }[];
+	/**
+	 * Every solution, in CoW's ranking: the winning ones first, then the others by score, then
+	 * the ones CIP-67's fairness filter removed.
+	 */
+	solutions: AuctionSolution[];
+}
+
+export interface AuctionSolution {
+	/** Id of the solver that submitted it (`SnapshotSolver.id`). */
+	solver: string;
+	/**
+	 * Its score (CIP-20), converted from the native token to USD at the ETH/USD rate of the
+	 * auction's start block, to 6 significant figures. Null when CoW's API gave none.
+	 */
+	score: number | null;
+	/** Present when CIP-67's fairness filter removed it. */
+	filteredOut?: true;
+	/** Present when it won; an auction can have several winning solutions. */
+	winner?: true;
 }
 
 export interface SettlementSummary {
@@ -165,12 +234,25 @@ export interface SettlementSummary {
 	gas: number;
 	/** Transaction cost in USD (see `SnapshotSolver.cost`); null without an ETH/USD rate. */
 	cost: number | null;
+	/**
+	 * The solver whose quote the order of the first trade (as in `pair`) was placed with; null
+	 * when it was placed without a solver's quote. Absent when the order was not looked up in
+	 * CoW's order book, as outside `coverage.detailDays`.
+	 */
+	quotedBy?: string | null;
 }
 
 /** A settlement of the network-wide list: its summary and the credited solver. */
 export interface CreditedSettlement extends SettlementSummary {
 	/** Id of the solver credited with the settlement (`SnapshotSolver.id`). */
 	solver: string;
+	/**
+	 * USD of CoW's protocol fees on its trades (see `SnapshotSolver.protocolFees`); null when the
+	 * fees of one of its trades are unknown or cannot be valued or split into the two kinds.
+	 */
+	protocolFee: number | null;
+	/** USD of the partner fees on its trades (see `SnapshotSolver.partnerFees`); null likewise. */
+	partnerFee: number | null;
 }
 
 /** A solver as CoW's registry lists it, with its history in `coverage.chainDays`. */

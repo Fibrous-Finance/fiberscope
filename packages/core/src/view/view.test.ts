@@ -34,6 +34,15 @@ function solver(id: string, name: string | null, s: Partial<SnapshotSolver> = {}
 		cost: [],
 		entered: [],
 		won: [],
+		solutions: [],
+		filteredOut: [],
+		losses: [],
+		closeLosses: [],
+		quotes: [],
+		quotesVerified: [],
+		quotesSettled: [],
+		protocolFees: [],
+		partnerFees: [],
 		latestSettlements: [],
 		...s,
 	};
@@ -47,7 +56,7 @@ function snapshot(chainDays: number, auctionDays: number, solvers: SnapshotSolve
 		end: { block: 52_074_002, time: END },
 		lastRunAt: END,
 		refreshMinutes: 10,
-		coverage: { chainDays, auctionDays, surplusDays: auctionDays },
+		coverage: { chainDays, auctionDays, surplusDays: auctionDays, detailDays: 0 },
 		auctions: {
 			count: Array.from({ length: auctionDays }, () => 100),
 			solutions: Array.from({ length: auctionDays }, () => 900),
@@ -280,6 +289,11 @@ describe("tapeCell", () => {
 		winners: [
 			{ solver: "a", tx: "0xaa" },
 			{ solver: "b", tx: "0xbb" },
+		],
+		solutions: [
+			{ solver: "a", score: 2, winner: true as const },
+			{ solver: "b", score: 1, winner: true as const },
+			{ solver: "c", score: 0.5 },
 		],
 	};
 	it("opens the solver's own settlement when it won, else the first winner's", () => {

@@ -94,7 +94,9 @@ same options) also read `apps/indexer/.env` when it exists.
    flash-loan router settlement keeps its auction while it is in the chain data, since its
    attribution may need the auction's winner.
 4. Catches up the details of the new blocks: the orders traded and their trades' protocol fees,
-   looking again at the last 10 minutes of trades whose fees the API did not list yet.
+   looking again at the last 10 minutes of trades whose fees the API did not list yet. If one of
+   these lookups fails, or they take more than 2 minutes, the snapshot is written without the
+   auction-detail figures, and the rest is caught up after it.
 5. Marks the data current and, with `--snapshot`, writes the snapshot.
 6. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
    settlements, followed by their auction lookups, followed by their details. Settlement history

@@ -31,12 +31,24 @@ function solver(id: string, s: Partial<SnapshotSolver> = {}): SnapshotSolver {
 		cost: [],
 		entered: [],
 		won: [],
+		solutions: [],
+		filteredOut: [],
+		losses: [],
+		closeLosses: [],
+		quotes: [],
+		quotesVerified: [],
+		quotesSettled: [],
+		protocolFees: [],
+		partnerFees: [],
 		latestSettlements: [],
 		...s,
 	};
 }
 
-function snapshot(coverage: Snapshot["coverage"], solvers: SnapshotSolver[]): Snapshot {
+/** Coverage as a test gives it: no auction details unless it says. */
+type Coverage = Omit<Snapshot["coverage"], "detailDays"> & { detailDays?: number };
+
+function snapshot(coverage: Coverage, solvers: SnapshotSolver[]): Snapshot {
 	return {
 		schema: 1,
 		network: "base",
@@ -44,7 +56,7 @@ function snapshot(coverage: Snapshot["coverage"], solvers: SnapshotSolver[]): Sn
 		end: { block: 52_125_782, time: END },
 		lastRunAt: END,
 		refreshMinutes: 10,
-		coverage,
+		coverage: { detailDays: 0, ...coverage },
 		auctions: {
 			count: days(coverage.auctionDays, 100),
 			solutions: days(coverage.auctionDays, 900),
@@ -63,7 +75,7 @@ function exported(s: Snapshot, period: Period) {
 	return { coverage, csv: leaderboardCsv(view.rows, figures, coverage).split("\n") };
 }
 
-const one = (coverage: Snapshot["coverage"]) =>
+const one = (coverage: Coverage) =>
 	snapshot(coverage, [solver("a", { batches: days(180, 1), trades: days(180, 1) })]);
 
 describe("exportCoverage", () => {

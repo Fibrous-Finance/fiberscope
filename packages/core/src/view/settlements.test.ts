@@ -32,6 +32,15 @@ function solver(
 		cost: [],
 		entered: [],
 		won: [],
+		solutions: [],
+		filteredOut: [],
+		losses: [],
+		closeLosses: [],
+		quotes: [],
+		quotesVerified: [],
+		quotesSettled: [],
+		protocolFees: [],
+		partnerFees: [],
 		latestSettlements: [],
 	};
 }
@@ -49,6 +58,8 @@ function settled(solver: string, secondsAgo: number, volume: number | null): Cre
 		surplus: volume === null ? null : volume / 1000,
 		gas: 434_710,
 		cost: 0.0213,
+		protocolFee: 0.0118,
+		partnerFee: 0,
 	};
 }
 
@@ -60,7 +71,7 @@ function snapshot(solvers: SnapshotSolver[], latest: CreditedSettlement[]): Snap
 		end: { block: 52_115_823, time: END },
 		lastRunAt: END,
 		refreshMinutes: 10,
-		coverage: { chainDays: 1, auctionDays: 1, surplusDays: 1 },
+		coverage: { chainDays: 1, auctionDays: 1, surplusDays: 1, detailDays: 1 },
 		auctions: { count: [100], solutions: [900] },
 		solvers,
 		latestAuctions: [],

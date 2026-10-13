@@ -33,12 +33,13 @@ const USAGE = `Usage:
   node src/cli.ts window --from <block> --to <block>
       Print totals and the per-solver table for a block range, from the database.
   node src/cli.ts attribution --from <block> --to <block>
-      Check, from the database, that every batch in a block range is credited to the solver of
-      the winning solution that settled its transaction in CoW's competition data.
+      Compare, from the database, each batch's credited solver address in a block range with the
+      solver address of the winning solution for its transaction in CoW's competition data.
   node src/cli.ts terms --from <block> --to <block> [--sample N]
-      Check the order terms read from settle() calldata: for N trades (default 90) spread over
-      the range, decode the transaction again, compare the fee with its Trade event, and compare
-      the order with CoW's order book.
+      Count the trades with order terms decoded from settle() calldata, by route, then sample
+      about N of them (default 90) across the range and the routes: reread and decode each
+      transaction from the RPC, compare its executed fee with its Trade event's, and compare the
+      signed order with CoW's order book.
   node src/cli.ts seed --url <url>
       Download a database from <url> when there is none yet, e.g. to move the indexer to a new
       host without indexing again. It is integrity-checked before it is used.

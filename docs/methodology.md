@@ -201,18 +201,20 @@ transaction in CoW's competition data, and every batch was credited to that solu
 address: 24,534 of 24,534. Of these, 1,230 went through the flash-loan router: 397 were credited
 to the transaction's recipient and 833 to its sender, and all 1,230 match the winner. None of them
 fell back to CoW's winner, so this check does not depend on the competition data it is compared
-with. `node src/cli.ts attribution --from 51811228 --to 52115823` reruns it from the database.
+with. `node src/cli.ts attribution --from 51811228 --to 52115823` reruns this attribution check
+using the database.
 
 **Order terms against the trades and CoW's order book.** Surplus is calculated from the limits
 decoded from `settle()` calldata. A sample of 407 trades covered every way that calldata reaches the
 settlement contract: a direct call, the flash-loan router, and solver contracts that pass the call
 on. Every decoded trade reproduced its `Trade` event exactly, and the limits, order kinds and fees
 of 80 of 80 orders checked agree with CoW's order API (`api.cow.fi/base/api/v1/orders/{uid}`).
-`node src/cli.ts terms --from <block> --to <block>` repeats this check for any block range: it
-counts the trades whose terms were read, by route, then reads a sample of them again from the RPC
-and checks each against its `Trade` event and CoW's order book. For one day of blocks
-(52,506,074–52,549,273, 12–13 Oct 2026), all 2,519 trades had their terms, and all 90 sampled, 30
-per route, agreed with both.
+`node src/cli.ts terms --from <block> --to <block>` repeats this check for any block range. It
+counts trades with decoded order terms by route, then rereads a sample from the RPC and checks each
+trade against its `Trade` event and CoW's order book. For one day of blocks (52,506,074–52,549,273,
+12–13 Oct 2026), order terms were read for all 2,519 trades. For all 90 sampled trades (30 per
+route), the executed fee matched the fee in the `Trade` event, and the signed-order fields matched
+CoW's order book.
 
 To check a block range yourself, `node src/cli.ts window --from <block> --to <block>` in
 `apps/indexer` prints its totals and per-solver table from the database (see

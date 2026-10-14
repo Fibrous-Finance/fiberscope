@@ -1,22 +1,38 @@
 /**
- * Appearance: Auto follows the system; Light and Dark pin a theme. The choice is saved and applied
- * before first paint by `themeScript`, so the page never flashes the wrong theme.
+ * Appearance: Auto follows the system; Light and Dark pin a theme. The appearance button switches
+ * to the other theme, and a switch back to the system's theme returns to Auto
+ * (`toggledAppearance`). `themeScript` applies the saved choice before first paint, so the page
+ * never flashes the wrong theme. Every later change, from the button, the system or another tab,
+ * goes through `showAppearance`.
  */
 
 export type Appearance = "auto" | "light" | "dark";
 export type Theme = "light" | "dark";
 
-export const APPEARANCES: readonly Appearance[] = ["auto", "light", "dark"];
 const STORAGE_KEY = "fiberscope.appearance";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 /** `<meta name="theme-color">` follows the active background. */
 const BACKGROUND: Record<Theme, string> = { light: "#F7F8F8", dark: "#1B1F2C" };
-const CHANGE_EVENT = "fiberscope:appearance";
+/** Fired when the page has changed to the other theme. */
+const CHANGE_EVENT = "fiberscope:theme";
+/**
+ * Holds every transition while the theme changes. Rows, bars, dots and links fade their colors on
+ * hover; without this, those fades would also run on a theme change, each at its own speed, while
+ * the rest of the page switched at once. Running transitions, such as the mosaic's intro, go on.
+ */
+const HOLD_TRANSITIONS =
+	"*,*::before,*::after{transition-duration:0s!important;transition-delay:0s!important}";
 
-/** Inline in `<head>`: mirrors `applyAppearance` for the saved choice, before React loads. */
-export const themeScript = `(()=>{try{var p=localStorage.getItem(${JSON.stringify(STORAGE_KEY)}),d=document.documentElement;if(p==="light"||p==="dark")d.dataset.theme=p;var t=p==="light"||p==="dark"?p:matchMedia(${JSON.stringify(DARK_QUERY)}).matches?"dark":"light";var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?${JSON.stringify(BACKGROUND.dark)}:${JSON.stringify(BACKGROUND.light)})}catch(e){}})()`;
+/**
+ * Inline in `<head>`: mirrors `applyTheme` for the saved choice, before React loads. It sets
+ * data-theme in Auto too, to the system's theme, so the colors change only when this code says so:
+ * CSS that followed the system by itself would recolor before transitions could be held.
+ */
+export const themeScript = `(()=>{var p;try{p=localStorage.getItem(${JSON.stringify(STORAGE_KEY)})}catch(e){}var t=p==="light"||p==="dark"?p:matchMedia(${JSON.stringify(DARK_QUERY)}).matches?"dark":"light";document.documentElement.dataset.theme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?${JSON.stringify(BACKGROUND.dark)}:${JSON.stringify(BACKGROUND.light)})})()`;
 
-export function readAppearance(): Appearance {
+/** The saved choice; Auto when there is none. */
+function readAppearance(): Appearance {
 	try {
 		const saved = localStorage.getItem(STORAGE_KEY);
 		return saved === "light" || saved === "dark" ? saved : "auto";
@@ -25,39 +41,101 @@ export function readAppearance(): Appearance {
 	}
 }
 
-export function systemTheme(): Theme {
+function systemTheme(): Theme {
 	return window.matchMedia(DARK_QUERY).matches ? "dark" : "light";
 }
 
-function applyAppearance(appearance: Appearance): void {
-	const root = document.documentElement;
-	if (appearance === "auto") delete root.dataset.theme;
-	else root.dataset.theme = appearance;
-	const theme = appearance === "auto" ? systemTheme() : appearance;
-	document.querySelector('meta[name="theme-color"]')?.setAttribute("content", BACKGROUND[theme]);
+/** The theme on screen. */
+export function shownTheme(): Theme {
+	return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
-export function saveAppearance(appearance: Appearance): void {
+/**
+ * The appearance a click on the appearance button chooses: the other theme, pinned only when it
+ * differs from the system's. A click back to the system's theme returns to Auto, so the page
+ * follows the system again; saving Light or Dark there would pin the theme with nothing on screen
+ * to show it. A later system change never unpins a choice, even one it comes to match.
+ */
+export function toggledAppearance(shown: Theme, system: Theme): Appearance {
+	const other: Theme = shown === "dark" ? "light" : "dark";
+	return other === system ? "auto" : other;
+}
+
+/** Recolors the page in one frame. */
+function applyTheme(theme: Theme): void {
+	const hold = document.createElement("style");
+	hold.textContent = HOLD_TRANSITIONS;
+	document.head.append(hold);
+	document.documentElement.dataset.theme = theme;
+	document.querySelector('meta[name="theme-color"]')?.setAttribute("content", BACKGROUND[theme]);
+	window.dispatchEvent(new Event(CHANGE_EVENT));
+	// The next frame recolors the page with transitions held; the one after releases them.
+	requestAnimationFrame(() => requestAnimationFrame(() => hold.remove()));
+}
+
+/** Counts theme changes, so a fade still waiting to start can tell that a later change came. */
+let changes = 0;
+/** The theme a fade that has not recolored the page yet is heading for. */
+let fadingTo: Theme | null = null;
+
+/**
+ * Changes the theme on screen, if the appearance changes it: the old page fades into the new one
+ * as a single picture, for as long as globals.css says. With reduced motion, while the page is
+ * hidden, or in browsers without view transitions, it changes in one frame.
+ */
+function showAppearance(appearance: Appearance): void {
+	const theme = appearance === "auto" ? systemTheme() : appearance;
+	// Auto and the pinned theme it matches look the same; each subscriber also reports a system
+	// change, so the same theme can be asked for twice.
+	if ((fadingTo ?? document.documentElement.dataset.theme) === theme) return;
+	const change = ++changes;
+	const fade =
+		typeof document.startViewTransition === "function" &&
+		document.visibilityState === "visible" &&
+		!window.matchMedia(REDUCED_MOTION_QUERY).matches;
+	if (!fade) {
+		fadingTo = null;
+		applyTheme(theme);
+		return;
+	}
+	fadingTo = theme;
+	const transition = document.startViewTransition(() => {
+		// The browser runs this even for a fade it skipped; the latest change wins.
+		if (change !== changes) return;
+		fadingTo = null;
+		applyTheme(theme);
+	});
+	// The browser skips a fade when another one starts or the page is hidden. The theme changes
+	// all the same, so the rejected `ready` is expected.
+	transition.ready.catch(() => {});
+}
+
+/**
+ * The appearance button: switches to the other theme. During a fade, "the theme on screen" is the
+ * one the fade is heading for, so a quick second press switches back.
+ */
+export function toggleAppearance(): void {
+	const appearance = toggledAppearance(fadingTo ?? shownTheme(), systemTheme());
 	try {
-		localStorage.setItem(STORAGE_KEY, appearance);
+		if (appearance === "auto") localStorage.removeItem(STORAGE_KEY);
+		else localStorage.setItem(STORAGE_KEY, appearance);
 	} catch {
 		// Private mode or blocked storage: the choice lasts for this page only.
 	}
-	applyAppearance(appearance);
-	window.dispatchEvent(new Event(CHANGE_EVENT));
+	showAppearance(appearance);
 }
 
-/** For `useSyncExternalStore`: the saved choice, other tabs, and live system changes in Auto. */
-export function subscribeAppearance(onChange: () => void): () => void {
+/**
+ * For `useSyncExternalStore`: the theme on screen. While subscribed, the page also follows the
+ * system in Auto, and a choice made in another tab.
+ */
+export function subscribeTheme(onChange: () => void): () => void {
 	const media = window.matchMedia(DARK_QUERY);
 	const onSystem = () => {
-		if (readAppearance() === "auto") applyAppearance("auto");
-		onChange();
+		if (readAppearance() === "auto") showAppearance("auto");
 	};
 	const onStorage = (event: StorageEvent) => {
-		if (event.key !== STORAGE_KEY) return;
-		applyAppearance(readAppearance());
-		onChange();
+		if (event.key === STORAGE_KEY) showAppearance(readAppearance());
 	};
 	media.addEventListener("change", onSystem);
 	window.addEventListener("storage", onStorage);

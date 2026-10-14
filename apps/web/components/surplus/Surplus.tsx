@@ -131,7 +131,9 @@ export function Surplus() {
 							className={`${GRID} items-end pb-2 font-mono text-[11px] leading-[normal] font-medium tracking-[0.06em] text-mu uppercase`}
 						>
 							<span />
-							<span>{partial ? t("header.partial", { label: track }) : track}</span>
+							<span aria-describedby={partial ? "fn-surplus" : undefined}>
+								{partial ? t("header.partial", { label: track }) : track}
+							</span>
 							<span className="text-right">
 								<span className="max-wide:hidden">{t("header.typical")}</span>
 								<span className="wide:hidden">{t("header.typicalShort")}</span>
@@ -157,7 +159,7 @@ export function Surplus() {
 									className={`${GRID} h-[31px] items-center border-t border-ln`}
 								>
 									<span
-										className={`truncate text-[13.5px] font-medium transition-colors duration-200 ${row.unnamed ? "font-mono" : ""} ${hot ? "text-teal" : ""}`}
+										className={`truncate text-[13.5px] font-medium transition-colors duration-200 ${row.unnamed ? "font-mono" : ""} ${hot ? "text-hvt" : ""}`}
 									>
 										{row.label}
 									</span>
@@ -237,7 +239,7 @@ export function Surplus() {
 						<span className="wide:hidden">{t("noteCompact")}</span>
 					</FootLine>
 					{partial ? (
-						<p className="mt-1.5 foot-line">
+						<p id="fn-surplus" className="mt-1.5 foot-line">
 							{t("footnote", { covered, days: view.days })}
 						</p>
 					) : null}

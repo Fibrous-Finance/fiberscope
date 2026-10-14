@@ -2,18 +2,18 @@
 	"eyebrow": "Solver competition · CoW Protocol on {network}",
 	"headline": "{fraction, select, all {All} moreThanHalf {More than half of all} half {Half of all} nearlyHalf {Nearly half of all} twoInFive {{kind, select, volume {Two-fifths} other {Two in five}} of all} aThird {A third of all} overAQuarter {Over a quarter of all} aQuarter {A quarter of all} oneInFive {{kind, select, volume {A fifth} other {One in five}} of all} other {{kind, select, volume {{n, select, 6 {A sixth} 7 {A seventh} 8 {An eighth} 9 {A ninth} 10 {A tenth} other {Less than a tenth}}} other {One in {n, select, 6 {six} 7 {seven} 8 {eight} 9 {nine} other {{n}}}}} of all}} {network} {measure} went to one solver in {span}.",
 	"span": {
-		"last": "the last {days, plural, =1 {24\u00a0hours} other {#\u00a0days}}",
-		"to": "the {days, plural, =1 {24\u00a0hours} other {#\u00a0days}} to {asOf}"
+		"last": "the last {days, plural, =1 {24 hours} other {# days}}",
+		"to": "the {days, plural, =1 {24 hours} other {# days}} to {asOf}"
 	},
 	"delayed": "<strong>Last updated {age}.</strong> Every figure on this page is as of {asOf}. The page checks for new data every minute and updates on its own.",
 	"totals": {
-		"batches": "{count, plural, one {#\u00a0batch} other {#\u00a0batches}}",
-		"trades": "{count, plural, one {#\u00a0trade} other {#\u00a0trades}}",
-		"volume": "{value}\u00a0volume",
-		"volumeCovered": "{value}\u00a0volume\u00a0(last\u00a0{days, plural, =1 {24\u00a0hours} other {#\u00a0days}})",
-		"solvers": "{count, plural, one {#\u00a0solver} other {#\u00a0solvers}}",
-		"to": "to\u00a0{asOf}",
-		"checked": "checked\u00a0{asOf}"
+		"batches": "{count, plural, one {# batch} other {# batches}}",
+		"trades": "{count, plural, one {# trade} other {# trades}}",
+		"volume": "{value} volume",
+		"volumeCovered": "{value} volume ({delayed, select, yes {the {days, plural, =1 {24 hours} other {# days}} to {asOf}} other {last {days, plural, =1 {24 hours} other {# days}}}})",
+		"solvers": "{count, plural, one {# solver} other {# solvers}}",
+		"to": "to {asOf}",
+		"checked": "checked {asOf}"
 	},
 	"controls": {
 		"period": "Period",
@@ -21,23 +21,23 @@
 	},
 	"mosaic": {
 		"label": {
-			"batches": "Mosaic of {total, plural, one {#\u00a0batch} other {#\u00a0batches}}, one square per {unit, plural, one {batch} other {#\u00a0batches}}: {solvers}.",
-			"trades": "Mosaic of {total, plural, one {#\u00a0trade} other {#\u00a0trades}}, one square per {unit, plural, one {trade} other {#\u00a0trades}}: {solvers}.",
+			"batches": "Mosaic of {total, plural, one {# batch} other {# batches}}, one square per {unit, plural, one {batch} other {# batches}}: {solvers}.",
+			"trades": "Mosaic of {total, plural, one {# trade} other {# trades}}, one square per {unit, plural, one {trade} other {# trades}}: {solvers}.",
 			"volume": "Mosaic of {total} in volume, one square per {unit, number, ::currency/USD precision-integer}: {solvers}."
 		},
 		"item": "{name} {share}",
 		"unit": {
-			"batches": "1\u00a0square = {unit, plural, one {#\u00a0batch} other {#\u00a0batches}}",
-			"trades": "1\u00a0square = {unit, plural, one {#\u00a0trade} other {#\u00a0trades}}",
-			"volume": "1\u00a0square = {unit, number, ::currency/USD precision-integer}"
+			"batches": "1 square = {unit, plural, one {# batch} other {# batches}}",
+			"trades": "1 square = {unit, plural, one {# trade} other {# trades}}",
+			"volume": "1 square = {unit, number, ::currency/USD precision-integer}"
 		},
 		"readout": {
-			"batches": "{name} · {value, plural, one {#\u00a0batch} other {#\u00a0batches}} · {share}",
-			"trades": "{name} · {value, plural, one {#\u00a0trade} other {#\u00a0trades}} · {share}",
+			"batches": "{name} · {value, plural, one {# batch} other {# batches}} · {share}",
+			"trades": "{name} · {value, plural, one {# trade} other {# trades}} · {share}",
 			"volume": "{name} · {value} · {share}"
 		},
 		"rest": "{count, plural, one {# smaller solver} other {# smaller solvers}} · {share}",
-		"others": "{count, plural, one {#\u00a0other} other {#\u00a0others}}"
+		"others": "{count, plural, one {# other} other {# others}}"
 	},
 	"facts": {
 		"share": "Leader’s share",
@@ -45,13 +45,13 @@
 		"versus": "vs {name}",
 		"alone": "No other solver",
 		"since": "Leading since",
-		"run": "{days, plural, one {#\u00a0day in a row} other {#\u00a0days in a row}}",
-		"runAtLeast": "{days, plural, other {#+\u00a0days in a row}}",
+		"run": "{days, plural, one {# day in a row} other {# days in a row}}",
+		"runAtLeast": "{days, plural, other {#+ days in a row}}",
 		"runBy": "{name} · {run}",
 		"noRun": "No leader today",
-		"gas": "Lowest gas/trade",
+		"gas": "Lowest gas per trade",
 		"noGas": "No gas data",
-		"gasBy": "{name} · {minBatches}+\u00a0batches"
+		"gasBy": "{name} · of solvers with {minBatches}+ batches"
 	},
 	"empty": {
 		"headline": "No batches settled on {network} in {span}.",
@@ -61,8 +61,8 @@
 	},
 	"error": {
 		"headline": "We couldn’t load the latest data.",
-		"text": "Fiberscope’s data service didn’t respond at {time}\u00a0UTC. The page tries again every minute and updates as soon as the data arrives.",
+		"text": "Fiberscope’s data service didn’t respond at {time} UTC. The page tries again every minute and updates as soon as the data arrives.",
 		"retry": "Retry now",
-		"next": "Next automatic try {time}\u00a0UTC"
+		"next": "Next automatic try {time} UTC"
 	}
 }

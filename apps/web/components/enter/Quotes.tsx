@@ -82,7 +82,11 @@ export function Quotes({ rankIndex }: { rankIndex: Map<string, number> }) {
 			<div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2">
 				<h3 className="text-[15px] font-medium">{t("title")}</h3>
 				{has ? (
-					<span className="font-mono text-[12px] leading-[normal] font-medium text-mu">
+					// Its "†" points at the footnote under the chart.
+					<span
+						aria-describedby={partial ? "fn-quotes" : undefined}
+						className="font-mono text-[12px] leading-[normal] font-medium text-mu"
+					>
 						{t("scope", { partial: partial ? "yes" : "no" })}
 					</span>
 				) : null}
@@ -103,6 +107,16 @@ export function Quotes({ rankIndex }: { rankIndex: Map<string, number> }) {
 						</span>
 					</div>
 					<div className="mt-3.5">
+						{/*
+						 * The values' key heads their column, right-aligned over the bars' column and
+						 * theirs, on compact pages over the whole row, as in the entered bars.
+						 */}
+						<div className={`${BAR_GRID} pb-2 label`}>
+							<span className="col-span-full text-right text-balance wide:col-[2/-1]">
+								<span className="max-wide:hidden">{t("axis.ratesWide")}</span>
+								<span className="wide:hidden">{t("axis.rates")}</span>
+							</span>
+						</div>
 						{quoters.map((quoter) => {
 							const hot = isHot(hovered, quoter.id, rankIndex.get(quoter.id) ?? -1);
 							const share = quoter.figures.quoteShare ?? 0;
@@ -121,7 +135,7 @@ export function Quotes({ rankIndex }: { rankIndex: Map<string, number> }) {
 								>
 									<span
 										title={quoter.label}
-										className={`truncate text-[13.5px] font-medium transition-colors duration-200 ${quoter.unnamed ? "font-mono" : ""} ${hot ? "text-teal" : ""}`}
+										className={`truncate text-[13.5px] font-medium transition-colors duration-200 ${quoter.unnamed ? "font-mono" : ""} ${hot ? "text-hvt" : ""}`}
 									>
 										{quoter.label}
 									</span>
@@ -174,12 +188,7 @@ export function Quotes({ rankIndex }: { rankIndex: Map<string, number> }) {
 								end={t("axis.end", { value: f.percent(axis.max) })}
 								className="max-wide:hidden"
 							/>
-							<span className="text-right text-balance max-wide:hidden">
-								{t("axis.ratesWide")}
-							</span>
-						</div>
-						<div className="mt-1 text-right font-mono text-[11px] leading-[normal] font-medium text-fa wide:hidden">
-							{t("axis.rates")}
+							<span />
 						</div>
 					</div>
 					<FootLine source={t("source")}>
@@ -191,7 +200,7 @@ export function Quotes({ rankIndex }: { rankIndex: Map<string, number> }) {
 							.join(" ")}
 					</FootLine>
 					{partial ? (
-						<p className="mt-1.5 foot-line">
+						<p id="fn-quotes" className="mt-1.5 foot-line">
 							{t("footnote", { covered: coverage, days: view.days })}
 						</p>
 					) : null}

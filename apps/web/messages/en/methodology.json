@@ -18,8 +18,8 @@
 			"text": "A solver’s portion of all batches, trades or volume in the window."
 		},
 		"gas": {
-			"term": "Gas/trade",
-			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas/trade” considers only solvers with at least {minBatches}\u00a0batches per day of settlement data in the window, or every solver when none has that many."
+			"term": "Gas per trade",
+			"text": "Gas units used by a solver’s settlements divided by trades filled. Units of gas, not cost. “Lowest gas per trade” considers only solvers with at least {minBatches} batches per day of settlement data in the window, or every solver when none has that many."
 		},
 		"cost": {
 			"term": "Transaction cost",
@@ -47,7 +47,7 @@
 		},
 		"fees": {
 			"term": "Fees",
-			"text": "Protocol fees are CoW’s: on market orders, half of the improvement over the quote; on limit orders that execute beyond the market price, half of the surplus; either capped at 0.98% of volume; then a volume fee of 2\u00a0bps, or 0.3\u00a0bps for correlated pairs such as stablecoins. Partner fees are set by the integrator in the order, up to 100\u00a0bps, and apply after CoW’s own fees; CoW keeps a quarter as a service fee. Each is charged in the trade’s surplus token, as CoW’s trades API lists it, and valued at the trade’s own exchange rate. Fees follow the orders a solver settles; solvers do not set them."
+			"text": "Protocol fees are CoW’s: on market orders, half of the improvement over the quote; on limit orders that execute beyond the market price, half of the surplus; either capped at 0.98% of volume; then a volume fee of 2 bps, or 0.3 bps for correlated pairs such as stablecoins. Partner fees are set by the integrator in the order, up to 100 bps, and apply after CoW’s own fees; CoW keeps a quarter as a service fee. Each is charged in the trade’s surplus token, as CoW’s trades API lists it, and valued at the trade’s own exchange rate. Fees follow the orders a solver settles; solvers do not set them."
 		},
 		"networkAverage": {
 			"term": "Network average",
@@ -95,9 +95,9 @@
 		},
 		"freshness": {
 			"term": "Freshness",
-			"text": "Updated every {minutes, plural, one {minute} other {#\u00a0minutes}}. The figures run to block {block}, produced {date} at {time}\u00a0UTC.",
-			"noData": "Updated every {minutes, plural, one {minute} other {#\u00a0minutes}}.",
-			"delayed": "Normally updated every {minutes, plural, one {minute} other {#\u00a0minutes}}. The figures run to block {block}, produced {date} at {time}\u00a0UTC."
+			"text": "Updated every {minutes, plural, one {minute} other {# minutes}}. The figures run to block {block}, produced {date} at {time} UTC.",
+			"noData": "Updated every {minutes, plural, one {minute} other {# minutes}}.",
+			"delayed": "Normally updated every {minutes, plural, one {minute} other {# minutes}}. The figures run to block {block}, produced {date} at {time} UTC."
 		},
 		"windows": {
 			"term": "Windows",
@@ -105,7 +105,7 @@
 		},
 		"coverage": {
 			"term": "Coverage",
-			"text": "Settlement history goes back {chain, plural, one {#\u00a0day} other {#\u00a0days}}, auction history {auction, plural, one {#\u00a0day} other {#\u00a0days}}{detail, plural, =0 { and surplus history {surplus, plural, one {#\u00a0day} other {#\u00a0days}}} other {, surplus history {surplus, plural, one {#\u00a0day} other {#\u00a0days}} and auction details (solutions, quotes and fees) {detail, plural, one {#\u00a0day} other {#\u00a0days}}}}. Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page.",
+			"text": "Settlement history goes back {chain, plural, one {# day} other {# days}}, auction history {auction, plural, one {# day} other {# days}}{detail, plural, =0 { and surplus history {surplus, plural, one {# day} other {# days}}} other {, surplus history {surplus, plural, one {# day} other {# days}} and auction details (solutions, quotes and fees) {detail, plural, one {# day} other {# days}}}}. Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page.",
 			"noData": "Volume, Entered and Win rate require auction data; surplus also requires signed order terms. In longer windows, these figures cover only the days with the required data, as noted on the page."
 		},
 		"names": {

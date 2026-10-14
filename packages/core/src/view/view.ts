@@ -157,11 +157,6 @@ export interface Entrant extends SolverRef {
 
 export interface TapeCell {
 	state: "won" | "entered" | "absent";
-	/**
-	 * The settlement to open: the solver's own when it won and settled, otherwise the first
-	 * winner's that settled; null when none did.
-	 */
-	tx: string | null;
 }
 
 interface TapeAuction {
@@ -280,15 +275,10 @@ function rankBy<T>(items: readonly T[], value: (item: T) => number): Map<T, numb
 	return new Map(ranked.map((item, i) => [item, i + 1]));
 }
 
-/**
- * The settlement a tape cell opens for `solverId`: its own when it won and settled, else the first
- * winner's that settled (the first winner may never have settled).
- */
+/** A tape cell for `solverId`: won, entered without winning, or not entered. */
 export function tapeCell(auction: AuctionSummary, solverId: string): TapeCell {
-	const settled = auction.winners.find((w) => w.tx !== null)?.tx ?? null;
-	const own = auction.winners.find((w) => w.solver === solverId);
-	if (own) return { state: "won", tx: own.tx ?? settled };
-	return { state: auction.entered.includes(solverId) ? "entered" : "absent", tx: settled };
+	if (auction.winners.some((w) => w.solver === solverId)) return { state: "won" };
+	return { state: auction.entered.includes(solverId) ? "entered" : "absent" };
 }
 
 export function buildView(snapshot: Snapshot, period: Period, measure: Measure): View {

@@ -27,10 +27,11 @@ const DOT_MAX = 18;
 /**
  * Desktop: name | gas track | gas value | cost track | cost value | swaps track | swaps value.
  * Compact: the cost and swaps tracks are hidden, and their values take the last two columns,
- * each wide enough for five characters ("14.50", "<0.1¢").
+ * each wide enough for five characters ("14.50", "<0.1¢"). The desktop gap keeps each value
+ * clear of the next panel's track.
  */
 const GRID =
-	"grid grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_44px_38px_38px] gap-2 wide:grid-cols-[clamp(96px,16vw,190px)_minmax(0,1.25fr)_56px_minmax(0,1fr)_48px_minmax(0,1fr)_44px] wide:gap-4";
+	"grid grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_44px_38px_38px] gap-2 wide:grid-cols-[clamp(96px,16vw,190px)_minmax(0,1.25fr)_56px_minmax(0,1fr)_48px_minmax(0,1fr)_44px] wide:gap-6";
 
 const VALUE = "text-right font-mono text-[12.5px] leading-[normal] font-medium";
 
@@ -149,7 +150,7 @@ export function Efficiency() {
 							className={`${GRID} h-[31px] items-center border-t border-ln`}
 						>
 							<span
-								className={`truncate text-[13.5px] font-medium ${row.unnamed ? "font-mono" : ""} ${dot.hot ? "text-teal" : ""}`}
+								className={`truncate text-[13.5px] font-medium ${row.unnamed ? "font-mono" : ""} ${dot.hot ? "text-hvt" : ""}`}
 							>
 								{row.label}
 							</span>

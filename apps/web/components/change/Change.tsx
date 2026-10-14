@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import { useTranslations } from "next-intl";
 
 import { linePath, networkActivity } from "@fiberscope/core";
@@ -8,6 +10,7 @@ import type { Row } from "@fiberscope/core";
 import { Network } from "@/components/change/Network";
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
+import { useDaySlider } from "@/components/ui/daySlider";
 import { FootLine, Section } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
@@ -86,13 +89,13 @@ export function Change({
 	const offset = (100 * first) / last;
 	const tiles = view.rows.slice(0, MULTIPLES).map((row) => ({
 		row,
-		daily: (activity.shares.get(row.id) ?? []).filter((share) => share !== null),
+		shares: activity.shares.get(row.id) ?? [],
 	}));
 	// Every tile shares one scale: 0 to the highest daily share rounded up to a multiple of 10%.
-	const max = Math.max(
-		0.1,
-		Math.ceil(Math.max(...tiles.flatMap((tile) => tile.daily)) * 10) / 10
+	const highest = Math.max(
+		...tiles.flatMap(({ shares }) => shares).filter((share) => share !== null)
 	);
+	const max = Math.max(0.1, Math.ceil(highest * 10) / 10);
 	const start = f.day(days[first]);
 	const end = f.day(days[last]);
 
@@ -104,11 +107,12 @@ export function Change({
 			</div>
 			<Network activity={activity} period={view.period} measure={view.measure} asOf={asOf} />
 			<div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(min(100%,140px),1fr))] gap-x-5 wide:grid-cols-[repeat(auto-fill,minmax(min(100%,230px),1fr))] wide:gap-x-8">
-				{tiles.map(({ row, daily }, index) => (
+				{tiles.map(({ row, shares }, index) => (
 					<Multiple
 						key={row.id}
 						row={row}
-						daily={daily}
+						shares={shares}
+						days={days}
 						offset={offset}
 						max={max}
 						hot={isHot(hovered, row.id, index)}
@@ -129,10 +133,15 @@ export function Change({
 	);
 }
 
-/** One solver's tile: window share, change since the first day with data, and the daily line. */
+/**
+ * One solver's tile: window share, change since the first day with data, and the daily line. The
+ * line is a slider over the days: while one is picked, the share and the date of that day replace
+ * the window's figures, and the end dot moves to it.
+ */
 function Multiple({
 	row,
-	daily,
+	shares,
+	days,
 	offset,
 	max,
 	hot,
@@ -142,9 +151,11 @@ function Multiple({
 	onHover,
 }: {
 	row: Row;
-	/** Daily share of the measure on the days with data, oldest first. */
-	daily: number[];
-	/** Where the first of those days sits across the chart, 0–100. */
+	/** Daily share of the measure, oldest first; null on the days without data, which come first. */
+	shares: (number | null)[];
+	/** End time of each day, as the network chart draws them. */
+	days: number[];
+	/** Where the first day with data sits across the chart, 0–100. */
 	offset: number;
 	/** Top of the shared y-scale. */
 	max: number;
@@ -158,9 +169,18 @@ function Multiple({
 	const t = useTranslations("Change");
 	const tc = useTranslations("Common");
 	const f = useFormat();
-	const { line, area, endY } = linePath(daily, 0, max, 100 - offset, 40);
+	const summary = useId();
+	const daily = shares.filter((share) => share !== null);
+	const { line, area } = linePath(daily, 0, max, 100 - offset, 40);
 	const first = daily[0];
 	const last = daily[daily.length - 1];
+	const count = days.length;
+	// The line's points spread evenly across the chart: the day under the pointer is the nearest.
+	const slider = useDaySlider({ count, at: (across) => Math.round(across * (count - 1)) });
+	const picked = slider.day !== null;
+	// The day the slider stands on, the latest unless one is picked: the dot marks its share.
+	const nowShare = shares[slider.now];
+	const nowDate = f.day(days[slider.now]);
 
 	return (
 		<div
@@ -178,16 +198,14 @@ function Multiple({
 			</div>
 			<div className="mt-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
 				<span className="font-mono text-[24px] leading-[normal] font-medium tracking-[-0.04em]">
-					{f.percent(row.share, 1)}
+					{f.percent(picked ? nowShare : row.share, 1)}
 				</span>
 				<span className="font-mono text-[11.5px] leading-[normal] font-medium text-mu">
-					{tc("points", { value: f.points((last - first) * 100) })}
+					{picked ? nowDate : tc("points", { value: f.points((last - first) * 100) })}
 				</span>
 			</div>
-			{/* 44px (wide 64px) of chart above the 1px baseline. */}
-			<div
-				role="img"
-				aria-label={t("chart", {
+			<span id={summary} className="sr-only">
+				{t("chart", {
 					solver: row.label,
 					measure,
 					first: f.percent(first, 1),
@@ -195,7 +213,23 @@ function Multiple({
 					start,
 					end,
 				})}
-				className="relative mt-3 h-[45px] border-b border-ln2 wide:h-[65px]"
+			</span>
+			{/* 44px (wide 64px) of chart above the 1px baseline. */}
+			<div
+				role="slider"
+				tabIndex={0}
+				aria-label={t("multiple.slider", { solver: row.label, measure, days: count })}
+				aria-valuemin={1}
+				aria-valuemax={count}
+				aria-valuenow={slider.now + 1}
+				aria-valuetext={
+					nowShare === null
+						? t("multiple.noData", { date: nowDate })
+						: t("multiple.value", { date: nowDate, share: f.percent(nowShare, 1) })
+				}
+				aria-describedby={summary}
+				{...slider.handlers}
+				className="relative mt-3 h-[45px] touch-pan-y touch-pinch-zoom border-b border-ln2 wide:h-[65px]"
 			>
 				<svg
 					viewBox="0 0 100 40"
@@ -215,10 +249,16 @@ function Multiple({
 						/>
 					</g>
 				</svg>
-				<span
-					className={`absolute -right-[3px] -mt-[3px] size-1.5 rounded-full ${hot ? "bg-teal" : "bg-fg"}`}
-					style={{ top: `${endY}%` }}
-				/>
+				{/* No dot on a picked day without data, where the line has no point. */}
+				{nowShare !== null && (
+					<span
+						className={`absolute -mt-[3px] -ml-[3px] size-1.5 rounded-full ${hot ? "bg-teal" : "bg-fg"}`}
+						style={{
+							left: `${(100 * slider.now) / (count - 1)}%`,
+							top: `${100 - (100 * nowShare) / max}%`,
+						}}
+					/>
+				)}
 			</div>
 		</div>
 	);

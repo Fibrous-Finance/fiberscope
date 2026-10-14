@@ -14,10 +14,11 @@ import { shownTheme, subscribeTheme, toggleAppearance } from "@/lib/theme";
 /** The data status the header shows on every page; the overview adds what its sections need. */
 export type HeaderStatus = Omit<Status, "delayed" | "asOf" | "retry">;
 
-/** Sections the nav follows, in page order. */
+/** Sections the nav follows, in page order; at the bottom of the page the last one is marked. */
 const SECTIONS = [
 	{ id: "who", key: "solvers" },
 	{ id: "enter", key: "auctions" },
+	{ id: "eff", key: "efficiency" },
 	{ id: "method", key: "methodology" },
 ] as const;
 /** A section is "in view" once its top is this close to the viewport top. */
@@ -153,7 +154,8 @@ function NetworkMenu() {
 				className="-mx-1.5 flex h-11 items-center gap-[7px] border-0 bg-transparent px-1.5 text-[14px] font-medium text-fg wide:mx-0 wide:h-auto wide:px-0 wide:py-2.5"
 			>
 				<span className="size-2 rounded-[2px] bg-base" />
-				{tc("network")}
+				{/* Below 360px the name does not fit next to the Delayed label; the button keeps it. */}
+				<span className="max-[360px]:hidden">{tc("network")}</span>
 				<Caret open={open} className="text-mu" />
 			</button>
 			{open ? (
@@ -197,14 +199,14 @@ interface Pill {
 	dot: string;
 	label: string;
 	tone?: string;
-	/** The label below 860px, when it differs. */
+	/** The label below 980px, when it differs. */
 	short?: string;
-	/** Below 860px only the dot shows; the label stays for screen readers. */
+	/** Below 980px only the dot shows; the label stays for screen readers. */
 	quiet?: boolean;
 }
 
 /**
- * The data status: a dot and a label. Below 860px the label does not fit next to the nav, so the
+ * The data status: a dot and a label. Below 980px the label does not fit next to the nav, so the
  * pill shows only the dot when live and one word otherwise; that is also what lets the header fit
  * at 360px.
  */
@@ -258,7 +260,7 @@ function StatusPill({ status, away }: { status: HeaderStatus; away?: boolean }) 
 				short: t("errorShort"),
 			};
 	}
-	const compact = pill.short ? "max-[860px]:hidden" : pill.quiet ? "max-[860px]:sr-only" : "";
+	const compact = pill.short ? "max-[980px]:hidden" : pill.quiet ? "max-[980px]:sr-only" : "";
 
 	return (
 		<span
@@ -269,7 +271,7 @@ function StatusPill({ status, away }: { status: HeaderStatus; away?: boolean }) 
 			<span className={`size-[7px] flex-none rounded-full ${pill.dot}`} />
 			<span className={`${pill.tone ?? ""} ${compact}`}>{pill.label}</span>
 			{pill.short ? (
-				<span className={`min-[860px]:hidden ${pill.tone ?? ""}`}>{pill.short}</span>
+				<span className={`min-[980px]:hidden ${pill.tone ?? ""}`}>{pill.short}</span>
 			) : null}
 		</span>
 	);

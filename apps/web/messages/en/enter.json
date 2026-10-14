@@ -1,7 +1,7 @@
 {
 	"title": "Who enters, who wins",
-	"coverage": "Auction records cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.",
-	"sentence": "On average, {entrants}\u00a0solvers enter each auction, submitting about {solutions, plural, one {# competing solution} other {# competing solutions}}.",
+	"coverage": "Auction records cover the last {covered, plural, =1 {24 hours} other {#}} of the {days, plural, one {# day} other {# days}}.",
+	"sentence": "On average, {entrants} solvers enter each auction, submitting about {solutions, plural, one {# competing solution} other {# competing solutions}}.",
 	"top": "{solver} enters {participation} of auctions and wins {winRate} of those.",
 	"empty": "No auction data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}}, so entries and wins can’t be shown yet.",
 	"legend": {
@@ -12,13 +12,13 @@
 	"rates": "{participation} · <win>{winRate}</win>",
 	"axis": {
 		"end": "{value} of auctions",
-		"rates": "in\u00a0· win\u00a0rate",
-		"ratesFiltered": "in\u00a0· win\u00a0rate\u00a0· filtered\u00a0out{partial, select, yes {†} other {}}"
+		"rates": "in · win rate",
+		"ratesFiltered": "in · win rate · filtered out{partial, select, yes {†} other {}}"
 	},
 	"tape": {
-		"title": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}",
-		"label": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}. Left and right arrow keys move between auctions. Home and End jump to the first and last. Enter or Space opens or closes the selected auction’s solutions, and Escape closes them.",
-		"readout": "#{id}\u00a0· {time}\u00a0UTC\u00a0· {entered}\u00a0entered\u00a0· {winners, plural, =0 {no\u00a0winner} other {won\u00a0by\u00a0<winner>{names}</winner>}}"
+		"title": "{count, plural, one {Latest auction} other {Latest # auctions}}",
+		"label": "{count, plural, one {Latest auction} other {Latest # auctions}}. Left and right arrow keys move between auctions. Home and End jump to the first and last. Enter or Space opens or closes the selected auction’s solutions, and Escape closes them.",
+		"readout": "#{id} · {time} UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
 	},
 	"note": "Click an auction to see its solutions. Filtered out: the share of a solver’s solutions that CoW’s fairness filter removed; a filtered-out solution cannot win.",
 	"noteCompact": "Tap an auction to see its solutions.",
@@ -28,7 +28,7 @@
 		"title": "Latest settlements",
 		"scope": "All solvers · newest first",
 		"columns": {
-			"time": "Time\u00a0UTC",
+			"time": "Time UTC",
 			"solver": "Solver",
 			"trades": "Trades",
 			"pair": "Pair",
@@ -40,36 +40,37 @@
 			"partnerFee": "Partner fee",
 			"quotedBy": "Quoted by"
 		},
-		"pair": "<swap>{sell} → {buy}</swap>{more, plural, =0 {} other {<extra>\u00a0+#</extra>}}",
+		"pair": "<swap>{sell} → {buy}</swap>{more, plural, =0 {} other {<extra> +#</extra>}}",
 		"more": "Show {count} more",
 		"fewer": "Show fewer",
 		"note": "Transaction cost: what the transaction paid on Base, including the L1 data fee. Fees: charged on the settlement’s trades by CoW’s protocol and by partners. Quoted by: the solver whose quote the first trade’s order was placed with.",
 		"source": "Source: CoW Protocol API · {network} settlement events",
 		"items": {
-			"trades": "{trades, plural, one {#\u00a0trade} other {#\u00a0trades}}",
-			"volume": "{volume}",
-			"surplus": "{surplus}\u00a0surplus",
-			"cost": "{cost}\u00a0cost",
-			"protocolFee": "{fee}\u00a0protocol fee",
-			"partnerFee": "{fee}\u00a0partner fee",
+			"trades": "{trades, plural, one {# trade} other {# trades}}",
+			"volume": "{volume} volume",
+			"surplus": "{surplus} surplus",
+			"cost": "{cost} cost",
+			"protocolFee": "{fee} protocol fee",
+			"partnerFee": "{fee} partner fee",
 			"quotedBy": "quoted by {solver}"
 		},
-		"fees": "In {span}, CoW’s protocol fees totaled {protocol} ({protocolBps}\u00a0bps of volume) and partner fees {partner} ({partnerBps}\u00a0bps).",
+		"fees": "In {span}, CoW’s protocol fees totaled {protocol} ({protocolBps} bps of volume) and partner fees {partner} ({partnerBps} bps).",
 		"feesEmpty": "No fee data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet.{auctions, select, none { Fees need auction data.} other {}}"
 	},
 	"ratesFiltered": "{participation} · <win>{winRate}</win> · {filtered}",
 	"barFiltered": "Entered {participation} of auctions, won {wonShare} of all auctions, {filtered} of its solutions filtered out",
-	"filteredFootnote": "† Filtered out covers the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}.",
+	"filteredFootnote": "† Filtered out covers the last {covered, plural, =1 {24 hours} other {#}} of the {days, plural, one {# day} other {# days}}.",
 	"solutions": {
 		"title": "Solutions",
-		"heading": "#{id} · {time}\u00a0UTC",
+		"heading": "#{id} · {time} UTC",
 		"label": "Solutions of auction #{id}",
 		"close": "Close",
 		"legend": {
 			"won": "Winning solution",
 			"best": "Best solution",
 			"others": "Its other solutions",
-			"filtered": "Filtered out"
+			"filtered": "Filtered out",
+			"above": "Scored above the winner"
 		},
 		"columns": {
 			"solver": "Solver",
@@ -82,9 +83,11 @@
 		"value": {
 			"won": "Won",
 			"same": "Same score",
-			"filtered": "Filtered out"
+			"filtered": "Filtered out",
+			"above": "{gap} above",
+			"best": "best {score}"
 		},
-		"head": "{solutions, plural, one {1\u00a0solution from {solver}} other {#\u00a0solutions from {solvers, plural, one {#\u00a0solver} other {#\u00a0solvers}}}}",
+		"head": "{solutions, plural, one {1 solution from {solver}} other {# solutions from {solvers, plural, one {# solver} other {# solvers}}}}",
 		"single": "{head}. {winner} won with a score of {score}; the best rival, {rival}’s, scored {bound, select, below {less than {gap}} above {more than {gap}} other {{gap}}} lower.",
 		"singleTie": "{head}. {winner} won with a score of {score}; {ties, plural, one {{rivals} best solution} other {{rivals} best solutions}} had the same score.",
 		"possessive": "{solver}’s",
@@ -92,15 +95,15 @@
 		"singleOnly": "{head}. {winner} won{scored, select, yes { with a score of {score}} other {}}.",
 		"oneSolution": "{head} won{scored, select, yes { with a score of {score}} other {}}.",
 		"multi": "{head}. {winners} won together, settling different orders{scored, select, yes {, with scores of {scores}} other {}}.{losers, select, yes { Each losing solution competed with the winning solution whose orders it would also have settled. The scores alone don’t show this, so no gaps are given.} other {}}",
-		"multiSolutions": "{head}. {winners} won{winningSolvers, plural, one {} other { together}} with {wins}\u00a0solutions, settling different orders{scored, select, yes {, with scores of {scores}} other {}}.{losers, select, yes { Each losing solution competed with the winning solution whose orders it would also have settled. The scores alone don’t show this, so no gaps are given.} other {}}",
+		"multiSolutions": "{head}. {winners} won{winningSolvers, plural, one {} other { together}} with {wins} solutions, settling different orders{scored, select, yes {, with scores of {scores}} other {}}.{losers, select, yes { Each losing solution competed with the winning solution whose orders it would also have settled. The scores alone don’t show this, so no gaps are given.} other {}}",
 		"none": "{head}. No solution won.",
 		"filteredOne": "{solver}’s solution was filtered out.",
-		"filteredSome": "{count, plural, one {1 of {solver}’s {total}\u00a0solutions was filtered out.} other {# of {solver}’s {total}\u00a0solutions were filtered out.}}",
+		"filteredSome": "{count, plural, one {1 of {solver}’s {total} solutions was filtered out.} other {# of {solver}’s {total} solutions were filtered out.}}",
 		"filteredBoth": "Both of {solver}’s solutions were filtered out.",
 		"filteredAll": "All {count} of {solver}’s solutions were filtered out.",
-		"filteredMany": "{count}\u00a0solutions from {solvers} were filtered out.",
+		"filteredMany": "{count} solutions from {solvers} were filtered out.",
 		"dot": "{solver}: {solutions}",
-		"dotItem": "{score}{state, select, won {, won} filtered {, filtered out} same {, same score as the winner} gap {, {gap} below the winner} other {}}",
+		"dotItem": "{score}{state, select, won {, won} filtered {, filtered out} above {, filtered out, {gap} above the winner} same {, same score as the winner} gap {, {gap} below the winner} other {}}",
 		"note": "Score: roughly the surplus a solution generates for traders, in USD at the auction’s ETH/USD rate. One row per solver, with its best solution: ×2 means it submitted two{track, select, yes {, and its other solutions are the small dots} other {}}.",
 		"noteCompact": "Score: roughly the surplus a solution generates for traders, in USD. One row per solver, with its best solution: ×2 means it submitted two.",
 		"axis": {
@@ -109,12 +112,18 @@
 			"c": "1%",
 			"d": "10%",
 			"e": "100%"
-		}
+		},
+		"filteredAbove": "{total, plural, one {{solver}’s solution} other {1 of {solver}’s # solutions}} scored {bound, select, below {less than {gap}} other {{gap}}} higher but was filtered out.",
+		"groups": {
+			"won": "Won",
+			"lost": "Did not win"
+		},
+		"more": "+{count}"
 	},
 	"quotes": {
 		"title": "Quotes",
 		"scope": "Share of quoted trades{partial, select, yes {†} other {}}",
-		"sentence": "In {span}, {quoted} of {trades}\u00a0trades were placed with a solver’s quote. CoW had verified {verified} of those quotes by simulating them. {solver} gave {share} of all those quotes. The solver that gave the quote settled {settled} of those trades itself.",
+		"sentence": "In {span}, {quoted} of {trades} trades were placed with a solver’s quote. CoW had verified {verified} of those quotes by simulating them. {solver} gave {share} of all those quotes. The solver that gave the quote settled {settled} of those trades itself.",
 		"empty": "No quote data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet.{auctions, select, none { Quotes need auction data.} other {}}",
 		"noQuotes": "No trade in {span} was placed with a solver’s quote.",
 		"legend": {
@@ -125,13 +134,13 @@
 		"ratesWide": "{share} · <own>{settled}</own> · {verified}",
 		"axis": {
 			"end": "{value} of quoted trades",
-			"rates": "share\u00a0· settled\u00a0itself",
-			"ratesWide": "share\u00a0· settled\u00a0itself\u00a0· verified"
+			"rates": "share · settled itself",
+			"ratesWide": "share · settled itself · verified"
 		},
 		"bar": "Gave the quote for {share} of quoted trades and settled {settled} of those itself; {verified} of its quotes were verified",
-		"note": "Verified: CoW checked the quote by simulating it. Settled itself: the solver that gave the quote also settled the trade. Not quote rewards.",
+		"note": "Verified: CoW checked the quote by simulating it. Settled itself: the solver that gave the quote also settled the trade. These figures do not show quote rewards, which CoW pays by a different rule.",
 		"none": "{names} gave no quotes.",
 		"source": "Source: CoW Protocol order book",
-		"footnote": "† Quotes cover the last {covered} of {days, plural, one {#\u00a0day} other {#\u00a0days}}."
+		"footnote": "† Quotes cover the last {covered, plural, =1 {24 hours} other {#}} of the {days, plural, one {# day} other {# days}}."
 	}
 }

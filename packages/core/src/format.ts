@@ -7,6 +7,8 @@
 /** Shown wherever a value is unknown. */
 export const DASH = "—";
 const NBSP = "\u00a0";
+/** U+202F: Geist Mono draws it at half a space's width. */
+const NNBSP = "\u202f";
 const MINUTE_MS = 60_000;
 const DAY_MS = 86_400_000;
 
@@ -16,7 +18,7 @@ export interface Format {
 	int(value: number): string;
 	/** A plain decimal with fixed digits: 1.05, 8.0 */
 	fixed(value: number, digits: number): string;
-	/** $4.87M · $286K · $53.0K · $3.56K · $56 · <$1 */
+	/** $4.87M · $37.4M · $412M · $1.95B · $286K · $53.0K · $3.56K · $56 · <$1 */
 	usd(value: number | null): string;
 	/** Dollars with cents under $100, for surplus: $36.40 · $0.08 · <$0.01; from $100 as `usd` */
 	usdCents(value: number | null): string;
@@ -51,6 +53,11 @@ export interface Format {
 	clock(ms: number): string;
 	/** 2 Oct */
 	day(ms: number): string;
+	/**
+	 * 26 Sep with a narrow no-break space, for the hero's large mono figure, where a full space
+	 * reads as a double one
+	 */
+	dayNarrow(ms: number): string;
 	/** 1 Oct 22:10 */
 	dayTime(ms: number): string;
 	/** 2 Oct 2026 */
@@ -103,17 +110,22 @@ export function createFormat(locale: string): Format {
 	const integer = number({ maximumFractionDigits: 0 });
 	const decimals = new Map<number, Intl.NumberFormat>();
 	const percents = new Map<number, Intl.NumberFormat>();
-	const usdCompact = (digits: number) =>
-		number({
-			style: "currency",
-			currency: "USD",
-			notation: "compact",
-			minimumFractionDigits: digits,
-			maximumFractionDigits: digits,
-		});
-	const usd2 = usdCompact(2);
-	const usd1 = usdCompact(1);
-	const usd0 = usdCompact(0);
+	// Three significant figures in each unit: $1.00K, $10.0K, $100K, then M and B alike, largest
+	// first. Each tier starts where the one below would round up into it, so 999,600 reads
+	// "$1.00M", not "$1000K", and 999.60 reads "$1.00K", not "$1,000".
+	const usdTiers = [1e9, 1e6, 1e3].flatMap((unit) =>
+		([0, 1, 2] as const).map((digits) => {
+			const floor = unit * 10 ** (2 - digits);
+			const format = number({
+				style: "currency",
+				currency: "USD",
+				notation: "compact",
+				minimumFractionDigits: digits,
+				maximumFractionDigits: digits,
+			});
+			return { from: floor - floor / 2000, floor, format };
+		})
+	);
 	const wholeUsd = number({ style: "currency", currency: "USD", maximumFractionDigits: 0 });
 	const centsUsd = number({
 		style: "currency",
@@ -168,19 +180,17 @@ export function createFormat(locale: string): Format {
 		return f;
 	};
 	// "13 Sep" never splits across lines: a no-break space joins the day and the month.
-	const day = (ms: number) => {
-		if (!english) return dayMonth.format(ms).replaceAll(" ", NBSP);
+	const dayWith = (ms: number, space: string) => {
+		if (!english) return dayMonth.format(ms).replaceAll(" ", space);
 		const d = new Date(ms);
-		return `${d.getUTCDate()}${NBSP}${EN_MONTHS[d.getUTCMonth()]}`;
+		return `${d.getUTCDate()}${space}${EN_MONTHS[d.getUTCMonth()]}`;
 	};
+	const day = (ms: number) => dayWith(ms, NBSP);
 	const usd = (value: number | null): string => {
 		if (value === null) return DASH;
-		// Each tier starts where the one below would round up into it, so 999,600 reads
-		// "$1.00M", not "$1M", and 999.60 reads "$1.00K", not "$1,000".
-		if (value >= 999_500) return usd2.format(Math.max(value, 1e6));
-		if (value >= 99_950) return usd0.format(Math.max(value, 1e5));
-		if (value >= 9_995) return usd1.format(Math.max(value, 1e4));
-		if (value >= 999.5) return usd2.format(Math.max(value, 1e3));
+		for (const tier of usdTiers) {
+			if (value >= tier.from) return tier.format.format(Math.max(value, tier.floor));
+		}
 		// A positive amount under a dollar would otherwise round to "$0" or "$1".
 		if (value > 0 && value < 1) return `<${wholeUsd.format(1)}`;
 		return wholeUsd.format(Math.max(0, value));
@@ -267,6 +277,7 @@ export function createFormat(locale: string): Format {
 		time: (ms) => hm.format(ms),
 		clock: (ms) => hms.format(ms),
 		day,
+		dayNarrow: (ms) => dayWith(ms, NNBSP),
 		dayTime: (ms) => `${day(ms)} ${hm.format(ms)}`,
 		date(ms) {
 			if (!english) return dayMonthYear.format(ms).replaceAll(" ", NBSP);

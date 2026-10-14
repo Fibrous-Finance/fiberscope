@@ -138,7 +138,7 @@ export function Enter() {
 					) : null}
 					<FootLine source={t("source")}>{note}</FootLine>
 					{partial && !layout.compact ? (
-						<p className="mt-1.5 foot-line">
+						<p id="fn-filtered" className="mt-1.5 foot-line">
 							{t("filteredFootnote", { covered: details.coverage, days: view.days })}
 						</p>
 					) : null}
@@ -189,6 +189,21 @@ function Bars({
 				</span>
 			</div>
 			<div className="mt-3.5">
+				{/*
+				 * The values' key heads their column, right-aligned over the bars' column and
+				 * theirs, on compact pages over the whole row; where it wraps, it breaks at a "·".
+				 * Its "†" points at the footnote under the chart.
+				 */}
+				<div className={`${BAR_GRID} pb-2 label`}>
+					<span
+						aria-describedby={partial && !compact ? "fn-filtered" : undefined}
+						className="col-span-full text-right text-balance wide:col-[2/-1]"
+					>
+						{t(compact ? "axis.rates" : "axis.ratesFiltered", {
+							partial: partial ? "yes" : "no",
+						})}
+					</span>
+				</div>
 				{entrants.map((entrant) => {
 					const hot = isHot(hovered, entrant.id, rankIndex.get(entrant.id) ?? -1);
 					// Filtered out: one decimal, exactly zero as "0%", and "—" for a solver without
@@ -209,7 +224,7 @@ function Bars({
 						>
 							<span
 								title={entrant.label}
-								className={`truncate text-[13.5px] font-medium ${entrant.unnamed ? "font-mono" : ""} ${hot ? "text-teal" : ""}`}
+								className={`truncate text-[13.5px] font-medium ${entrant.unnamed ? "font-mono" : ""} ${hot ? "text-hvt" : ""}`}
 							>
 								{entrant.label}
 							</span>
@@ -250,12 +265,7 @@ function Bars({
 						end={t("axis.end", { value: f.percent(1) })}
 						className="max-wide:hidden"
 					/>
-					{/* Where the values column is narrower than the label, it wraps at a "·". */}
-					<span className="text-right text-balance">
-						{t(compact ? "axis.rates" : "axis.ratesFiltered", {
-							partial: partial ? "yes" : "no",
-						})}
-					</span>
+					<span />
 				</div>
 			</div>
 		</>

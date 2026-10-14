@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useId } from "react";
 
 import { useTranslations } from "next-intl";
 
 import { networkBars } from "@fiberscope/core";
 import type { Measure, NetworkActivity, Period } from "@fiberscope/core";
 
+import { useDaySlider } from "@/components/ui/daySlider";
+
 import { useFormat } from "@/lib/format";
 
 /**
  * All solvers together: the measure per day of the period and its change on the period before,
  * then one bar per day over the small multiples' days, the period's days bolder (darker in the
- * light theme, lighter in the dark one). Hovering the chart reads out the day under the pointer.
+ * light theme, lighter in the dark one). The bars are a slider over their days: the pointer, the
+ * keys or a tap pick a day, and the readout shows it.
  */
 export function Network({
 	activity,
@@ -29,12 +32,14 @@ export function Network({
 	const t = useTranslations("Change.network");
 	const tc = useTranslations("Common");
 	const f = useFormat();
-	const [day, setDay] = useState<number | null>(null);
+	const summary = useId();
 
 	const { days, totals, first, window, covered, perDay, change } = activity;
 	const count = days.length;
-	const hovered = day !== null && day < count ? day : null;
-	const bars = networkBars(activity, hovered);
+	// Each bar stands in its day's slot, so the day under the pointer is the slot it is in.
+	const slider = useDaySlider({ count, at: (across) => Math.floor(across * count), hover: true });
+	const picked = slider.day;
+	const bars = networkBars(activity, picked);
 	const amount = (value: number) => (measure === "volume" ? f.usd(value) : f.int(value));
 	const noun = tc(`measure.${measure}`);
 	const date = (index: number) => f.day(days[index]);
@@ -51,16 +56,20 @@ export function Network({
 					previousPeriod: tc(`previousPeriod.${period}`),
 				});
 
-	const hoveredTotal = hovered === null ? null : totals[hovered];
+	// The day the slider stands on; the readout shows it while it is picked.
+	const nowDate = date(slider.now);
+	const nowTotal = totals[slider.now];
+	const nowValue = nowTotal === null ? null : measure === "volume" ? f.usd(nowTotal) : nowTotal;
 	const readout =
-		hovered === null
+		picked === null
 			? t("idle", { noun, days: count })
-			: hoveredTotal === null
-				? t("noData", { date: date(hovered) })
-				: t(`day.${measure}`, {
-						date: date(hovered),
-						value: measure === "volume" ? f.usd(hoveredTotal) : hoveredTotal,
-					});
+			: nowValue === null
+				? t("noData", { date: nowDate })
+				: t(`day.${measure}`, { date: nowDate, value: nowValue });
+	const valueText =
+		nowValue === null
+			? t("value.noData", { date: nowDate })
+			: t(`value.${measure}`, { date: nowDate, value: nowValue });
 
 	// The oldest days have no data when the measure's history is shorter than the chart.
 	const note =
@@ -77,10 +86,7 @@ export function Network({
 		<div className="mt-9 border-t border-ln pt-4 pb-[22px]">
 			<div className="flex items-baseline justify-between gap-3 text-[13px]">
 				<span className="font-medium">{t("title")}</span>
-				<span
-					aria-live="polite"
-					className="font-mono text-[11px] leading-[normal] font-medium whitespace-nowrap text-mu"
-				>
+				<span className="font-mono text-[11px] leading-[normal] font-medium whitespace-nowrap text-mu">
 					{readout}
 				</span>
 			</div>
@@ -92,24 +98,27 @@ export function Network({
 					{caption}
 				</span>
 			</div>
-			{/* 48px (wide 72px) of bars above the 1px baseline. */}
-			<div
-				role="img"
-				aria-label={t("chart", {
+			<span id={summary} className="sr-only">
+				{t("chart", {
 					noun,
 					start: date(first),
 					end: date(count - 1),
 					min: amount(Math.min(...known)),
 					max: amount(Math.max(...known)),
 				})}
-				onMouseMove={(event) => {
-					const box = event.currentTarget.getBoundingClientRect();
-					if (box.width === 0) return;
-					const index = Math.floor(((event.clientX - box.left) / box.width) * count);
-					setDay(Math.max(0, Math.min(count - 1, index)));
-				}}
-				onMouseLeave={() => setDay(null)}
-				className="relative mt-3 h-[49px] cursor-crosshair border-b border-ln2 wide:h-[73px]"
+			</span>
+			{/* 48px (wide 72px) of bars above the 1px baseline. */}
+			<div
+				role="slider"
+				tabIndex={0}
+				aria-label={t("slider", { noun, days: count })}
+				aria-valuemin={1}
+				aria-valuemax={count}
+				aria-valuenow={slider.now + 1}
+				aria-valuetext={valueText}
+				aria-describedby={summary}
+				{...slider.handlers}
+				className="relative mt-3 h-[49px] cursor-crosshair touch-pan-y touch-pinch-zoom border-b border-ln2 wide:h-[73px]"
 			>
 				<svg
 					viewBox={`0 0 ${count} 100`}
@@ -124,7 +133,7 @@ export function Network({
 						d={bars.window}
 						className="fill-[color-mix(in_oklab,var(--fg)_56%,var(--bg))]"
 					/>
-					<path d={bars.hovered} className="fill-teal" />
+					<path d={bars.picked} className="fill-teal" />
 				</svg>
 			</div>
 			<div className="mt-1.5 flex justify-between gap-3 font-mono text-[11px] leading-[normal] font-medium text-fa">

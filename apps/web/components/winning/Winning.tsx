@@ -22,6 +22,7 @@ import {
 	rankText,
 	shareText,
 	useColumnLabels,
+	WHO_FOOTNOTE,
 } from "@/components/winning/columns";
 import { List, Table } from "@/components/winning/Leaderboard";
 import { Registry } from "@/components/winning/Registry";
@@ -41,7 +42,7 @@ const SKELETON_NAMES = [62, 48, 55, 40, 51, 44, 58, 37];
 /** "Who is winning": the leaderboard, with an expandable detail per solver, then the registry. */
 export function Winning() {
 	const view = useView();
-	const { snapshot, sort } = useDashboard();
+	const { snapshot, sort, status } = useDashboard();
 	const t = useTranslations("Winning");
 	const tc = useTranslations("Common");
 	const ts = useTranslations("Surplus.header");
@@ -187,11 +188,15 @@ export function Winning() {
 							measure: tc(`measure.${view.measure}`),
 							ratio: rival ? f.times(leader.share / rival.share) : "",
 							runnerUp: runnerUpName,
-							// Volume needs auction data: name its span when that is shorter.
+							// Volume needs auction data: name its span when that is shorter, and
+							// while delayed, when it ends ("the 90 days to 09:08 UTC").
 							byVolume: volumeLeader ? (partial ? "partial" : "yes") : "no",
 							volumeLeader: volumeLeader?.label ?? "",
-							volumeShare: f.percent(volumeLeader?.shares.volume ?? null),
+							// One decimal, like the leader's share.
+							volumeShare: f.percent(volumeLeader?.shares.volume ?? null, 1),
 							volumeDays: view.coverage.auction,
+							delayed: status.delayed ? "yes" : "no",
+							asOf: status.asOf ?? "",
 						})}
 					</p>
 				</div>
@@ -218,6 +223,7 @@ export function Winning() {
 			{partial ? (
 				// Without any auction data, the compact rows say so and carry no mark to explain.
 				<div
+					id={WHO_FOOTNOTE}
 					className={`mt-1.5 foot-line ${view.coverage.auction === 0 ? "max-wide:hidden" : ""}`}
 				>
 					{t("auctionCoverage", { covered: view.coverage.auction, days: view.days })}

@@ -82,7 +82,13 @@ export function Hero() {
 			? []
 			: [
 					auction < view.days
-						? t("totals.volumeCovered", { value: f.usd(volume), days: auction })
+						? // "(last 90 days)", or while delayed "(the 90 days to 09:08 UTC)".
+							t("totals.volumeCovered", {
+								value: f.usd(volume),
+								days: auction,
+								delayed: status.delayed ? "yes" : "no",
+								asOf,
+							})
 						: t("totals.volume", { value: f.usd(volume) }),
 				]),
 		t("totals.solvers", { count: solvers }),

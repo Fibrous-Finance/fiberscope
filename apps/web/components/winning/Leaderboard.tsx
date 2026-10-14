@@ -13,12 +13,14 @@ import { BAR_MIN_TONE, hoverIndex, isHot, TEAL, tone } from "@/components/dashbo
 import { ScrollMoreFade, useScrollMore } from "@/components/ui/ScrollMore";
 import { arrow, Caret } from "@/components/ui/Section";
 import {
+	AUCTION_COLUMNS,
 	cellText,
 	COLUMNS,
 	rankText,
 	shareText,
 	useHeaderLabels,
 	VALUE_COLUMNS,
+	WHO_FOOTNOTE,
 } from "@/components/winning/columns";
 import { DetailCompact, DetailWide } from "@/components/winning/Detail";
 import { DotList } from "@/components/winning/DotList";
@@ -50,7 +52,8 @@ export function Table({ rows }: { rows: Row[] }) {
 	const { ref: scroller, more, scrolled, width } = useScrollMore();
 
 	const leaderShare = view.rows[0]?.share ?? 0;
-	const labels = useHeaderLabels(view.coverage.auction < view.days);
+	const partial = view.coverage.auction < view.days;
+	const labels = useHeaderLabels(partial);
 
 	return (
 		<div className="relative mt-8 hidden wide:block">
@@ -89,6 +92,12 @@ export function Table({ rows }: { rows: Row[] }) {
 								>
 									<button
 										type="button"
+										// A marked header points to the footnote that explains "†".
+										aria-describedby={
+											partial && AUCTION_COLUMNS[key]
+												? WHO_FOOTNOTE
+												: undefined
+										}
 										onClick={() =>
 											setSort({
 												key,
@@ -300,6 +309,9 @@ function ListRow({
 		mark: row.volume === null ? "" : mark,
 	});
 	const gas = t("meta.gas", { gas: f.gas(row.gasPerTrade) });
+	// A figure that carries the mark points to the footnote that explains it.
+	const marked = mark === "" ? undefined : WHO_FOOTNOTE;
+	const volumeMarked = measure === "volume" && row.volume !== null ? marked : undefined;
 
 	return (
 		<>
@@ -334,15 +346,28 @@ function ListRow({
 					items={
 						row.entered
 							? [
-									value,
-									t("meta.entered", {
-										entered: f.percent(row.participation),
-										mark,
-									}),
-									t("meta.winRate", { winRate: f.percent(row.winRate), mark }),
-									gas,
+									{ text: value, describedBy: volumeMarked },
+									{
+										text: t("meta.entered", {
+											entered: f.percent(row.participation),
+											mark,
+										}),
+										describedBy: marked,
+									},
+									{
+										text: t("meta.winRate", {
+											winRate: f.percent(row.winRate),
+											mark,
+										}),
+										describedBy: marked,
+									},
+									{ text: gas },
 								]
-							: [value, gas, t("meta.noAuctions")]
+							: [
+									{ text: value, describedBy: volumeMarked },
+									{ text: gas },
+									{ text: t("meta.noAuctions") },
+								]
 					}
 					className="col-[2/4] font-mono text-[11.5px] leading-[normal] font-medium text-mu"
 				/>
@@ -361,7 +386,7 @@ function RankChange({ row }: { row: Row }) {
 	const places = Math.abs(change);
 	return (
 		<span
-			className={`font-mono text-[10.5px] leading-[normal] font-medium ${direction === "down" ? "text-mu" : "text-fg"}`}
+			className={`font-mono text-[10.5px] leading-[normal] font-medium ${direction === "new" ? "text-fg" : "text-mu"}`}
 		>
 			<span aria-hidden="true">{t("short", { direction, places })}</span>
 			<span className="sr-only">{t("spoken", { direction, places })}</span>

@@ -20,11 +20,14 @@ export const VALUE_COLUMNS = COLUMNS.filter(
 );
 
 /** Columns that need auction data: "Volume†" when it covers only part of the window. */
-const AUCTION_COLUMNS: Partial<Record<SortKey, true>> = {
+export const AUCTION_COLUMNS: Partial<Record<SortKey, true>> = {
 	volume: true,
 	participation: true,
 	winRate: true,
 };
+
+/** The leaderboard's footnote that explains "†", which every marked figure points to. */
+export const WHO_FOOTNOTE = "fn-who";
 
 /** Header labels of the sortable columns; the detail's stats and Copy as Markdown use them too. */
 export function useColumnLabels(): Record<SortKey, string> {

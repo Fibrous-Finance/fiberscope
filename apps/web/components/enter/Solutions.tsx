@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import { useTranslations } from "next-intl";
 
 import {
+	aboveWinner,
 	auctionOutcome,
 	auctionSolutions,
 	filteredOutcome,
 	NETWORKS,
 	solutionState,
+	TRACK_ANCHOR,
+	TRACK_START,
 	trackLanes,
 	trackPosition,
 } from "@fiberscope/core";
@@ -29,21 +32,33 @@ const WIDE_GRID = "grid grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_84px_104
 /** Solver | Score | Below: compact pages leave the track out. */
 const COMPACT_GRID = "grid grid-cols-[minmax(0,1fr)_70px_88px] gap-2";
 /**
- * The track's 0–100% runs between insets of half its largest mark, the 9px best solution, so the
- * marks at either end stay inside it.
- */
-const TRACK_INSET = "mx-[4.5px]";
-/**
  * How far above or below the centre line a mark moves when it would overlap another
  * (`trackLanes`): a 5px mark then clears a 9px one by 1px and stays inside the 31px row.
  */
 const LANE_PX = 8;
+/** The track's gridlines, one per decade of its log scale: 0.01%, 0.1%, 1% and 10%. */
+const GRIDLINES = {
+	backgroundImage: "repeating-linear-gradient(90deg,var(--ln) 0 1px,transparent 1px 25%)",
+	backgroundSize: `calc(100% - ${TRACK_START + TRACK_ANCHOR}px) 100%`,
+	backgroundPosition: `${TRACK_START}px 0`,
+	backgroundRepeat: "no-repeat",
+};
 
 /**
- * The solutions of the auction selected on the tape: a sentence, then one row per solver, in the
- * order of its best solution in CoW's ranking, with that solution's score, how far below the
- * winning score it came and a log track with all of the solver's solutions. Several winners
- * settle different orders, so they get scores without gaps or track; a lone solution has nothing
+ * A place on the track (`trackPosition`, null for the anchor) as a CSS length: the anchor, or the
+ * log scale from its 0.01% gridline to 100%, `TRACK_ANCHOR` in from the right edge.
+ */
+function trackLeft(position: number | null): string {
+	return position === null
+		? `${TRACK_ANCHOR}px`
+		: `calc(${TRACK_START}px + (100% - ${TRACK_START + TRACK_ANCHOR}px) * ${position})`;
+}
+
+/**
+ * The solutions of the auction selected on the tape: a sentence, then one row per solver, with
+ * its best solution's score, how far below the winning score it came and a log track with all
+ * of the solver's solutions. Several winners settle different orders, so they get scores without
+ * gaps or track, the solvers that won apart from those that did not; a lone solution has nothing
  * to plot, and compact pages leave the track out. Close or Escape closes them.
  */
 export function Solutions({
@@ -139,7 +154,8 @@ export function Solutions({
 
 /**
  * How the auction went: its solutions and solvers, the winner and its score, how far below it the
- * best rival scored or who tied it, and the solutions the fairness filter removed.
+ * best rival scored or who tied it, and the solutions the fairness filter removed, with how far
+ * above the winner one scored when it did.
  */
 function useSentence(auction: AuctionSolutions | null): string | null {
 	const t = useTranslations("Enter.solutions");
@@ -155,6 +171,7 @@ function useSentence(auction: AuctionSolutions | null): string | null {
 	// Prose words a bound: the best rival scored "less than 0.01%" lower, not "<0.01%".
 	const gap = f.gap(auction.rival?.gap ?? null);
 	const bound = gap.startsWith("<") ? "below" : gap.startsWith(">") ? "above" : "none";
+	const above = f.gap(removed?.above ?? null);
 	return [
 		// Each outcome's sentence takes what it says from the same values.
 		t(auctionOutcome(auction), {
@@ -185,6 +202,9 @@ function useSentence(auction: AuctionSolutions | null): string | null {
 					solvers: f.list(removed.solvers.map((solver) => solver.label)),
 					count: removed.count,
 					total: removed.total,
+					// A removed solution that scored above the winner: "less than 0.01%" higher.
+					bound: above.startsWith("<") ? "below" : "none",
+					gap: above.startsWith("<") ? above.slice(1) : above,
 				})
 			: null,
 	]
@@ -194,7 +214,8 @@ function useSentence(auction: AuctionSolutions | null): string | null {
 
 /**
  * The legend, one row per solver with its best solution's score and gap and, on the track, all of
- * its solutions, then the axis and the note.
+ * its solutions, then the axis and the note. With several winners, the rows that won come first,
+ * under Won, the others under Did not win.
  */
 function SolutionsTable({
 	auction,
@@ -216,6 +237,9 @@ function SolutionsTable({
 	// Without a track, the figures skip its empty column on wide pages.
 	const figures = !compact && !track ? "col-start-3" : "";
 	const [trackWidth, trackRef] = useWidth();
+	// A filtered-out solution that scored above the winner is marked "‹" on the track.
+	const above =
+		track && auction.rows.some((row) => row.solutions.some((s) => aboveWinner(s) !== null));
 
 	return (
 		<>
@@ -237,6 +261,14 @@ function SolutionsTable({
 						<span className="size-[9px] rounded-full border-[1.5px] border-fg" />
 						{t("legend.filtered")}
 					</span>
+					{above ? (
+						<span className="flex items-center gap-2">
+							<span aria-hidden="true" className="text-[13px] text-fa">
+								‹
+							</span>
+							{t("legend.above")}
+						</span>
+					) : null}
 				</div>
 			) : null}
 			<div className="mt-3.5 tabular-nums">
@@ -252,49 +284,95 @@ function SolutionsTable({
 							{t(compact ? "columns.belowShort" : "columns.below")}
 						</span>
 					</div>
-					{auction.rows.map((row) => {
-						// The row's figures are its best solution's, the first in CoW's ranking.
-						const [best] = row.solutions;
-						const state = solutionState(best);
+					{auction.rows.map((row, index) => {
+						// The row's figures are its first solution's in CoW's ranking: its best, or
+						// the winning one.
+						const [first] = row.solutions;
+						const state = solutionState(first);
 						const hot = isHot(hovered, row.id, rankIndex.get(row.id) ?? -1);
 						return (
-							<div
-								key={row.id}
-								role="row"
-								onMouseEnter={() => setHovered(row.id)}
-								onMouseLeave={() => setHovered(null)}
-								className={`${grid} min-h-[31px] items-center border-t border-ln`}
-							>
-								<span role="cell" className="flex min-w-0 items-baseline gap-2">
-									<span
-										title={row.label}
-										className={`truncate text-[13.5px] font-medium transition-colors duration-200 ${row.unnamed ? "font-mono" : ""} ${hot ? "text-teal" : ""}`}
+							<Fragment key={row.id}>
+								{auction.wonRows !== null &&
+								(index === 0 || index === auction.wonRows) ? (
+									<div
+										role="row"
+										className="border-t border-ln pt-3.5 pb-1.5 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-mu uppercase"
 									>
-										{row.label}
-									</span>
-									{row.solutions.length > 1 ? (
-										<span className="flex-none font-mono text-[11px] leading-[normal] font-medium text-mu">
-											{t("count", { count: row.solutions.length })}
+										<span role="cell">
+											{t(index === 0 ? "groups.won" : "groups.lost")}
 										</span>
+									</div>
+								) : null}
+								<div
+									role="row"
+									onMouseEnter={() => setHovered(row.id)}
+									onMouseLeave={() => setHovered(null)}
+									className={`${grid} min-h-[31px] items-center border-t border-ln`}
+								>
+									<span role="cell" className="flex min-w-0 items-baseline gap-2">
+										<span
+											title={row.label}
+											className={`truncate text-[13.5px] font-medium transition-colors duration-200 ${row.unnamed ? "font-mono" : ""} ${hot ? "text-hvt" : ""}`}
+										>
+											{row.label}
+										</span>
+										{row.solutions.length > 1 ? (
+											<span className="flex-none font-mono text-[11px] leading-[normal] font-medium text-mu">
+												{t("count", { count: row.solutions.length })}
+											</span>
+										) : null}
+									</span>
+									{track ? (
+										<Track row={row} hot={hot} width={trackWidth} />
 									) : null}
-								</span>
-								{track ? <Track row={row} hot={hot} width={trackWidth} /> : null}
-								<span
-									role="cell"
-									className={`text-right font-mono text-[12.5px] leading-[normal] font-medium ${figures} ${best.filteredOut ? "text-mu" : ""}`}
-								>
-									{f.score(best.score)}
-								</span>
-								<span
-									role="cell"
-									className={`text-right font-mono leading-[normal] font-medium whitespace-nowrap ${compact ? "text-[11.5px]" : "text-[12.5px]"} ${best.filteredOut || state === "none" ? "text-mu" : ""}`}
-								>
-									{/* "—" where no gap is given: several winners, or no score. */}
-									{state === "gap" || state === "none"
-										? f.gap(best.gap)
-										: t(`value.${state}`)}
-								</span>
-							</div>
+									<span
+										role="cell"
+										className={`text-right font-mono text-[12.5px] leading-[normal] font-medium ${figures} ${first.filteredOut ? "text-mu" : ""}`}
+									>
+										{f.score(first.score)}
+										{/* A winner that scored higher with a solution that did not win. */}
+										{row.bestScore !== null ? (
+											<span className="block text-[11px] text-mu">
+												{t("value.best", { score: f.score(row.bestScore) })}
+											</span>
+										) : null}
+									</span>
+									{/*
+									 * "—" where no gap is given: several winners, or no score. Above the
+									 * winner, two items that wrap as a list: each "·" sits in its item's
+									 * 14px ::after, and the list ends 14px past the clipped edge, so no
+									 * line ends in one.
+									 */}
+									<span
+										role="cell"
+										className={`text-right font-mono leading-[normal] font-medium whitespace-nowrap ${compact ? "text-[11.5px]" : "text-[12.5px]"} ${first.filteredOut || state === "none" ? "text-mu" : ""}`}
+									>
+										{state === "above" ? (
+											<span className="block overflow-x-clip">
+												<span className="-mr-3.5 flex flex-wrap justify-end">
+													{[
+														t("value.filtered"),
+														t("value.above", {
+															gap: f.gap(aboveWinner(first)),
+														}),
+													].map((item) => (
+														<span
+															key={item}
+															className="after:inline-block after:w-3.5 after:text-center after:content-['·']"
+														>
+															{item}
+														</span>
+													))}
+												</span>
+											</span>
+										) : state === "gap" || state === "none" ? (
+											f.gap(first.gap)
+										) : (
+											t(`value.${state}`)
+										)}
+									</span>
+								</div>
+							</Fragment>
 						);
 					})}
 				</div>
@@ -305,17 +383,17 @@ function SolutionsTable({
 						className={`${grid} border-t border-ln2 pt-2 font-mono text-[11px] leading-[normal] font-medium text-fa`}
 					>
 						<span />
-						<span ref={trackRef} className={`relative h-3.5 ${TRACK_INSET}`}>
-							<span className="absolute left-0">{t("axis.a")}</span>
-							<span className="absolute left-1/4 -translate-x-1/2">
-								{t("axis.b")}
-							</span>
-							<span className="absolute left-1/2 -translate-x-1/2">
-								{t("axis.c")}
-							</span>
-							<span className="absolute left-3/4 -translate-x-1/2">
-								{t("axis.d")}
-							</span>
+						{/* Each decade's label is centred on its gridline; 100% ends the track. */}
+						<span ref={trackRef} className="relative h-3.5">
+							{(["a", "b", "c", "d"] as const).map((key, decade) => (
+								<span
+									key={key}
+									className="absolute -translate-x-1/2"
+									style={{ left: trackLeft(decade / 4) }}
+								>
+									{t(`axis.${key}`)}
+								</span>
+							))}
 							<span className="absolute right-0">{t("axis.e")}</span>
 						</span>
 						<span />
@@ -334,21 +412,39 @@ function SolutionsTable({
 
 /**
  * A solver's solutions on the log track below the winning score: the winning one an 8px square
- * at the left end, its best a 9px dot, its others 5px dots at 50%; filtered-out ones hollow. Marks
- * that would overlap at the track's `width` move above or below the centre line (`trackLanes`).
+ * on the anchor at the left end, its best a 9px dot, its others 5px dots at 50%; filtered-out
+ * ones hollow. A tie and a score above the winner sit on the anchor too, the latter marked "‹"
+ * outside the track. Marks that would overlap at the track's `width` move above or below the
+ * centre line (`trackLanes`); those with no room left are counted in a "+N" instead.
  */
 function Track({ row, hot, width }: { row: SolutionsRow; hot: boolean; width: number }) {
 	const t = useTranslations("Enter.solutions");
 	const f = useFormat();
-	// The solutions with a place on the track, the row's best first, and their size in px as drawn
-	// below. A solution without a score has no place.
+	// The solutions with a place on the track, in CoW's ranking, with their size in px as drawn
+	// below. The winning solution and the row's best stay on the centre line. A solution without
+	// a score has no place.
 	const marks = row.solutions.flatMap((solution, index) => {
 		const best = index === 0;
-		if (solution.winner) return [{ solution, best, position: 0, size: 8 }];
+		if (solution.winner) return [{ solution, best, position: null, size: 8, fixed: true }];
 		if (solution.gap === null) return [];
-		return [{ solution, best, position: trackPosition(solution.gap), size: best ? 9 : 5 }];
+		return [
+			{
+				solution,
+				best,
+				position: trackPosition(solution.gap),
+				size: best ? 9 : 5,
+				fixed: best,
+			},
+		];
 	});
 	const lanes = trackLanes(marks, width);
+	const skipped = marks.filter((_, index) => lanes[index] === null);
+	// "+N" follows the rightmost of the marks left out; the anchor is the track's left end.
+	const rightmost = skipped.reduce<number | null>(
+		(max, { position }) =>
+			position !== null && (max === null || position > max) ? position : max,
+		null
+	);
 
 	return (
 		<span role="cell" className="flex self-stretch">
@@ -361,23 +457,26 @@ function Track({ row, hot, width }: { row: SolutionsRow; hot: boolean; width: nu
 							t("dotItem", {
 								score: f.score(solution.score),
 								state: solutionState(solution),
-								gap: f.gap(solution.gap),
+								gap: f.gap(aboveWinner(solution) ?? solution.gap),
 							})
 						)
 						.join("; "),
 				})}
-				className={`relative flex-1 ${TRACK_INSET} bg-[repeating-linear-gradient(90deg,var(--ln)_0_1px,transparent_1px_25%)]`}
+				className="relative flex-1"
+				style={GRIDLINES}
 			>
 				{marks.map(({ solution, best, position }, index) => {
+					const lane = lanes[index];
+					if (lane === null) return null;
 					const place = {
-						left: `${position * 100}%`,
-						top: `calc(50% + ${(lanes[index] ?? 0) * LANE_PX}px)`,
+						left: trackLeft(position),
+						top: `calc(50% + ${lane * LANE_PX}px)`,
 					};
 					if (solution.winner) {
 						return (
 							<span
 								key={index}
-								className={`absolute z-1 size-2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] transition-colors duration-200 ${hot ? "bg-teal" : "bg-fg"}`}
+								className={`absolute z-2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] transition-colors duration-200 ${hot ? "bg-teal" : "bg-fg"}`}
 								style={place}
 							/>
 						);
@@ -392,11 +491,29 @@ function Track({ row, hot, width }: { row: SolutionsRow; hot: boolean; width: nu
 					return (
 						<span
 							key={index}
-							className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200 ${best ? "size-[9px]" : "size-[5px]"} ${look}`}
+							className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200 ${best ? "z-1 size-[9px]" : "size-[5px]"} ${look}`}
 							style={place}
 						/>
 					);
 				})}
+				{/* Outside the track's left end, as "›" marks a value past an axis's end. */}
+				{row.solutions.some((s) => aboveWinner(s) !== null) ? (
+					<span
+						aria-hidden="true"
+						className="absolute top-1/2 right-full -translate-x-[3px] -translate-y-[52%] font-mono text-[13px] leading-[normal] font-medium text-fa"
+					>
+						‹
+					</span>
+				) : null}
+				{skipped.length > 0 ? (
+					<span
+						aria-hidden="true"
+						className="absolute top-1/2 -translate-y-1/2 font-mono text-[10px] leading-[normal] font-medium text-mu"
+						style={{ left: `calc(${trackLeft(rightmost)} + 7px)` }}
+					>
+						{t("more", { count: skipped.length })}
+					</span>
+				) : null}
 			</span>
 		</span>
 	);

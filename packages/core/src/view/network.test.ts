@@ -187,19 +187,19 @@ describe("networkBars", () => {
 		assert.deepEqual(bars, {
 			earlier: "M1.15 76.00H1.85V100H1.15Z",
 			window: "M2.15 52.00H2.85V100H2.15ZM3.15 4.00H3.85V100H3.15Z",
-			hovered: "",
+			picked: "",
 		});
 	});
 
-	it("draws the hovered day on its own, wherever it is", () => {
+	it("draws the picked day on its own, wherever it is", () => {
 		const totals = [10, 20, 40];
 		assert.deepEqual(networkBars({ totals, window: 1 }, 2), {
 			earlier: "M0.15 76.00H0.85V100H0.15ZM1.15 52.00H1.85V100H1.15Z",
 			window: "",
-			hovered: "M2.15 4.00H2.85V100H2.15Z",
+			picked: "M2.15 4.00H2.85V100H2.15Z",
 		});
-		assert.equal(networkBars({ totals, window: 1 }, 0).hovered, "M0.15 76.00H0.85V100H0.15Z");
-		// Nothing to hover on a day without data.
-		assert.equal(networkBars({ totals: [null, 5], window: 1 }, 0).hovered, "");
+		assert.equal(networkBars({ totals, window: 1 }, 0).picked, "M0.15 76.00H0.85V100H0.15Z");
+		// A picked day without data has no bar to draw.
+		assert.equal(networkBars({ totals: [null, 5], window: 1 }, 0).picked, "");
 	});
 });

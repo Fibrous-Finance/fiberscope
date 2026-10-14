@@ -9,10 +9,10 @@
 		"size": "Dot size: trades"
 	},
 	"header": {
-		"gas": "Gas per trade · average {average}",
-		"swaps": "DEX swaps per trade · average {average}",
+		"gas": "Gas per trade · average {average}",
+		"swaps": "DEX swaps per trade · average {average}",
 		"swapsShort": "Swaps",
-		"cost": "Cost per trade · average {average}",
+		"cost": "Cost per trade · average {average}",
 		"costShort": "Cost"
 	},
 	"dot": "{gas} gas per trade over {trades, plural, one {# trade} other {# trades}}",

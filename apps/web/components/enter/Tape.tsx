@@ -131,7 +131,8 @@ export function Tape({
 	};
 
 	return (
-		<div id="tape" className="mt-14">
+		// The detail's "Latest 24 auctions" lands here: the margin keeps the title clear of the header.
+		<div id="tape" className="mt-14 scroll-mt-6">
 			<div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1.5">
 				<h3 className="text-[15px] font-medium max-wide:basis-full">
 					{t("title", { count })}

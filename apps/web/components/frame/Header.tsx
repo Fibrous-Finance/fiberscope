@@ -96,8 +96,12 @@ function Nav({ away }: { away?: boolean }) {
 		</a>
 	);
 
+	// Below 980px the five items leave too little room for the network menu and the button at 26px.
 	return (
-		<nav aria-label={t("label")} className="hidden gap-[26px] text-[14px] wide:flex">
+		<nav
+			aria-label={t("label")}
+			className="hidden gap-[26px] text-[14px] max-[980px]:gap-4 wide:flex"
+		>
 			{link("#", t("overview"), !away && active === -1)}
 			{SECTIONS.map(({ id, key }, i) => link(`#${id}`, t(key), !away && active === i))}
 		</nav>

@@ -1,5 +1,5 @@
 import { ROUTER } from "./chain.ts";
-import { ethUsdAt } from "./prices.ts";
+import { nativeUsdAt } from "./prices.ts";
 import type { PricePoint } from "./prices.ts";
 import type { Registry, SolverIdentity } from "./registry.ts";
 import {
@@ -26,11 +26,11 @@ export interface Batch {
 	solver: SolverIdentity;
 	viaRouter: boolean;
 	trades: number;
-	/** DEX swaps: Interaction events other than approvals and WETH unwraps. */
+	/** DEX swaps: Interaction events other than approvals and unwraps. */
 	swaps: number;
 	/** Gas used by the transaction, split evenly if it holds several batches. */
 	gas: number;
-	/** The transaction's cost in USD, split the same way; null without an ETH/USD rate. */
+	/** The transaction's cost in USD, split the same way; null without the native token's price. */
 	cost: number | null;
 }
 
@@ -40,7 +40,7 @@ export function* creditedBatches(
 	registry: Registry,
 	range: BlockRange
 ): Generator<Batch> {
-	const points = store.ethUsdPoints();
+	const points = store.nativeUsdPoints();
 	for (const row of store.batchRows(range)) {
 		const credited = creditedAddress(
 			{
@@ -53,7 +53,7 @@ export function* creditedBatches(
 			(candidate) => registry.has(candidate),
 			() => store.apiWinner(row.tx)
 		);
-		const ethUsd = ethUsdAt(points, row.block);
+		const nativeUsd = nativeUsdAt(points, row.block);
 		const address = credited.address;
 		yield {
 			tx: row.tx,
@@ -66,7 +66,7 @@ export function* creditedBatches(
 			trades: row.trades,
 			swaps: row.swaps,
 			gas: row.gasUsed / row.txBatches,
-			cost: ethUsd === null ? null : batchCostUsd(row, ethUsd),
+			cost: nativeUsd === null ? null : batchCostUsd(row, nativeUsd),
 		};
 	}
 }
@@ -86,7 +86,10 @@ export type PricedTrade = Pick<
 	"auctionId" | "block" | "sellToken" | "buyToken" | "sellAmount" | "buyAmount"
 >;
 
-/** Values trades with their own auction's native prices and ETH/USD at their block. */
+/**
+ * Values trades with their own auction's native prices and the native token's USD price at their
+ * block.
+ */
 export class TradeValuer {
 	readonly #store: Store;
 	readonly #points: PricePoint[];
@@ -94,7 +97,7 @@ export class TradeValuer {
 
 	constructor(store: Store) {
 		this.#store = store;
-		this.#points = store.ethUsdPoints();
+		this.#points = store.nativeUsdPoints();
 	}
 
 	value(trade: TradeValueRow): TradeValue {
@@ -120,11 +123,11 @@ export class TradeValuer {
 		const prices = this.#pricesOf(trade.auctionId);
 		const sellPrice = prices.get(priceToken(trade.sellToken)) ?? null;
 		const buyPrice = prices.get(priceToken(trade.buyToken)) ?? null;
-		const ethUsd = ethUsdAt(this.#points, trade.block);
+		const nativeUsd = nativeUsdAt(this.#points, trade.block);
 		const usd =
-			ethUsd === null
+			nativeUsd === null
 				? null
-				: tradeVolumeUsd(trade.sellAmount, sellPrice, trade.buyAmount, buyPrice, ethUsd);
+				: tradeVolumeUsd(trade.sellAmount, sellPrice, trade.buyAmount, buyPrice, nativeUsd);
 		return { usd, sellPrice, buyPrice };
 	}
 

@@ -1,29 +1,19 @@
 import { fileURLToPath } from "node:url";
 
-import { BASE } from "@fiberscope/core";
+import { NETWORKS } from "@fiberscope/core";
+import type { Network, NetworkId } from "@fiberscope/core";
 
-/** The network this indexer covers. */
-export const NETWORK = BASE;
-
-/** Blocks in one rolling day (Base produces a block exactly every 2 seconds). */
-export const BLOCKS_PER_DAY = 86_400 / NETWORK.blockTime;
-
-/**
- * Blocks per `eth_getLogs` request, and the step of the auction backfill and catch-up. Base's docs
- * recommend ranges under 2,000 blocks; a range the node refuses is split (see `getLogs`).
- */
-export const LOG_RANGE = 2_000;
+/** The network this indexer covers: NETWORK names it, Base by default. */
+export const NETWORK = network(process.env.NETWORK || "base");
 
 /** Calls per JSON-RPC batch request, kept small for the public Base RPC. */
 export const RPC_BATCH_SIZE = 10;
 
-/** Wrapped ether on Base. Buys of native ETH are priced with it. */
-export const WETH = "0x4200000000000000000000000000000000000006";
+/** CoW's placeholder address for the native token as a buy token, the same on every network. */
+export const NATIVE_TOKEN = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
-/** CoW's placeholder address for native ETH as a buy token. */
-export const NATIVE_ETH = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-
-export const DEFAULT_DB_PATH = fileURLToPath(new URL("../.data/base.db", import.meta.url));
+/** The network's database in apps/indexer/.data, which the Docker image links to its volume. */
+export const DEFAULT_DB_PATH = fileURLToPath(new URL(`../.data/${NETWORK.id}.db`, import.meta.url));
 export const DEFAULT_SNAPSHOT_PATH = fileURLToPath(
 	new URL("../../web/data/snapshot.json", import.meta.url)
 );
@@ -39,10 +29,11 @@ export interface R2Target {
 }
 
 export interface Env {
-	/** The SQLite database (DB_PATH, default `apps/indexer/.data/base.db`). */
+	/** The SQLite database (DB_PATH, default `apps/indexer/.data/<network>.db`). */
 	dbPath: string;
+	/** The network's RPC endpoint: BASE_RPC_URL or BNB_RPC_URL. */
 	rpcUrl: string;
-	/** Most RPC calls per second; every call in a batch counts. */
+	/** Most RPC calls per second (BASE_RPC_RPS or BNB_RPC_RPS); every call in a batch counts. */
 	rpcRps: number;
 	/** Most CoW API requests per second. */
 	cowApiRps: number;
@@ -60,11 +51,21 @@ export interface Env {
 	commit: string | null;
 }
 
+/**
+ * The RPC endpoint used when the network's RPC_URL is unset. BNB Chain has none: its public nodes
+ * refuse old logs or archive calls, or rate-limit them far below what a backfill needs.
+ */
+const PUBLIC_RPC: Partial<Record<NetworkId, string>> = { base: "https://mainnet.base.org" };
+
 export function readEnv(env: NodeJS.ProcessEnv = process.env): Env {
+	// The RPC's variables are named after the network.
+	const rpc = `${NETWORK.id.toUpperCase()}_RPC`;
+	const rpcUrl = env[`${rpc}_URL`] || PUBLIC_RPC[NETWORK.id];
+	if (!rpcUrl) throw new Error(`${rpc}_URL must be set: ${NETWORK.name} has no default RPC`);
 	return {
 		dbPath: env.DB_PATH || DEFAULT_DB_PATH,
-		rpcUrl: env.BASE_RPC_URL || "https://mainnet.base.org",
-		rpcRps: positive(env, "BASE_RPC_RPS", 15),
+		rpcUrl,
+		rpcRps: positive(env, `${rpc}_RPS`, 15),
 		cowApiRps: positive(env, "COW_API_RPS", 3),
 		refreshMinutes: positive(env, "REFRESH_MINUTES", 10),
 		upload: r2Target(env),
@@ -106,7 +107,9 @@ function positive(env: NodeJS.ProcessEnv, name: string, fallback: number): numbe
 	return value;
 }
 
-/** Unix seconds of a block. Base's block time is exact, so headers never need fetching. */
-export function timeOf(block: number): number {
-	return NETWORK.genesisTime + block * NETWORK.blockTime;
+function network(id: string): Network {
+	if (!Object.hasOwn(NETWORKS, id)) {
+		throw new Error(`NETWORK must be one of ${Object.keys(NETWORKS).join(", ")}, got "${id}"`);
+	}
+	return NETWORKS[id as NetworkId];
 }

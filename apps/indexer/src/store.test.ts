@@ -6,16 +6,24 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, test } from "node:test";
 
 import { ROUTER } from "./chain.ts";
-import { WETH } from "./config.ts";
 import { TradeValuer } from "./facts.ts";
 import { Store } from "./store.ts";
 
 const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+const WETH = "0x4200000000000000000000000000000000000006";
 const SOLVER = "0x5050505050505050505050505050505050505050";
+/** When Base's block 0 came; then a block every 2 seconds. */
+const BASE_GENESIS = 1_686_789_347;
 
 /** A transaction hash spelled from a readable label. */
 function hash(label: string): string {
 	return `0x${Buffer.from(label).toString("hex").padStart(64, "0")}`;
+}
+
+/** The blocks of the clock's anchors, in order. */
+function anchorBlocks(store: Store): number[] {
+	const rows = store.db.prepare("SELECT block FROM anchors ORDER BY block").all();
+	return rows.map((row) => Number(row.block));
 }
 
 /** One-trade batches by label and block; `router` ones are settled through the flash-loan router. */
@@ -53,6 +61,7 @@ function storeWith(batches: { label: string; block: number; router?: boolean }[]
 				fee: "500000",
 			})),
 			prices: [1, 140, 350].map((block) => ({ block, answer: 2_000e8 })),
+			anchors: [1, 140, 200, 350, 1_000].map((block) => ({ block, time: 2 * block })),
 		},
 		range
 	);
@@ -121,11 +130,14 @@ describe("prune", () => {
 		assert.deepEqual([...new Set(auctions)], [2, 3]);
 		const [trade] = store.tradeRows({ from: 320, to: 320 });
 		assert.equal(new TradeValuer(store).value(trade).pricedSides, 2);
-		// The answer in force at block 150 stays.
+		// The answer in force at block 150 stays, and so does the last anchor before it, so block
+		// 149 keeps its time.
 		assert.deepEqual(
-			store.ethUsdPoints().map(({ block }) => block),
+			store.nativeUsdPoints().map(({ block }) => block),
 			[140, 350]
 		);
+		assert.deepEqual(anchorBlocks(store), [140, 200, 350, 1_000]);
+		assert.equal(store.timeOf(149), 298);
 	});
 
 	test("drops the orders and fees of trades below the auction depth with the detail range", () => {
@@ -196,6 +208,7 @@ describe("schema", () => {
 				buy_token INTEGER NOT NULL, sell_amount TEXT NOT NULL, buy_amount TEXT NOT NULL,
 				limit_sell_amount TEXT, limit_buy_amount TEXT, fee_amount TEXT,
 				PRIMARY KEY (block, log_index)) WITHOUT ROWID;
+			CREATE TABLE eth_usd (block INTEGER PRIMARY KEY, answer INTEGER NOT NULL);
 			CREATE TABLE auctions (id INTEGER PRIMARY KEY, start_block INTEGER NOT NULL);
 			CREATE TABLE solutions (auction_id INTEGER NOT NULL, position INTEGER NOT NULL,
 				solver INTEGER NOT NULL, ranking INTEGER NOT NULL, winner INTEGER NOT NULL, tx BLOB,
@@ -227,5 +240,53 @@ describe("schema", () => {
 		const reopened = new Store(path);
 		assert.equal(reopened.uidGap(), null);
 		reopened.close();
+	});
+
+	test("a version 3 database is Base's, and its chain range gets Base's block times", () => {
+		const path = join(mkdtempSync(join(tmpdir(), "fiberscope-")), "v3.db");
+		const range = { from: 1_000, to: 44_199 };
+		const current = new Store(path);
+		current.commitChunk(
+			{
+				range,
+				settlements: [],
+				trades: [],
+				txs: [],
+				prices: [{ block: 1_000, answer: 2_000e8 }],
+				anchors: [],
+			},
+			range
+		);
+		// What version 3 was: no anchors and no chain id, and the prices under their old name.
+		current.db.exec(`
+			DROP TABLE anchors;
+			ALTER TABLE native_usd RENAME TO eth_usd;
+			DELETE FROM meta WHERE key = 'chain_id';
+			PRAGMA user_version = 3;
+		`);
+		current.close();
+
+		const store = new Store(path);
+		assert.equal(store.db.prepare("PRAGMA user_version").get()?.user_version, 4);
+		const chainId = store.db.prepare("SELECT value FROM meta WHERE key = 'chain_id'").get();
+		assert.equal(chainId?.value, "8453");
+		assert.deepEqual(anchorBlocks(store), [1_000, 44_199]);
+		// Exact inside the range and past its end, where the clock goes on 2 seconds a block.
+		for (const block of [1_000, 20_001, 44_199, 50_000]) {
+			assert.equal(store.timeOf(block), BASE_GENESIS + 2 * block);
+		}
+		assert.deepEqual(
+			store.nativeUsdPoints().map(({ block, answer }) => [block, answer]),
+			[[1_000, 2_000e8]]
+		);
+		store.close();
+	});
+
+	test("a database of another network is refused", () => {
+		const path = join(mkdtempSync(join(tmpdir(), "fiberscope-")), "bnb.db");
+		const store = new Store(path);
+		store.db.exec("UPDATE meta SET value = '56' WHERE key = 'chain_id'");
+		store.close();
+		assert.throws(() => new Store(path), /is a BNB Chain database; this indexer covers Base/);
 	});
 });

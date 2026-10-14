@@ -1,5 +1,6 @@
 import { ROUTER } from "./chain.ts";
-import { BLOCKS_PER_DAY, NATIVE_ETH, WETH } from "./config.ts";
+import type { Clock } from "./clock.ts";
+import { NATIVE_TOKEN, NETWORK } from "./config.ts";
 
 /** The published methodology as pure functions: buckets, attribution, volume, surplus and cost. */
 
@@ -8,26 +9,62 @@ export interface BlockRange {
 	to: number;
 }
 
-/**
- * The rolling-day bucket of a block: bucket d holds blocks (end − (d + 1) days, end − d days].
- * Blocks after `end` get -1.
- */
-export function bucketOf(end: number, block: number): number {
-	return block > end ? -1 : Math.floor((end - block) / BLOCKS_PER_DAY);
-}
+/** Seconds in a rolling day. */
+const DAY = 86_400;
 
-/** The first block of a window made of the `days` buckets that end at `end`. */
-export function windowStart(end: number, days: number): number {
-	return end - days * BLOCKS_PER_DAY + 1;
-}
+/** How much deeper a backfill goes where its depth is estimated, as a share of the estimate. */
+const REACH_MARGIN = 0.01;
 
 /**
- * How many buckets, counting from bucket 0, lie wholly inside an ingested range. Zero when the
- * range stops short of `end`, since bucket 0 is then incomplete.
+ * Rolling days that end at E, the time of block `end`: bucket d holds the blocks whose time lies
+ * in (E − (d + 1) days, E − d days], so a block's bucket follows its time, however fast the
+ * blocks came. On Base, a block every 2 seconds, a day is 43,200 blocks.
  */
-export function completeBuckets(end: number, range: BlockRange | null): number {
-	if (range === null || range.to < end || range.from > end) return 0;
-	return Math.floor((end - range.from + 1) / BLOCKS_PER_DAY);
+export class Days {
+	readonly end: number;
+	readonly #clock: Clock;
+	readonly #endTime: number;
+
+	constructor(clock: Clock, end: number) {
+		this.end = end;
+		this.#clock = clock;
+		this.#endTime = clock.time(end);
+	}
+
+	/** The bucket of a block; -1 after `end`. */
+	bucketOf(block: number): number {
+		if (block > this.end) return -1;
+		return Math.floor((this.#endTime - this.#clock.time(block)) / DAY);
+	}
+
+	/** The first block of the window made of `days` buckets: the first block after E − days. */
+	windowStart(days: number): number {
+		return this.#clock.firstBlockAfter(this.#endTime - days * DAY);
+	}
+
+	/**
+	 * How many buckets, counting from bucket 0, an ingested range holds entirely: those every
+	 * block before the range is older than. Zero when the range stops short of `end`, since bucket
+	 * 0 is then incomplete.
+	 */
+	completeBuckets(range: BlockRange | null): number {
+		if (range === null || range.to < this.end || range.from > this.end) return 0;
+		return Math.floor((this.#endTime - this.#clock.time(range.from - 1)) / DAY);
+	}
+
+	/**
+	 * The block a backfill must reach down to for `days` buckets. Where the clock's anchors do
+	 * not reach back as far, the window's start is only estimated, with the network's average
+	 * block time, so the backfill goes deeper by REACH_MARGIN of the estimated blocks: the
+	 * snapshot counts only whole buckets, so the extra blocks are harmless, and once they are
+	 * ingested their anchors place the start.
+	 */
+	reach(days: number): number {
+		const start = this.windowStart(days);
+		const anchored = this.#clock.oldest!.block;
+		if (start >= anchored) return start;
+		return start - Math.ceil((anchored - start) * REACH_MARGIN);
+	}
 }
 
 /** What attribution needs to know about a settlement. */
@@ -79,30 +116,30 @@ export function creditedAddress(
 		: { address: winner, source: "winner" };
 }
 
-/** The token whose native price values `token`: native ETH is priced as WETH. */
+/** The token whose native price values `token`: the native token is priced as its wrapped token. */
 export function priceToken(token: string): string {
-	return token === NATIVE_ETH ? WETH : token;
+	return token === NATIVE_TOKEN ? NETWORK.native.wrapped : token;
 }
 
 /**
  * A trade's USD value: the lower of its sell side and buy side, each valued as amount × native
- * price / 1e36 ETH (CoW native prices are in wei per token atom, scaled by 1e18), times ETH/USD.
- * A side with no price or a zero price is unpriced. With one priced side, that side is used; with
- * none, the trade has no value.
+ * price / 1e36 native tokens (CoW native prices are in the native token's smallest unit per token
+ * atom, scaled by 1e18), times the native token's USD price. A side with no price or a zero price
+ * is unpriced. With one priced side, that side is used; with none, the trade has no value.
  */
 export function tradeVolumeUsd(
 	sellAmount: string,
 	sellPrice: string | null,
 	buyAmount: string,
 	buyPrice: string | null,
-	ethUsd: number
+	nativeUsd: number
 ): number | null {
 	const sellNative = sellPrice === null ? 0n : BigInt(sellPrice);
 	const buyNative = buyPrice === null ? 0n : BigInt(buyPrice);
 	const sell = sellNative > 0n ? BigInt(sellAmount) * sellNative : null;
 	const buy = buyNative > 0n ? BigInt(buyAmount) * buyNative : null;
 	const lower = sell !== null && buy !== null ? (sell < buy ? sell : buy) : (sell ?? buy);
-	return lower === null ? null : (Number(lower) / 1e36) * ethUsd;
+	return lower === null ? null : (Number(lower) / 1e36) * nativeUsd;
 }
 
 /**
@@ -178,11 +215,11 @@ export function tradeSurplus(usd: number | null, trade: SurplusFacts): TradeSurp
 
 /**
  * A batch's transaction cost in USD: its transaction's fee, gas used × effective gas price plus
- * the L1 data fee (wei), in ETH at the ETH/USD rate of its block, split evenly between the
- * batches the transaction holds, as its gas is.
+ * Base's L1 data fee, in the native token at its USD price at the batch's block, split evenly
+ * between the batches the transaction holds, as its gas is.
  */
-export function batchCostUsd(tx: { fee: string; txBatches: number }, ethUsd: number): number {
-	return (Number(BigInt(tx.fee)) / 1e18 / tx.txBatches) * ethUsd;
+export function batchCostUsd(tx: { fee: string; txBatches: number }, nativeUsd: number): number {
+	return (Number(BigInt(tx.fee)) / 1e18 / tx.txBatches) * nativeUsd;
 }
 
 /** A solution of an auction, as the loss rules read it. */

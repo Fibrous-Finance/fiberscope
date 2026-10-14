@@ -2,18 +2,20 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { backfillAuctions, catchUpAuctions, resolveRouterSenders } from "./auctions.ts";
 import type { AuctionStats, ChainWatch } from "./auctions.ts";
+import { Clock } from "./clock.ts";
+import type { Anchor } from "./clock.ts";
 import { NETWORK } from "./config.ts";
 import type { CowApi } from "./cow.ts";
 import { backfillDetails, catchUpDetails } from "./details.ts";
 import type { DetailStats, DetailWatch } from "./details.ts";
-import { backfillChain, catchUpChain, fillOrderUids, seedEthUsd } from "./ingest.ts";
+import { backfillChain, catchUpChain, fillOrderUids, seedNativeUsd } from "./ingest.ts";
 import type { IngestStats } from "./ingest.ts";
 import { log } from "./log.ts";
 import { OVERRIDES } from "./overrides.ts";
 import { describeError } from "./pacer.ts";
 import { fetchCmsEntries, Registry } from "./registry.ts";
 import type { Rpc } from "./rpc.ts";
-import { windowStart } from "./rules.ts";
+import { Days } from "./rules.ts";
 import type { Store } from "./store.ts";
 
 export interface SyncOptions {
@@ -38,15 +40,15 @@ export interface SyncStats {
 	details: DetailStats;
 }
 
-/** Blocks the end may trail the head after a catch-up round before another round runs (5 min). */
-const CATCH_UP_SLACK = 150;
+/** Blocks the end may trail the head after a catch-up round before another round runs: 5 minutes. */
+const CATCH_UP_SLACK = Math.ceil(300 / NETWORK.blockTime);
 /** The longest the details' catch-up may hold up the snapshot before it stops (2 minutes). */
 const DETAIL_CATCH_UP_MS = 120_000;
 
 /**
- * Brings the database up to date. Chain and auction data catch up with Base's safe block, and
- * the details (the auctions' scores, and the quotes and protocol fees of the orders traded) with
- * the auctions; that makes the data current (the last run time) and is when the snapshot is
+ * Brings the database up to date. Chain and auction data catch up with the network's safe block,
+ * and the details (the auctions' scores, and the quotes and protocol fees of the orders traded)
+ * with the auctions; that makes the data current (the last run time) and is when the snapshot is
  * written. Then chain, auction and detail history are backfilled to the requested depths, within
  * the budget if there is one; the snapshot is written again if history grew. Every step resumes
  * where an interrupted or stopped run left off.
@@ -69,25 +71,30 @@ export async function sync(
 		auctions: { lookups: 0, missing: 0, seconds: 0 },
 		details: { scores: 0, orders: 0, fees: 0, seconds: 0 },
 	};
-	await seedEthUsd(store, rpc);
+	await seedNativeUsd(store, rpc);
 
 	// Catch up: chain data to the head, then the auctions of the new blocks. A long pause since
 	// the last run leaves the head far behind, so this repeats, at most three times, until the end
-	// is within CATCH_UP_SLACK blocks of the head.
-	// An empty database has nothing to catch up: its backfill starts at the head.
+	// is within CATCH_UP_SLACK blocks of the head. Then the days end at the end of the chain data.
+	// An empty database has nothing to catch up: its backfill starts at the head, and the head's
+	// own header places the days until the backfill brings the anchors of their blocks.
 	const empty = store.chainRange() === null;
-	if (!empty) {
+	let days: Days;
+	if (empty) {
+		const head = await safeHead(rpc);
+		days = new Days(new Clock([head], NETWORK.blockTime), head.block);
+	} else {
 		for (let round = 0; round < 3; round++) {
-			await catchUpChain(store, rpc, await safeHead(rpc), stats.chain);
+			await catchUpChain(store, rpc, (await safeHead(rpc)).block, stats.chain);
 			await catchUpAuctions(store, cow, stats.auctions);
-			if ((await safeHead(rpc)) - store.chainRange()!.to <= CATCH_UP_SLACK) break;
+			if ((await safeHead(rpc)).block - store.chainRange()!.to <= CATCH_UP_SLACK) break;
 		}
 		await resolveRouterSenders(store, cow, registry, stats.auctions);
+		days = new Days(store.clock(), store.chainRange()!.to);
 		if (options.prune && chainDays > 0) {
-			const end = store.chainRange()!.to;
 			store.prune(
-				windowStart(end, chainDays),
-				options.auctionDays > 0 ? windowStart(end, options.auctionDays) : null
+				days.windowStart(chainDays),
+				options.auctionDays > 0 ? days.windowStart(options.auctionDays) : null
 			);
 		}
 		// The details of the new blocks, for the snapshot. Their lookups must not hold it up: if
@@ -111,7 +118,6 @@ export async function sync(
 	// before it goes deeper: auction history never waits for the full chain depth. The details
 	// trail the auction backfill. The trades stored before the schema held order uids get them
 	// from the RPC.
-	const head = empty ? await safeHead(rpc) : store.chainRange()!.to;
 	const chainFrom = store.chainRange()?.from;
 	const auctionFrom = store.auctionRange()?.from;
 	const detailFrom = store.detailRange()?.from;
@@ -122,8 +128,8 @@ export async function sync(
 	const chainWork = (async () => {
 		try {
 			if (chainDays > 0) {
-				const low = windowStart(head, chainDays);
-				await backfillChain(store, rpc, low, head, stats.chain, budget ?? undefined);
+				const low = days.reach(chainDays);
+				await backfillChain(store, rpc, low, days.end, stats.chain, budget ?? undefined);
 			}
 		} catch (error) {
 			abort.abort(error);
@@ -145,7 +151,7 @@ export async function sync(
 	const auctionWork = (async () => {
 		try {
 			if (options.auctionDays > 0) {
-				const low = windowStart(head, options.auctionDays);
+				const low = days.reach(options.auctionDays);
 				await backfillAuctions(store, cow, low, chain, stats.auctions, stop);
 			}
 		} finally {
@@ -163,7 +169,7 @@ export async function sync(
 		// Whatever the catch-up before the snapshot left, if it stopped early.
 		await catchUpDetails(store, cow, stats.details);
 		if (options.auctionDays > 0) {
-			const low = windowStart(head, options.auctionDays);
+			const low = days.reach(options.auctionDays);
 			await backfillDetails(store, cow, low, details, stats.details, stop);
 		}
 	})();
@@ -172,7 +178,7 @@ export async function sync(
 	if (budget?.aborted) {
 		log(`sync: the ${budgetMinutes}-minute budget is spent; the next run resumes the backfill`);
 	}
-	await seedEthUsd(store, rpc);
+	await seedNativeUsd(store, rpc);
 
 	if (empty && store.chainRange() !== null) store.setLastRunAt(Date.now());
 	const grew =
@@ -197,15 +203,16 @@ async function refreshRegistry(store: Store): Promise<Registry> {
 }
 
 /**
- * Base's safe block: the newest block whose transactions Base has posted to Ethereum. Blocks up
- * to it change only if Ethereum reorganizes the blocks holding that data, so the indexer never
- * stores a block Base itself might replace.
+ * The network's safe block, with its time. On Base, the newest block whose transactions Base has
+ * posted to Ethereum: blocks up to it change only if Ethereum reorganizes the blocks holding that
+ * data. On BNB Chain, the newest justified block, a block or two behind the head. The indexer
+ * never stores a block past it, so never one the network itself might replace.
  */
-async function safeHead(rpc: Rpc): Promise<number> {
-	const block = await rpc.call<{ number: string } | null>("eth_getBlockByNumber", [
-		"safe",
-		false,
-	]);
+async function safeHead(rpc: Rpc): Promise<Anchor> {
+	const block = await rpc.call<{ number: string; timestamp: string } | null>(
+		"eth_getBlockByNumber",
+		["safe", false]
+	);
 	if (block === null) throw new Error("the RPC node has no safe block");
-	return Number(block.number);
+	return { block: Number(block.number), time: Number(block.timestamp) };
 }

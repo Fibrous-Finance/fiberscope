@@ -4,14 +4,19 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { backfillAuctions, processAuctionRange } from "./auctions.ts";
 import type { AuctionStats, CompetitionSource } from "./auctions.ts";
-import { NATIVE_ETH, NETWORK, WETH } from "./config.ts";
+import { NATIVE_TOKEN, NETWORK } from "./config.ts";
 import type { Competition } from "./cow.ts";
 import { TradeValuer } from "./facts.ts";
 import type { BlockRange } from "./rules.ts";
 import { Store } from "./store.ts";
 
+/** The wrapped native token: WETH on Base, which the tests run as. */
+const WETH = NETWORK.native.wrapped;
 const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const SOLVER = "0x5050505050505050505050505050505050505050";
+/** Now in Unix seconds, and the block taken to be the head then. */
+const NOW = Math.floor(Date.now() / 1000);
+const HEAD = 10_000_000;
 
 /** A transaction hash spelled from a readable label. */
 function hash(label: string): string {
@@ -24,7 +29,10 @@ interface Settled {
 	buy?: string;
 }
 
-/** Commits one-trade batches (1,000 USDC for 0.5 WETH by default) as the chain data of `range`. */
+/**
+ * Commits one-trade batches (1,000 USDC for 0.5 WETH by default) as the chain data of `range`,
+ * whose blocks come every 2 seconds up to HEAD at NOW.
+ */
 function ingest(store: Store, range: BlockRange, settled: Settled[]): void {
 	const current = store.chainRange();
 	store.commitChunk(
@@ -58,6 +66,10 @@ function ingest(store: Store, range: BlockRange, settled: Settled[]): void {
 				fee: "500001",
 			})),
 			prices: [{ block: range.from, answer: 2_000e8 }],
+			anchors: [range.from, range.to].map((block) => ({
+				block,
+				time: NOW - 2 * (HEAD - block),
+			})),
 		},
 		{
 			from: Math.min(current?.from ?? range.from, range.from),
@@ -136,9 +148,9 @@ describe("competition lookups", () => {
 		assert.equal(store.competitionLink(hash("d"))?.priced, true);
 	});
 
-	test("a trade buying native ETH is priced with WETH", async () => {
+	test("a trade buying the native token is priced as its wrapped token", async () => {
 		const store = new Store(":memory:");
-		ingest(store, { from: 100, to: 199 }, [{ tx: hash("e"), block: 100, buy: NATIVE_ETH }]);
+		ingest(store, { from: 100, to: 199 }, [{ tx: hash("e"), block: 100, buy: NATIVE_TOKEN }]);
 		await processAuctionRange(
 			store,
 			fakeApi([competition(1, [hash("e")])]),
@@ -153,14 +165,13 @@ describe("competition lookups", () => {
 
 	test("a miss is looked up again only while it is recent", async () => {
 		const store = new Store(":memory:");
-		const head = Math.floor((Date.now() / 1000 - NETWORK.genesisTime) / NETWORK.blockTime);
-		ingest(store, { from: 100, to: head }, [
+		ingest(store, { from: 100, to: HEAD }, [
 			{ tx: hash("old"), block: 100 },
-			{ tx: hash("new"), block: head - 10 },
+			{ tx: hash("new"), block: HEAD - 10 },
 		]);
 		const api = fakeApi([]);
-		await processAuctionRange(store, api, { from: 100, to: head }, stats());
-		await processAuctionRange(store, api, { from: 100, to: head }, stats());
+		await processAuctionRange(store, api, { from: 100, to: HEAD }, stats());
+		await processAuctionRange(store, api, { from: 100, to: HEAD }, stats());
 		assert.deepEqual(api.asked, [hash("old"), hash("new"), hash("new")]);
 	});
 });

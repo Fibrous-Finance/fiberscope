@@ -1,5 +1,5 @@
 import { ROUTER } from "./chain.ts";
-import { timeOf } from "./config.ts";
+import { NETWORK } from "./config.ts";
 import { auctionOutcomes, creditedBatches, tradeFees, TradeValuer } from "./facts.ts";
 import { fmt, shortAddress } from "./log.ts";
 import type { Registry, SolverIdentity } from "./registry.ts";
@@ -40,7 +40,7 @@ interface Row {
  */
 export function windowReport(store: Store, registry: Registry, range: BlockRange): string {
 	const out = [
-		windowLine(range),
+		windowLine(store, range),
 		...coverageWarnings(store, range, ["chain", "auction", "detail"]),
 	];
 
@@ -215,7 +215,7 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 			`(surplus over a tenth of their value)`,
 		`Gas        ${fmt(gas)} (${perTrade(gas, trades)} per trade)`,
 		`Cost       $${fmt(cost)} (${usdPer(cost, trades, 4)} per trade` +
-			`${uncosted > 0 ? `; ${fmt(uncosted)} batches without an ETH/USD rate` : ""})`,
+			`${uncosted > 0 ? `; ${fmt(uncosted)} batches without the ${NETWORK.native.symbol}/USD rate` : ""})`,
 		`Solvers    ${fmt(settling)} with batches, ${fmt(sorted.length)} with batches or solutions`,
 		`Auctions   ${fmt(auctions)} started in the window, ${fmt(solutions)} solutions, ` +
 			`${(winners / Math.max(1, auctions)).toFixed(2)} winners per auction`,
@@ -287,8 +287,9 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 }
 
 /** A report's first line: the block range and its times. */
-export function windowLine(range: BlockRange): string {
-	const iso = (block: number) => new Date(timeOf(block) * 1000).toISOString().replace(".000", "");
+export function windowLine(store: Store, range: BlockRange): string {
+	const iso = (block: number) =>
+		new Date(store.timeOf(block) * 1000).toISOString().replace(".000", "");
 	return `Window     blocks ${range.from}..${range.to}, ${iso(range.from)} → ${iso(range.to)}`;
 }
 

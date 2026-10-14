@@ -3,8 +3,13 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { SQLInputValue, StatementSync } from "node:sqlite";
 
+import { BASE, NETWORKS } from "@fiberscope/core";
+
 import { ROUTER } from "./chain.ts";
 import type { SettlementRow, TradeRow } from "./chain.ts";
+import { Clock } from "./clock.ts";
+import type { Anchor } from "./clock.ts";
+import { NETWORK } from "./config.ts";
 import type { Competition, ExecutedFee, FeePolicy, OrderDetail, Solution } from "./cow.ts";
 import { log } from "./log.ts";
 import type { PricePoint } from "./prices.ts";
@@ -22,7 +27,7 @@ export interface TxRow {
 	 */
 	recipient: string | null;
 	gasUsed: number;
-	/** What the transaction paid, in wei: gas used × effective gas price, plus the L1 data fee. */
+	/** What the transaction paid, in wei: gas used × effective gas price, plus Base's L1 data fee. */
 	fee: string;
 }
 
@@ -33,6 +38,8 @@ export interface ChainChunk {
 	trades: TradeRow[];
 	txs: TxRow[];
 	prices: PricePoint[];
+	/** Block times in the range, for the clock. */
+	anchors: Anchor[];
 }
 
 /** How a settlement transaction is linked to its competition. */
@@ -51,7 +58,7 @@ export interface BatchRow {
 	block: number;
 	solver: string;
 	trades: number;
-	/** Interaction events other than approvals and WETH unwraps. */
+	/** Interaction events other than approvals and unwraps of the wrapped native token. */
 	swaps: number;
 	sender: string;
 	recipient: string | null;
@@ -148,7 +155,14 @@ export interface TradeDetailRow {
 }
 
 /** The schema's `PRAGMA user_version`. */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
+
+/**
+ * When Base's block 0 came (Unix seconds). Base makes a block every 2 seconds exactly, so this
+ * gives every Base block's time: the anchors of a database upgraded from version 3, which every
+ * earlier indexer wrote for Base.
+ */
+const BASE_GENESIS = 1_686_789_347;
 
 /**
  * Settlements and trades are keyed by block and log index, so a block range is one stretch of
@@ -156,6 +170,7 @@ const SCHEMA_VERSION = 3;
  * hashes and order uids are stored as their bytes.
  */
 const SCHEMA = `
+-- Sync progress, and chain_id: the network whose data the database holds.
 CREATE TABLE IF NOT EXISTS meta (
 	key TEXT PRIMARY KEY,
 	value TEXT NOT NULL
@@ -217,10 +232,18 @@ CREATE TABLE IF NOT EXISTS allow_list (
 	is_solver INTEGER NOT NULL
 );
 
--- Chainlink ETH/USD answers (8 decimals), each valid from its block until the next row.
-CREATE TABLE IF NOT EXISTS eth_usd (
+-- Chainlink answers for the native token's USD price (8 decimals), each valid from its block until
+-- the next row.
+CREATE TABLE IF NOT EXISTS native_usd (
 	block INTEGER PRIMARY KEY,
 	answer INTEGER NOT NULL
+);
+
+-- The clock's anchors (see Clock): blocks with their timestamps (Unix seconds), from the logs and
+-- headers of the ingested block ranges.
+CREATE TABLE IF NOT EXISTS anchors (
+	block INTEGER PRIMARY KEY,
+	time INTEGER NOT NULL
 );
 
 -- Auctions that ended in a settlement, and every solution submitted to them, in the API's order.
@@ -330,6 +353,15 @@ ALTER TABLE solutions ADD COLUMN reference_score TEXT;
 ALTER TABLE solutions ADD COLUMN filtered_out INTEGER;
 `;
 
+/**
+ * Turns a version 3 database, which every earlier indexer wrote for Base, into version 4: the
+ * native token's USD prices get a network-neutral name. SCHEMA then adds the anchors table, and
+ * the constructor anchors the chain range.
+ */
+const UPGRADE_FROM_3 = `
+ALTER TABLE eth_usd RENAME TO native_usd;
+`;
+
 /** Binds a `0x`-prefixed hex hash to a column that stores its bytes. */
 const HASH = "unhex(substr(?, 3))";
 
@@ -353,20 +385,46 @@ export class Store {
 				`${path} has schema version ${version}; this indexer reads version ${SCHEMA_VERSION}`
 			);
 		}
-		const written = this.#get("SELECT 1 FROM sqlite_schema WHERE name = 'settlements'");
+		const written =
+			this.#get("SELECT 1 FROM sqlite_schema WHERE name = 'settlements'") !== undefined;
 		if (written && version < 2) {
 			throw new Error(
 				`${path} was written by an older indexer (schema version ${version}): delete it to ` +
 					"index from scratch, or seed a current copy"
 			);
 		}
+		if (written) {
+			// From version 4 a database records its network's chain id; every earlier one is Base's.
+			const chainId = version < 4 ? BASE.chainId : Number(this.#meta("chain_id"));
+			if (chainId !== NETWORK.chainId) {
+				const holds =
+					Object.values(NETWORKS).find((network) => network.chainId === chainId)?.name ??
+					`chain ${chainId}`;
+				throw new Error(
+					`${path} is a ${holds} database; this indexer covers ${NETWORK.name} ` +
+						`(NETWORK=${NETWORK.id}): give each network its own database`
+				);
+			}
+		}
+		const upgrade = written && version < SCHEMA_VERSION;
 		this.#transaction(() => {
 			if (written && version === 2) this.db.exec(UPGRADE_FROM_2);
+			if (upgrade) this.db.exec(UPGRADE_FROM_3);
 			this.db.exec(SCHEMA);
+			const chain = this.chainRange();
+			if (upgrade && chain !== null) {
+				for (const block of new Set([chain.from, chain.to])) {
+					this.#run(
+						"INSERT OR REPLACE INTO anchors (block, time) VALUES (?, ?)",
+						block,
+						BASE_GENESIS + 2 * block
+					);
+				}
+			}
+			this.#setMeta("chain_id", String(NETWORK.chainId));
 			this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 		});
-		if (written && version === 2)
-			log(`${path}: schema version 2 upgraded to ${SCHEMA_VERSION}`);
+		if (upgrade) log(`${path}: schema version ${version} upgraded to ${SCHEMA_VERSION}`);
 	}
 
 	close(): void {
@@ -427,7 +485,7 @@ export class Store {
 			if (s.trades > 0) batches.set(s.tx, (batches.get(s.tx) ?? 0) + 1);
 		}
 		this.#transaction(() => {
-			for (const table of ["settlements", "trades", "trade_fees", "eth_usd"]) {
+			for (const table of ["settlements", "trades", "trade_fees", "native_usd", "anchors"]) {
 				this.#run(`DELETE FROM ${table} WHERE block BETWEEN ? AND ?`, from, to);
 			}
 			for (const s of chunk.settlements) {
@@ -472,9 +530,16 @@ export class Store {
 			}
 			for (const p of chunk.prices) {
 				this.#run(
-					"INSERT OR REPLACE INTO eth_usd (block, answer) VALUES (?, ?)",
+					"INSERT OR REPLACE INTO native_usd (block, answer) VALUES (?, ?)",
 					p.block,
 					p.answer
+				);
+			}
+			for (const a of chunk.anchors) {
+				this.#run(
+					"INSERT OR REPLACE INTO anchors (block, time) VALUES (?, ?)",
+					a.block,
+					a.time
 				);
 			}
 			this.#setRange("chain", chainRange);
@@ -487,7 +552,8 @@ export class Store {
 	 * auction and detail ranges up to them. A flash-loan router settlement keeps its link while it
 	 * is in the chain data, since its attribution may need its auction's winner. An auction goes
 	 * with its last link, so one that started below `auctionFrom` stays while a later settlement
-	 * needs its prices. ETH/USD keeps the answer in force at `chainFrom`.
+	 * needs its prices. The native token's USD price keeps the answer in force at `chainFrom`, and
+	 * the clock the last anchor before it, so every block from there up keeps its time.
 	 */
 	prune(chainFrom: number, auctionFrom: number | null): void {
 		const chain = this.chainRange();
@@ -553,7 +619,11 @@ export class Store {
 				this.#run("DELETE FROM settlements WHERE block < ?", chainFrom);
 				this.#run("DELETE FROM trades WHERE block < ?", chainFrom);
 				this.#run(
-					"DELETE FROM eth_usd WHERE block < (SELECT MAX(block) FROM eth_usd WHERE block <= ?)",
+					"DELETE FROM native_usd WHERE block < (SELECT MAX(block) FROM native_usd WHERE block <= ?)",
+					chainFrom
+				);
+				this.#run(
+					"DELETE FROM anchors WHERE block < (SELECT MAX(block) FROM anchors WHERE block < ?)",
 					chainFrom
 				);
 				this.#setRange("chain", { from: chainFrom, to: chain!.to });
@@ -579,23 +649,43 @@ export class Store {
 		);
 	}
 
-	/** Every ETH/USD price point, sorted by block. */
-	ethUsdPoints(): PricePoint[] {
-		return this.#all<PricePoint>("SELECT block, answer FROM eth_usd ORDER BY block");
+	/** Every price point of the native token in USD, sorted by block. */
+	nativeUsdPoints(): PricePoint[] {
+		return this.#all<PricePoint>("SELECT block, answer FROM native_usd ORDER BY block");
 	}
 
-	/** The block of the earliest ETH/USD price point, or null when there is none. */
-	firstEthUsdBlock(): number | null {
-		return this.#get<{ block: number | null }>("SELECT MIN(block) AS block FROM eth_usd")!
+	/** The block of the earliest price point of the native token, or null when there is none. */
+	firstNativeUsdBlock(): number | null {
+		return this.#get<{ block: number | null }>("SELECT MIN(block) AS block FROM native_usd")!
 			.block;
 	}
 
-	saveEthUsdPoint(point: PricePoint): void {
+	saveNativeUsdPoint(point: PricePoint): void {
 		this.#run(
-			"INSERT OR REPLACE INTO eth_usd (block, answer) VALUES (?, ?)",
+			"INSERT OR REPLACE INTO native_usd (block, answer) VALUES (?, ?)",
 			point.block,
 			point.answer
 		);
+	}
+
+	/** The clock of every anchor, read at once: for the many blocks of a snapshot or of a sync. */
+	clock(): Clock {
+		return new Clock(
+			this.#iterate<Anchor>("SELECT block, time FROM anchors ORDER BY block"),
+			NETWORK.blockTime
+		);
+	}
+
+	/** Unix seconds of one block, from the anchors on either side of it (see Clock). */
+	timeOf(block: number): number {
+		const around = this.#all<Anchor>(
+			`SELECT * FROM (SELECT block, time FROM anchors WHERE block <= ? ORDER BY block DESC LIMIT 1)
+			UNION ALL SELECT * FROM (SELECT block, time FROM anchors WHERE block > ? ORDER BY block LIMIT 1)
+			ORDER BY block`,
+			block,
+			block
+		);
+		return new Clock(around, NETWORK.blockTime).time(block);
 	}
 
 	/** Batch transactions in a block range, in block order. */

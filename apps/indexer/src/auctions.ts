@@ -1,7 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { ROUTER } from "./chain.ts";
-import { LOG_RANGE, NETWORK, timeOf } from "./config.ts";
+import { NETWORK } from "./config.ts";
 import type { Competition } from "./cow.ts";
 import { duration, fmt, log, throttledLog } from "./log.ts";
 import type { Registry } from "./registry.ts";
@@ -32,21 +32,16 @@ export interface AuctionStats {
 /** Concurrent lookups. */
 const LANES = 4;
 /**
- * Blocks within which one auction's settlements land: between its start and its deadline,
- * observed at 6–8 blocks after the start on Base.
- */
-const SAME_AUCTION_BLOCKS = 10;
-/**
  * Seconds after a settlement's block after which an API miss is final; the API normally links a
  * settlement much sooner.
  */
 const MISS_IS_FINAL_AFTER = 600;
 
 /** Whether a batch transaction still needs a competition lookup. */
-function needsLookup(link: CompetitionLink | null, block: number): boolean {
+function needsLookup(store: Store, link: CompetitionLink | null, block: number): boolean {
 	if (link === null) return true;
 	if (link.auctionId !== null) return !link.priced;
-	return link.checkedAt - timeOf(block) < MISS_IS_FINAL_AFTER;
+	return link.checkedAt - store.timeOf(block) < MISS_IS_FINAL_AFTER;
 }
 
 /**
@@ -99,13 +94,13 @@ export async function processAuctionRange(
 	const errors: unknown[] = [];
 	for (const { tx, block } of store.batchTxs(range)) {
 		const nearby = [...inFlight.values()].filter(
-			(job) => job.block >= block - SAME_AUCTION_BLOCKS
+			(job) => job.block >= block - NETWORK.sameAuctionBlocks
 		);
 		await Promise.all(nearby.map((job) => job.done));
 		while (inFlight.size >= LANES)
 			await Promise.race([...inFlight.values()].map((job) => job.done));
 		if (errors.length > 0 || signal?.aborted) break;
-		if (!needsLookup(store.competitionLink(tx), block)) continue;
+		if (!needsLookup(store, store.competitionLink(tx), block)) continue;
 		stats.lookups++;
 		const done = lookUpCompetition(store, source, tx)
 			.then((competition) => {
@@ -145,7 +140,7 @@ export async function backfillAuctions(
 	const lookupsBefore = stats.lookups;
 	const report = throttledLog();
 	for (let top = start; top >= low;) {
-		const from = Math.max(low, top - LOG_RANGE + 1);
+		const from = Math.max(low, top - NETWORK.logRange + 1);
 		const ingested = () => (store.chainRange()?.from ?? Infinity) <= from;
 		await until(() => ingested() || chain.done, signal);
 		if (!ingested() || signal.aborted) break;
@@ -188,9 +183,9 @@ export async function catchUpAuctions(
 	for (
 		let from = Math.max(range.from, range.to + 1 - recheck);
 		from <= chain.to;
-		from += LOG_RANGE
+		from += NETWORK.logRange
 	) {
-		const to = Math.min(chain.to, from + LOG_RANGE - 1);
+		const to = Math.min(chain.to, from + NETWORK.logRange - 1);
 		await processAuctionRange(store, source, { from, to }, stats);
 		store.setAuctionRange({ from: range.from, to: Math.max(range.to, to) });
 		report(

@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { hexBlock, word, wordAddress } from "./abi.ts";
+import type { Anchor } from "./clock.ts";
 import { NETWORK } from "./config.ts";
 import { log } from "./log.ts";
 import { backoff } from "./pacer.ts";
@@ -25,7 +26,10 @@ export const SELECTOR = {
 	symbol: "0x95d89b41",
 };
 
-/** Interactions that are not DEX swaps: ERC-20 `approve` and WETH `withdraw` (unwrap). */
+/**
+ * Interactions that are not DEX swaps: ERC-20 `approve` and `withdraw` (unwrap) of the wrapped
+ * native token, the WETH9 interface that WBNB shares.
+ */
 const NOT_SWAPS: Record<string, true> = { "095ea7b3": true, "2e1a7d4d": true };
 
 export interface Log {
@@ -33,6 +37,8 @@ export interface Log {
 	topics: string[];
 	data: string;
 	blockNumber: string;
+	/** The block's timestamp, which some nodes add, ours for Base and BNB Chain among them. */
+	blockTimestamp?: string;
 	transactionHash: string;
 	logIndex: string;
 }
@@ -46,7 +52,7 @@ export interface SettlementRow {
 	solver: string;
 	/** Trade events this settlement emitted. */
 	trades: number;
-	/** Interaction events, excluding approvals and WETH unwraps. */
+	/** Interaction events, excluding approvals and unwraps. */
 	swaps: number;
 }
 
@@ -169,6 +175,22 @@ export async function getLogs(
 	}
 }
 
+/** Block times from the blocks' headers. */
+export async function headerAnchors(rpc: Rpc, blocks: number[]): Promise<Anchor[]> {
+	const outcomes = await rpc.batch(
+		blocks.map((block) => ({
+			method: "eth_getBlockByNumber",
+			params: [hexBlock(block), false],
+		}))
+	);
+	return outcomes.map((outcome, i) => {
+		if (!outcome.ok) throw outcome.error;
+		const header = outcome.result as { timestamp: string } | null;
+		if (header === null) throw new Error(`the RPC node has no block ${blocks[i]}`);
+		return { block: blocks[i], time: Number(header.timestamp) };
+	});
+}
+
 export interface Receipt {
 	blockNumber: string;
 	from: string;
@@ -176,7 +198,7 @@ export interface Receipt {
 	to: string | null;
 	gasUsed: string;
 	effectiveGasPrice: string;
-	/** OP-stack L1 data fee in wei; absent on some deposit transactions. */
+	/** The L1 data fee in wei, on Base (OP stack); absent on some deposit transactions. */
 	l1Fee?: string;
 }
 

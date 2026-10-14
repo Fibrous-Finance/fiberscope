@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { WETH } from "./config.ts";
 import { readOrderTerms, settleCalls } from "./terms.ts";
 import type { CalldataTrade, TradeFacts } from "./terms.ts";
 
 const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+const WETH = "0x4200000000000000000000000000000000000006";
 const DAI = "0x50c5725949a6f0c72e6c4a641f24049a917db0cb";
 const SETTLE = "13d79a0b";
 

@@ -34,7 +34,7 @@ const LANES = 3;
 /**
  * `eth_call` is limited far more tightly than other methods on the public Base RPC: measured at
  * about 15 calls/s overall but only about 0.5 `eth_call`/s (it publishes no limits). So it gets a
- * pacer of its own at 1/30 of BASE_RPC_RPS, which is 0.5/s at the default 15.
+ * pacer of its own at 1/30 of the RPC rate (BASE_RPC_RPS or BNB_RPC_RPS), 0.5/s at the default 15.
  */
 const ETH_CALL_SHARE = 1 / 30;
 

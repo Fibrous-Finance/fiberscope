@@ -80,8 +80,8 @@ export interface SnapshotSolver {
 	/** Trades (filled orders) in those settlements. Length `coverage.chainDays`. */
 	trades: number[];
 	/**
-	 * DEX swaps in those settlements: their interactions other than ERC-20 approvals and WETH
-	 * unwraps. Length `coverage.chainDays`.
+	 * DEX swaps in those settlements: their interactions other than ERC-20 approvals and unwraps
+	 * of the wrapped native token (WETH, WBNB). Length `coverage.chainDays`.
 	 */
 	swaps: number[];
 	/** Gas units used by those settlements. Length `coverage.chainDays`. */
@@ -219,7 +219,7 @@ export interface SettlementSummary {
 	/** Block timestamp (Unix ms). */
 	time: number;
 	trades: number;
-	/** DEX swaps: interactions other than ERC-20 approvals and WETH unwraps. */
+	/** DEX swaps: interactions other than ERC-20 approvals and unwraps of the wrapped native token. */
 	swaps: number;
 	/** Token symbols of the first trade. */
 	pair: { sell: string; buy: string };

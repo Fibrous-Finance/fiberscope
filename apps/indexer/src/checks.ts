@@ -35,7 +35,7 @@ const LISTED = 20;
  * others.
  */
 export function attributionReport(store: Store, registry: Registry, range: BlockRange): string {
-	const out = [windowLine(range), ...coverageWarnings(store, range, ["chain", "auction"])];
+	const out = [windowLine(store, range), ...coverageWarnings(store, range, ["chain", "auction"])];
 	let batches = 0;
 	let withWinner = 0;
 	let matched = 0;
@@ -109,7 +109,7 @@ export async function termsReport(
 	range: BlockRange,
 	sampleSize: number
 ): Promise<string> {
-	const out = [windowLine(range), ...coverageWarnings(store, range, ["chain"])];
+	const out = [windowLine(store, range), ...coverageWarnings(store, range, ["chain"])];
 	const routes = new Map<Route, { trades: number; read: TermRow[] }>();
 	let trades = 0;
 	let read = 0;

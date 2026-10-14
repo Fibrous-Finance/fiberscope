@@ -2,43 +2,93 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
 import { ROUTER } from "./chain.ts";
-import { BLOCKS_PER_DAY, NATIVE_ETH, WETH } from "./config.ts";
+import { Clock } from "./clock.ts";
+import { NATIVE_TOKEN, NETWORK } from "./config.ts";
 import {
 	batchCostUsd,
-	bucketOf,
-	completeBuckets,
 	creditedAddress,
+	Days,
 	feeUsd,
 	priceToken,
 	tradeSurplus,
 	tradeVolumeUsd,
-	windowStart,
 } from "./rules.ts";
 import type { SettlementParties } from "./rules.ts";
 
-describe("buckets", () => {
-	const end = 52_074_002;
+/** The wrapped native token of the network the tests run as: WETH on Base. */
+const WETH = NETWORK.native.wrapped;
+const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+const DAY = 86_400;
 
-	test("bucket d holds the blocks of (end − (d + 1) days, end − d days]", () => {
-		assert.equal(bucketOf(end, end), 0);
-		assert.equal(bucketOf(end, end - BLOCKS_PER_DAY + 1), 0);
-		assert.equal(bucketOf(end, end - BLOCKS_PER_DAY), 1);
-		assert.equal(bucketOf(end, end - 7 * BLOCKS_PER_DAY + 1), 6);
-		assert.equal(bucketOf(end, end - 7 * BLOCKS_PER_DAY), 7);
-		assert.equal(bucketOf(end, end + 1), -1);
+/** A clock with anchors at `blocks`, timed as on Base: block 0 at 1686789347, then every 2 s. */
+function baseClock(blocks: number[]): Clock {
+	return new Clock(
+		blocks.map((block) => ({ block, time: 1_686_789_347 + 2 * block })),
+		2
+	);
+}
+
+describe("days", () => {
+	test("on Base, buckets, windows and whole buckets are the old block arithmetic", () => {
+		// A day of Base blocks is 43,200 of them: bucket d held (end − (d + 1) days, end − d days].
+		const day = 43_200;
+		const end = 52_074_002;
+		const from = end - 180 * day + 1;
+		// Anchored at the ends of the chain range, as an upgraded database is, or at many blocks.
+		const many = Array.from({ length: 181 }, (_, i) => from + i * 43_123);
+		for (const clock of [baseClock([from, end]), baseClock(many)]) {
+			const days = new Days(clock, end);
+			for (const block of [end, end - day + 1, end - day, end - 7 * day + 1, end - 7 * day]) {
+				assert.equal(days.bucketOf(block), Math.floor((end - block) / day));
+			}
+			assert.equal(days.bucketOf(from), 179);
+			assert.equal(days.bucketOf(end + 1), -1);
+			for (const n of [1, 2, 7, 30, 90, 180]) {
+				assert.equal(days.windowStart(n), end - n * day + 1);
+			}
+			for (const start of [from - 1, from, from + 1, end - day + 1, end - day + 2]) {
+				const whole = Math.floor((end - start + 1) / day);
+				assert.equal(days.completeBuckets({ from: start, to: end }), whole);
+			}
+			assert.equal(days.completeBuckets({ from, to: end - 1 }), 0);
+			assert.equal(days.completeBuckets(null), 0);
+		}
 	});
 
-	test("a window of d days starts at the first block of bucket d − 1", () => {
-		assert.equal(bucketOf(end, windowStart(end, 7)), 6);
-		assert.equal(bucketOf(end, windowStart(end, 7) - 1), 7);
+	test("a block's bucket follows its time, however fast the blocks came", () => {
+		// A day of 3-second blocks, then a day of half-second ones: 28,800 blocks, then 172,800.
+		const start = 1_700_000_000;
+		const clock = new Clock(
+			[
+				{ block: 0, time: start },
+				{ block: 28_800, time: start + DAY },
+				{ block: 201_600, time: start + 2 * DAY },
+			],
+			0.45
+		);
+		const days = new Days(clock, 201_600);
+		// Bucket 0 is the last day's 172,800 blocks, bucket 1 the 28,800 of the day before.
+		assert.equal(days.bucketOf(201_600), 0);
+		assert.equal(days.bucketOf(28_801), 0);
+		assert.equal(days.bucketOf(28_800), 1);
+		assert.equal(days.bucketOf(1), 1);
+		assert.equal(days.bucketOf(0), 2);
+		assert.equal(days.windowStart(1), 28_801);
+		assert.equal(days.windowStart(2), 1);
+		assert.equal(days.completeBuckets({ from: 1, to: 201_600 }), 2);
+		assert.equal(days.completeBuckets({ from: 2, to: 201_600 }), 1);
+		assert.equal(days.completeBuckets({ from: 28_801, to: 201_600 }), 1);
+		assert.equal(days.completeBuckets({ from: 28_802, to: 201_600 }), 0);
 	});
 
-	test("only whole buckets from bucket 0 count as complete", () => {
-		assert.equal(completeBuckets(end, { from: windowStart(end, 30), to: end }), 30);
-		assert.equal(completeBuckets(end, { from: windowStart(end, 30) + 1, to: end }), 29);
-		assert.equal(completeBuckets(end, { from: windowStart(end, 30) - 1, to: end }), 30);
-		assert.equal(completeBuckets(end, { from: windowStart(end, 2), to: end - 1 }), 0);
-		assert.equal(completeBuckets(end, null), 0);
+	test("a backfill goes deeper than an estimated window start, not than an anchored one", () => {
+		const head = 1_000_000;
+		// Only the head is anchored: the day's 191,998 blocks at 0.45 s, and 1% more.
+		const estimated = new Days(new Clock([{ block: head, time: 1_800_000_000 }], 0.45), head);
+		assert.equal(estimated.windowStart(1), head - 191_998);
+		assert.equal(estimated.reach(1), head - 191_998 - 1_920);
+		const anchored = new Days(baseClock([0, head]), head);
+		assert.equal(anchored.reach(1), head - 43_200 + 1);
 	});
 });
 
@@ -47,40 +97,40 @@ describe("trade volume", () => {
 	// $2,000 per ETH is 0.0005 ETH per USDC, so 5e26 per atom.
 	const weth = { amount: "1000000000000000000", price: "1000000000000000000" };
 	const usdc = { amount: "1990000000", price: "500000000000000000000000000" };
-	const ethUsd = 2_000;
+	const nativeUsd = 2_000;
 
 	test("takes the lower of the sell and buy sides", () => {
-		const usd = tradeVolumeUsd(weth.amount, weth.price, usdc.amount, usdc.price, ethUsd);
+		const usd = tradeVolumeUsd(weth.amount, weth.price, usdc.amount, usdc.price, nativeUsd);
 		assert.ok(Math.abs(usd! - 1_990) < 1e-9);
 	});
 
 	test("uses the priced side when only one side has a price", () => {
 		assert.ok(
-			Math.abs(tradeVolumeUsd(weth.amount, null, usdc.amount, usdc.price, ethUsd)! - 1_990) <
-				1e-9
+			Math.abs(
+				tradeVolumeUsd(weth.amount, null, usdc.amount, usdc.price, nativeUsd)! - 1_990
+			) < 1e-9
 		);
 		assert.ok(
-			Math.abs(tradeVolumeUsd(weth.amount, weth.price, usdc.amount, null, ethUsd)! - 2_000) <
-				1e-9
+			Math.abs(
+				tradeVolumeUsd(weth.amount, weth.price, usdc.amount, null, nativeUsd)! - 2_000
+			) < 1e-9
 		);
 		assert.ok(
-			Math.abs(tradeVolumeUsd(weth.amount, weth.price, usdc.amount, "0", ethUsd)! - 2_000) <
-				1e-9
+			Math.abs(
+				tradeVolumeUsd(weth.amount, weth.price, usdc.amount, "0", nativeUsd)! - 2_000
+			) < 1e-9
 		);
 	});
 
 	test("has no value when neither side is priced", () => {
-		assert.equal(tradeVolumeUsd(weth.amount, null, usdc.amount, null, ethUsd), null);
-		assert.equal(tradeVolumeUsd(weth.amount, "0", usdc.amount, null, ethUsd), null);
+		assert.equal(tradeVolumeUsd(weth.amount, null, usdc.amount, null, nativeUsd), null);
+		assert.equal(tradeVolumeUsd(weth.amount, "0", usdc.amount, null, nativeUsd), null);
 	});
 
-	test("prices native ETH with WETH", () => {
-		assert.equal(priceToken(NATIVE_ETH), WETH);
+	test("prices the native token as its wrapped token", () => {
+		assert.equal(priceToken(NATIVE_TOKEN), WETH);
 		assert.equal(priceToken(WETH), WETH);
-		assert.equal(
-			priceToken("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
-			"0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
-		);
+		assert.equal(priceToken(USDC), USDC);
 	});
 });
 
@@ -157,7 +207,7 @@ describe("trade surplus", () => {
 describe("fee value", () => {
 	// 1,000 USDC sold for 0.5 WETH, a trade worth $1,000 at its lower side.
 	const trade = {
-		sellToken: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+		sellToken: USDC,
 		buyToken: WETH,
 		sellAmount: "1000000000",
 		buyAmount: "500000000000000000",
@@ -167,8 +217,8 @@ describe("fee value", () => {
 		// 0.0005 WETH of 0.5 WETH bought, and 2 USDC of 1,000 USDC sold.
 		assert.equal(feeUsd({ token: WETH, amount: "500000000000000" }, trade, 1_000), 1);
 		assert.equal(feeUsd({ token: trade.sellToken, amount: "2000000" }, trade, 1_000), 2);
-		// Native ETH is the same side as WETH.
-		const native = { ...trade, buyToken: NATIVE_ETH };
+		// The native token is the same side as its wrapped token.
+		const native = { ...trade, buyToken: NATIVE_TOKEN };
 		assert.equal(feeUsd({ token: WETH, amount: "500000000000000" }, native, 1_000), 1);
 	});
 
@@ -186,7 +236,7 @@ describe("batch cost", () => {
 	// 400K gas at 0.01 gwei plus 0.0000001 ETH of L1 data fee: 0.0000041 ETH.
 	const tx = { fee: "4100000000000", txBatches: 1 };
 
-	test("is the transaction's fee in ETH at the ETH/USD rate", () => {
+	test("is the transaction's fee in the native token at its USD price", () => {
 		assert.ok(Math.abs(batchCostUsd(tx, 2_500) - 0.01025) < 1e-12);
 	});
 

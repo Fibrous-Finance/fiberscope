@@ -2,8 +2,8 @@
 
 /*
  * Color tokens. Each token holds its light and dark value; the root's color-scheme picks one.
- * Auto follows the system; the appearance button pins light or dark by setting data-theme before
- * first paint (see lib/theme.ts).
+ * lib/theme.ts sets data-theme before first paint, Auto included; without scripts the page follows
+ * the system.
  */
 :root {
 	color-scheme: light dark;
@@ -28,9 +28,9 @@
 }
 
 /*
- * The appearance button fades the old page into the new one as a single picture (lib/theme.ts),
- * so every color changes together. 300ms: long enough to soften a full-screen change from light to
- * dark or back, short enough not to feel like a wait.
+ * A theme change fades the old page into the new one as a single picture (lib/theme.ts), so every
+ * color changes together. 300ms: long enough to soften a full-screen change from light to dark or
+ * back, short enough not to feel like a wait. The browser ignores clicks while it fades the page.
  */
 ::view-transition-group(root) {
 	animation-duration: 0.3s;
@@ -129,12 +129,6 @@
 			animation-duration: 0.01ms !important;
 			animation-iteration-count: 1 !important;
 			transition-duration: 0.01ms !important;
-		}
-
-		::view-transition-group(*),
-		::view-transition-old(*),
-		::view-transition-new(*) {
-			animation: none !important;
 		}
 	}
 }

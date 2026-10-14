@@ -1,6 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { ROUTER } from "./chain.ts";
 import { NETWORK } from "./config.ts";
 import type { Competition } from "./cow.ts";
 import { duration, fmt, log, throttledLog } from "./log.ts";
@@ -199,11 +198,11 @@ export async function catchUpAuctions(
 }
 
 /**
- * Looks up the competitions of flash-loan router settlements anywhere in the chain data, not only
- * in the auction range, whose recipient and sender are neither registered nor allow-listed: their
+ * Looks up the competitions of relay settlements anywhere in the chain data, not only in the
+ * auction range, whose recipient and sender are neither registered nor allow-listed: their
  * attribution falls back to the API's winner.
  */
-export async function resolveRouterSenders(
+export async function resolveRelaySenders(
 	store: Store,
 	source: CompetitionSource,
 	registry: Registry,
@@ -211,7 +210,7 @@ export async function resolveRouterSenders(
 	signal?: AbortSignal
 ): Promise<void> {
 	const pending = store
-		.unresolvedRouterTxs(ROUTER)
+		.unresolvedRelayTxs()
 		.filter(
 			({ sender, recipient }) =>
 				!registry.has(sender) && (recipient === null || !registry.has(recipient))
@@ -235,7 +234,7 @@ export async function resolveRouterSenders(
 	await Promise.all(Array.from({ length: Math.min(LANES, pending.length) }, lane));
 	const seconds = (performance.now() - started) / 1000;
 	stats.seconds += seconds;
-	log(`router settlements with unknown solvers: ${fmt(next)} looked up in ${duration(seconds)}`);
+	log(`relay settlements with unknown solvers: ${fmt(next)} looked up in ${duration(seconds)}`);
 }
 
 /** Waits until `ready`, or until `signal` aborts. */

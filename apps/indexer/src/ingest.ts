@@ -6,7 +6,7 @@ import {
 	headerAnchors,
 	orderUidOf,
 	parseSettlementLogs,
-	ROUTER,
+	RELAYS,
 	SELECTOR,
 	SETTLEMENT,
 	TOPIC,
@@ -36,10 +36,11 @@ export interface IngestStats {
 }
 
 /**
- * AllowList `isSolver` verdicts on flash-loan router senders and recipients. Each address is
- * checked once, at the block of the first router settlement seen with it, and the verdict is
- * kept: `eth_call` is the scarcest RPC allowance (see ETH_CALL_SHARE in rpc.ts), and an address
- * does not switch between being a solver and being an operator account.
+ * AllowList `isSolver` verdicts on the senders and recipients of relay settlements (see
+ * creditedAddress). Each address is checked once, at the block of the first relay settlement
+ * seen with it, and the verdict is kept: `eth_call` is the scarcest RPC allowance (see
+ * ETH_CALL_SHARE in rpc.ts), and an address does not switch between being a solver and being an
+ * operator account.
  */
 class AllowList {
 	readonly #store: Store;
@@ -79,8 +80,8 @@ class AllowList {
  * Fetches everything a block range adds: settlements and trades from the settlement contract's
  * logs, a receipt and the calldata of each batch transaction, with the order terms the calldata
  * gives its trades, the native token's USD answers of the aggregators that `feed` says the
- * Chainlink proxy used, and the clock's anchors. Flash-loan router senders and recipients get an
- * AllowList verdict on the way.
+ * Chainlink proxy used, and the clock's anchors. The senders and recipients of relay settlements
+ * get an AllowList verdict on the way.
  */
 async function fetchChunk(
 	rpc: Rpc,
@@ -102,11 +103,11 @@ async function fetchChunk(
 		logs.filter((entry) => entry.address.toLowerCase() === SETTLEMENT)
 	);
 	const blockOf = new Map<string, number>();
-	const routed = new Set<string>();
+	const relayed = new Set<string>();
 	for (const settlement of settlements) {
 		if (settlement.trades === 0) continue;
 		blockOf.set(settlement.tx, settlement.block);
-		if (settlement.solver === ROUTER) routed.add(settlement.tx);
+		if (RELAYS.includes(settlement.solver)) relayed.add(settlement.tx);
 	}
 	const hashes = [...blockOf.keys()];
 	const [receipts, inputs] = await Promise.all([
@@ -134,7 +135,7 @@ async function fetchChunk(
 	});
 	addTerms(trades, inputs);
 	for (const { tx, block, sender, recipient } of txs) {
-		if (routed.has(tx)) await checkRouterParties(allowList, sender, recipient, block);
+		if (relayed.has(tx)) await checkRelayParties(allowList, sender, recipient, block);
 	}
 	return {
 		range,
@@ -184,15 +185,31 @@ function addTerms(trades: TradeRow[], inputs: Map<string, string>): void {
 	}
 }
 
-/** AllowList verdicts on what attribution may credit a router settlement to. */
-async function checkRouterParties(
+/** AllowList verdicts on what attribution may credit a relay settlement to: never a relay. */
+async function checkRelayParties(
 	allowList: AllowList,
 	sender: string,
 	recipient: string | null,
 	block: number
 ): Promise<void> {
 	await allowList.isSolver(sender, block);
-	if (recipient !== null && recipient !== ROUTER) await allowList.isSolver(recipient, block);
+	if (recipient !== null && !RELAYS.includes(recipient)) {
+		await allowList.isSolver(recipient, block);
+	}
+}
+
+/**
+ * Gives the senders and recipients of relay settlements the AllowList verdicts they lack.
+ * Ingestion checks them, but not in the settlements stored before their relay was listed in
+ * `NETWORKS`, such as an Atomic Bundle added later. One `isSolver` call per address, at the block
+ * of its first relay settlement, as ingestion does.
+ */
+export async function fillRelayVerdicts(store: Store, rpc: Rpc): Promise<void> {
+	const parties = store.uncheckedRelayParties();
+	if (parties.length === 0) return;
+	const allowList = new AllowList(store, rpc);
+	for (const { address, block } of parties) await allowList.isSolver(address, block);
+	log(`AllowList: ${fmt(parties.length)} parties of relay settlements checked`);
 }
 
 /**

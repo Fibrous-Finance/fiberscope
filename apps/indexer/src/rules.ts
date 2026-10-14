@@ -1,4 +1,4 @@
-import { ROUTER } from "./chain.ts";
+import { RELAYS } from "./chain.ts";
 import type { Clock } from "./clock.ts";
 import { NATIVE_TOKEN, NETWORK } from "./config.ts";
 
@@ -82,28 +82,29 @@ export interface SettlementParties {
 }
 
 /**
- * How a settlement's credited address was chosen: the Settlement event's solver, or for a
- * flash-loan router settlement the transaction's recipient or sender, CoW's winning solution, or
- * the unverified sender.
+ * How a settlement's credited address was chosen: the Settlement event's solver, or for a relay
+ * settlement the transaction's recipient or sender, CoW's winning solution, or the unverified
+ * sender.
  */
 export type CreditSource = "event" | "recipient" | "sender" | "winner" | "unverified";
 
 /**
- * The address credited with a settlement, and how it was chosen. The flash-loan router settles
- * on behalf of the auction winner, which calls it either from its own account or through its own
- * contract, sent from per-transaction helper accounts. So a router settlement goes to the
- * transaction's recipient when that is a registered or allow-listed solver other than the router
- * itself; else to the sender when it is registered or allow-listed; else to the competition's
- * winning solution for the transaction; and to the sender only if the competition is unknown too.
+ * The address credited with a settlement, and how it was chosen. A relay (see RELAYS), the
+ * flash-loan router or an Atomic Bundle, settles on behalf of the auction winner, which calls it
+ * either from its own account or through its own contract, sent from per-transaction helper
+ * accounts. So a relay settlement goes to the transaction's recipient when that is a registered
+ * or allow-listed solver other than a relay, since the relays are allow-listed themselves; else to
+ * the sender when it is registered or allow-listed; else to the competition's winning solution for
+ * the transaction; and to the sender only if the competition is unknown too.
  */
 export function creditedAddress(
 	settlement: SettlementParties,
 	isRegistered: (address: string) => boolean,
 	apiWinner: () => string | null
 ): { address: string; source: CreditSource } {
-	if (settlement.solver !== ROUTER) return { address: settlement.solver, source: "event" };
+	if (!RELAYS.includes(settlement.solver)) return { address: settlement.solver, source: "event" };
 	const { recipient, sender } = settlement;
-	if (recipient !== null && recipient !== ROUTER) {
+	if (recipient !== null && !RELAYS.includes(recipient)) {
 		if (settlement.recipientIsSolver || isRegistered(recipient)) {
 			return { address: recipient, source: "recipient" };
 		}

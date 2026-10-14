@@ -15,7 +15,7 @@ Every figure comes from public data on Base and from CoW Protocol's public servi
 | CoW API `POST /api/v1/orders/by_uids`                                                                                               | Each traded order's quote (the solver that gave it, whether CoW verified it) and the partner fees its app data asks for                                           |
 | CoW API `GET /api/v2/trades?orderUid={uid}`                                                                                         | The protocol fees charged on each trade, one per fee policy, in the order CoW applied them                                                                        |
 | [CoW's solver registry](https://cms.cow.fi/api/solver-networks), plus overrides in `apps/indexer/src/overrides.ts`                  | Solver names and their prod and barn submission addresses; an address the registry marks inactive is retired                                                      |
-| `GPv2AllowListAuthentication` (`0x2c4c28ddbdac9c5e7055b4c863b72ea0149d8afe`) `isSolver`                                             | Whether a flash-loan router settlement's sender or recipient is a solver, for attribution                                                                         |
+| `GPv2AllowListAuthentication` (`0x2c4c28ddbdac9c5e7055b4c863b72ea0149d8afe`) `isSolver`                                             | Whether a relay settlement's sender or recipient is a solver, for attribution                                                                                     |
 | Chainlink ETH/USD on Base (`0x71041dddad3595f9ced3dccfbe3d1f4b0a16bb70`)                                                            | The dollar rate at each settlement: the latest answer at or before its block                                                                                      |
 | ERC-20 `symbol()`                                                                                                                   | Token symbols for the latest settlements' pairs                                                                                                                   |
 
@@ -108,8 +108,9 @@ surplus = value × (bought × limitSell − sold × limitBuy) ÷ (bought × limi
 
 - `bought` and `sold` are the executed amounts, `sold` without the fee.
 - `limitSell` and `limitBuy` are the amounts the user signed, read from the `settle()` calldata: the
-  transaction's own input, or the call the flash-loan router or a solver contract passes on. A
-  decoded call is used only when it reproduces the settlement's `Trade` events exactly.
+  transaction's own input, or the call the flash-loan router, an Atomic Bundle (see
+  [Attribution](#attribution)) or a solver contract passes on. A decoded call is used only when it
+  reproduces the settlement's `Trade` events exactly.
 - `value` is the trade's USD value, as in Volume.
 
 The expression is the same for sell and buy orders, and for whole and partial fills. The page
@@ -218,27 +219,36 @@ with the quote but not the fees. A settlement's pair shows the tokens in its fir
 
 ## Attribution
 
-A settlement is credited to the solver that submitted it: the address that called `settle`.
-Settlements sent through CoW's flash-loan router (`0x9da8b48441583a2b93e2ef8213aad0ec0b392c69`),
-which settles on the auction winner's behalf, are credited to the solver behind them, in this
-order:
+A settlement is credited to the solver that submitted it: the address that called `settle`. A
+relay calls `settle` on a solver's behalf, so the `Settlement` event names the relay instead. The
+relays are CoW's flash-loan router (`0x9da8b48441583a2b93e2ef8213aad0ec0b392c69`), which settles
+on the auction winner's behalf, and the network's
+[Atomic Bundles](https://docs.cow.fi/cow-protocol/concepts/order-types/wrappers): contracts CoW
+DAO allow-lists that a solver calls instead of the settlement contract. On BNB Chain these are
+Euler's, to open, close and collateral-swap positions (`0x64c26b3a182826fe2ab8c04c8caf40b0c4bf9a66`,
+`0x4f4ce927188637b4a1d91350c3114f4bd301dd02` and `0xcc054cd4b814a2caeb63c6f6a446435480a383f3`);
+Base has none. A relay's settlements are credited to the solver behind them, in this order:
 
-1. the transaction's recipient, when it is a registered or allow-listed solver other than the
-   router itself;
+1. the transaction's recipient, when it is a registered or allow-listed solver other than a relay
+   (the relays are allow-listed themselves);
 2. otherwise its sender, when that is one;
 3. otherwise the winner of that settlement in CoW's competition data;
 4. as a last resort, the sender.
 
 Allow-listed means `isSolver` on `GPv2AllowListAuthentication` returns true. Each address is
-checked once, at the block of the first router settlement seen with it.
+checked once, at the block of the first relay settlement seen with it; the settlements of a relay
+added to the indexer later get their checks on its next run.
 
 ## Registry and names
 
-Names, statuses and submission addresses come from CoW's solver registry for Base, refreshed on
-every indexer run; the last copy is kept for when the registry is unavailable. A solver groups its
-prod and barn addresses. An override adds an address the registry does not list as active that
-settles on Base and is on the settlement contract's on-chain allow-list; it is shown as active.
-Today there is one: Rizzolver's `0x8f5835e9d756c9bd934bce527157a4b0ef3c5cb7`.
+Names, statuses and submission addresses come from CoW's solver registry for the network,
+refreshed on every indexer run; the last copy is kept for when the registry is unavailable. A
+solver groups its prod and barn addresses. An override adds an address the registry does not list
+as active for the network that settles there and is on the settlement contract's on-chain
+allow-list; it is shown as active. On Base there is one, Rizzolver's
+`0x8f5835e9d756c9bd934bce527157a4b0ef3c5cb7`. On BNB Chain there are two, both of which the
+registry lists for Ethereum only: Rizzolver's same address and Fractal's
+`0x95480d3f27658e73b2785d30beb0c847d78294c7`.
 
 A retired address is one the registry marks inactive. A solver without a public name is shown by
 its address. The solver registry under the table lists every solver in CoW's registry for Base,

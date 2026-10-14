@@ -5,7 +5,7 @@ import type { SQLInputValue, StatementSync } from "node:sqlite";
 
 import { BASE, NETWORKS } from "@fiberscope/core";
 
-import { ROUTER } from "./chain.ts";
+import { RELAYS } from "./chain.ts";
 import type { SettlementRow, TradeRow } from "./chain.ts";
 import { Clock } from "./clock.ts";
 import type { Anchor } from "./clock.ts";
@@ -23,7 +23,7 @@ export interface TxRow {
 	sender: string;
 	/**
 	 * The receipt's `to`. Null in rows stored before it was kept; attribution reads it only for
-	 * flash-loan router transactions, and those all have it.
+	 * the transactions of relay settlements, and those all have it.
 	 */
 	recipient: string | null;
 	gasUsed: number;
@@ -65,9 +65,9 @@ export interface BatchRow {
 	gasUsed: number;
 	/** The transaction's fee in wei (see TxRow). */
 	fee: string;
-	/** The AllowList verdict on the sender, if it was ever checked (flash-loan router senders). */
+	/** The AllowList verdict on the sender, if it was ever checked (relay settlements' senders). */
 	senderIsSolver: number | null;
-	/** The AllowList verdict on the recipient, if it was ever checked (router recipients). */
+	/** The same for the recipient (relay settlements' recipients, other than relays). */
 	recipientIsSolver: number | null;
 	/** Batches in the same transaction; they share its gas and its fee. */
 	txBatches: number;
@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS trades (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS trades_without_uid ON trades (block) WHERE order_uid IS NULL;
 
--- AllowList isSolver verdicts, checked once per address (flash-loan router senders, recipients).
+-- AllowList isSolver verdicts, checked once per address (relay settlements' senders, recipients).
 CREATE TABLE IF NOT EXISTS allow_list (
 	address INTEGER PRIMARY KEY,
 	is_solver INTEGER NOT NULL
@@ -369,6 +369,9 @@ const HASH = "unhex(substr(?, 3))";
 function hexOf(column: string): string {
 	return `'0x' || lower(hex(${column}))`;
 }
+
+/** The ids of the relays in `addresses`; bind RELAYS to it, in order. */
+const RELAY_IDS = `SELECT id FROM addresses WHERE address IN (${RELAYS.map(() => "?").join(", ")})`;
 
 /** The indexer's SQLite database: raw chain and auction facts plus sync progress. */
 export class Store {
@@ -549,11 +552,11 @@ export class Store {
 	/**
 	 * Deletes the chain data below `chainFrom`, and the competition links of the settlements below
 	 * `auctionFrom` (null: none) with the orders and fees of their trades, and moves the chain,
-	 * auction and detail ranges up to them. A flash-loan router settlement keeps its link while it
-	 * is in the chain data, since its attribution may need its auction's winner. An auction goes
-	 * with its last link, so one that started below `auctionFrom` stays while a later settlement
-	 * needs its prices. The native token's USD price keeps the answer in force at `chainFrom`, and
-	 * the clock the last anchor before it, so every block from there up keeps its time.
+	 * auction and detail ranges up to them. A relay settlement keeps its link while it is in the
+	 * chain data, since its attribution may need its auction's winner. An auction goes with its
+	 * last link, so one that started below `auctionFrom` stays while a later settlement needs its
+	 * prices. The native token's USD price keeps the answer in force at `chainFrom`, and the clock
+	 * the last anchor before it, so every block from there up keeps its time.
 	 */
 	prune(chainFrom: number, auctionFrom: number | null): void {
 		const chain = this.chainRange();
@@ -571,15 +574,13 @@ export class Store {
 				? { from: auctions.from, to: auctionFrom }
 				: null;
 		if (chainGone === null && linksGone === null) return;
-		const router =
-			this.#get<{ id: number }>("SELECT id FROM addresses WHERE address = ?", ROUTER)?.id ??
-			null;
-		const unlinked = `SELECT tx FROM settlements WHERE block >= ? AND block < ? AND solver IS NOT ?
+		const unlinked = `SELECT tx FROM settlements
+				WHERE block >= ? AND block < ? AND solver NOT IN (${RELAY_IDS})
 			UNION ALL SELECT tx FROM settlements WHERE block >= ? AND block < ?`;
 		const params = [
 			linksGone?.from ?? 0,
 			linksGone?.to ?? 0,
-			router,
+			...RELAYS,
 			chainGone?.from ?? 0,
 			chainGone?.to ?? 0,
 		];
@@ -765,12 +766,10 @@ export class Store {
 	}
 
 	/**
-	 * Flash-loan router batch transactions never looked up in the API whose sender is not
-	 * allow-listed and whose recipient is the router or not allow-listed.
+	 * Relay batch transactions never looked up in the API whose sender is not allow-listed and
+	 * whose recipient is a relay or not allow-listed.
 	 */
-	unresolvedRouterTxs(
-		router: string
-	): { tx: string; sender: string; recipient: string | null }[] {
+	unresolvedRelayTxs(): { tx: string; sender: string; recipient: string | null }[] {
 		return this.#all(
 			`SELECT DISTINCT ${hexOf("s.tx")} AS tx, se.address AS sender, re.address AS recipient
 				FROM settlements s
@@ -779,10 +778,35 @@ export class Store {
 				LEFT JOIN allow_list l ON l.address = s.sender
 				LEFT JOIN allow_list r ON r.address = s.recipient
 				LEFT JOIN auction_txs a ON a.tx = s.tx
-				WHERE s.solver = (SELECT id FROM addresses WHERE address = ?) AND s.trades > 0
+				WHERE s.solver IN (${RELAY_IDS}) AND s.trades > 0
 					AND COALESCE(l.is_solver, 0) = 0
-					AND (s.recipient = s.solver OR COALESCE(r.is_solver, 0) = 0) AND a.tx IS NULL`,
-			router
+					AND (s.recipient IN (${RELAY_IDS}) OR COALESCE(r.is_solver, 0) = 0)
+					AND a.tx IS NULL`,
+			...RELAYS,
+			...RELAYS
+		);
+	}
+
+	/**
+	 * The senders and recipients of relay batches that have no AllowList verdict, other than the
+	 * relays themselves, each with the block of its first relay batch.
+	 */
+	uncheckedRelayParties(): { address: string; block: number }[] {
+		return this.#all(
+			`SELECT a.address, MIN(p.block) AS block FROM (
+					SELECT sender AS party, block FROM settlements
+						WHERE solver IN (${RELAY_IDS}) AND trades > 0
+					UNION ALL SELECT recipient, block FROM settlements
+						WHERE solver IN (${RELAY_IDS}) AND trades > 0
+							AND recipient NOT IN (${RELAY_IDS})
+				) p
+				JOIN addresses a ON a.id = p.party
+				LEFT JOIN allow_list l ON l.address = p.party
+				WHERE l.address IS NULL
+				GROUP BY p.party ORDER BY block, a.address`,
+			...RELAYS,
+			...RELAYS,
+			...RELAYS
 		);
 	}
 

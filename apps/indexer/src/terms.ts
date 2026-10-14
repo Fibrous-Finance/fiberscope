@@ -99,8 +99,8 @@ class Calldata {
 /**
  * Every settle() argument list a transaction's input holds. Candidates are the arguments of the
  * outer call (a direct settle(), or a solver contract that takes settle()'s arguments first) and
- * whatever follows each settle() selector: calldata the flash-loan router or a solver contract
- * passes on verbatim. A candidate that does not decode is dropped.
+ * whatever follows each settle() selector: calldata the flash-loan router, an Atomic Bundle or a
+ * solver contract passes on verbatim. A candidate that does not decode is dropped.
  */
 export function settleCalls(input: string): SettleCall[] {
 	const data = new Calldata(input);

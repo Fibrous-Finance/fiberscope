@@ -1,4 +1,5 @@
-import { ROUTER } from "./chain.ts";
+import { relayOf } from "./chain.ts";
+import type { Relay } from "./chain.ts";
 import { nativeUsdAt } from "./prices.ts";
 import type { PricePoint } from "./prices.ts";
 import type { Registry, SolverIdentity } from "./registry.ts";
@@ -24,7 +25,8 @@ export interface Batch {
 	/** How that address was chosen (see creditedAddress). */
 	credit: CreditSource;
 	solver: SolverIdentity;
-	viaRouter: boolean;
+	/** The kind of relay that settled it for its solver; null when the solver called `settle`. */
+	relay: Relay | null;
 	trades: number;
 	/** DEX swaps: Interaction events other than approvals and unwraps. */
 	swaps: number;
@@ -62,7 +64,7 @@ export function* creditedBatches(
 			address,
 			credit: credited.source,
 			solver: registry.identify(address),
-			viaRouter: row.solver === ROUTER,
+			relay: relayOf(row.solver),
 			trades: row.trades,
 			swaps: row.swaps,
 			gas: row.gasUsed / row.txBatches,

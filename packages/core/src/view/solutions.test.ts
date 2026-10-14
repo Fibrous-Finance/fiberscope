@@ -7,6 +7,7 @@ import {
 	auctionSolutions,
 	filteredOutcome,
 	solutionState,
+	trackLanes,
 	trackPosition,
 } from "./solutions.ts";
 import type { SolutionPoint } from "./solutions.ts";
@@ -312,5 +313,50 @@ describe("trackPosition", () => {
 		assert.equal(trackPosition(0), 0);
 		assert.equal(trackPosition(-0.2), 0);
 		assert.ok(Math.abs(trackPosition(0.001) - 0.25) < 1e-12);
+	});
+});
+
+describe("trackLanes", () => {
+	it("keeps marks that don't touch on the centre line", () => {
+		const marks = [
+			{ position: 0.1, size: 9 },
+			{ position: 0.5, size: 5 },
+			{ position: 0.52, size: 5 },
+		];
+		assert.deepEqual(trackLanes(marks, 400), [0, 0, 0]);
+	});
+
+	it("moves a mark that would overlap above, then below, the row's best staying put", () => {
+		// Two hollow rings 4px apart (Kaisersolver's 61% and 64% in #29,521,541) drew an "∞".
+		assert.deepEqual(
+			trackLanes(
+				[
+					{ position: 0.2, size: 9 },
+					{ position: 0.94, size: 5 },
+					{ position: 0.945, size: 5 },
+				],
+				800
+			),
+			[0, 0, -1]
+		);
+		// Next to a 9px best, a 5px mark needs 8px; a third goes below; a fourth has no room left.
+		const crowded = [0.5, 0.505, 0.51, 0.5].map((position, index) => ({
+			position,
+			size: index === 0 ? 9 : 5,
+		}));
+		assert.deepEqual(trackLanes(crowded, 400), [0, -1, 1, 0]);
+	});
+
+	it("keeps every mark on the centre line until the track is measured", () => {
+		assert.deepEqual(
+			trackLanes(
+				[
+					{ position: 0.5, size: 9 },
+					{ position: 0.5, size: 5 },
+				],
+				0
+			),
+			[0, 0]
+		);
 	});
 });

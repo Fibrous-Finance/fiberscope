@@ -51,6 +51,9 @@ describe("format", () => {
 		assert.equal(f.cost(0.0004), "<0.1¢");
 		assert.equal(f.cost(0), "0¢");
 		assert.equal(f.cost(0.0996), "10¢");
+		// 9.95¢ is 9.9499… in binary, but the cents format rounds the decimal 9.95 up, as Intl does.
+		assert.equal(f.cost(0.0995), "10¢");
+		assert.equal(f.cost(0.0994), "9.9¢");
 		assert.equal(f.cost(0.12), "12¢");
 		assert.equal(f.cost(0.996), "$1.00");
 		assert.equal(f.cost(1.24), "$1.24");
@@ -70,10 +73,17 @@ describe("format", () => {
 		assert.equal(f.bps1(null), "—");
 	});
 
-	it("writes scores with four decimals under $100, cents under $10,000, then whole dollars", () => {
-		assert.equal(f.score(4.578_293), "$4.5783");
+	it("writes scores in digits that tell apart scores 1% apart, moving up where rounding would", () => {
+		// Three significant digits under $0.10, where four decimals would both read $0.0041.
+		assert.equal(f.score(0.004_126_13), "$0.00413");
+		assert.equal(f.score(0.004_078_3), "$0.00408");
+		assert.equal(f.score(0.002_4), "$0.00240");
 		assert.equal(f.score(0.019_4), "$0.0194");
-		assert.equal(f.score(0.000_04), "<$0.0001");
+		assert.equal(f.score(0.000_1), "$0.000100");
+		assert.equal(f.score(0.000_099), "<$0.0001");
+		assert.equal(f.score(0.099_96), "$0.1000");
+		// Four decimals under $100, cents under $10,000, then whole dollars.
+		assert.equal(f.score(4.578_293), "$4.5783");
 		assert.equal(f.score(99.999_96), "$100.00");
 		assert.equal(f.score(165.47), "$165.47");
 		assert.equal(f.score(9_999.996), "$10,000");
@@ -96,6 +106,14 @@ describe("format", () => {
 	it("lists names without a comma before the last one", () => {
 		assert.equal(f.list(["OKX", "Rosato", "Arctic Bastion"]), "OKX, Rosato and Arctic Bastion");
 		assert.equal(f.list(["Nexroute", "Sector Finance"]), "Nexroute and Sector Finance");
+	});
+
+	it("writes multiples with two decimals under 1.1×, so a close lead never reads 1.0×", () => {
+		assert.equal(f.times(1.02), "1.02×");
+		assert.equal(f.times(1.028_8), "1.03×");
+		assert.equal(f.times(1.094_9), "1.09×");
+		assert.equal(f.times(1.095), "1.1×");
+		assert.equal(f.times(3.6), "3.6×");
 	});
 
 	it("switches gas to millions before thousands would round to 1000K", () => {

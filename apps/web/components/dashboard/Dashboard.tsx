@@ -13,7 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import { buildView } from "@fiberscope/core";
-import type { Measure, Period, Sort } from "@fiberscope/core";
+import type { Measure, Period, Snapshot, Sort } from "@fiberscope/core";
 
 import { Change } from "@/components/change/Change";
 import { DashboardContext, HoverContext } from "@/components/dashboard/context";
@@ -27,7 +27,7 @@ import { Methodology } from "@/components/methodology/Methodology";
 import { Winning, WinningSkeleton } from "@/components/winning/Winning";
 
 import { useFormat } from "@/lib/format";
-import { selectionQuery } from "@/lib/selection";
+import { parseSelection, selectionQuery } from "@/lib/selection";
 import type { Selection } from "@/lib/selection";
 import type { SnapshotResult } from "@/lib/snapshot";
 import { dataStatus } from "@/lib/status";
@@ -47,6 +47,12 @@ function subscribeCompact(onChange: () => void) {
 	return () => media.removeEventListener("change", onChange);
 }
 
+/** A solver id from a link, or null when the data has no such solver (the URL then drops it). */
+function knownSolver(snapshot: Snapshot | null, id: string | null): string | null {
+	if (id === null || snapshot === null) return id;
+	return snapshot.solvers.some((solver) => solver.id === id) ? id : null;
+}
+
 export function Dashboard({
 	result,
 	selection,
@@ -63,7 +69,7 @@ export function Dashboard({
 	const [period, setPeriod] = useState<Period>(selection.period);
 	const [measure, setMeasure] = useState<Measure>(selection.measure);
 	const [sort, setSort] = useState<Sort | null>(null);
-	const [open, setOpen] = useState<string | null>(selection.solver);
+	const [open, setOpen] = useState<string | null>(() => knownSolver(snapshot, selection.solver));
 	const [hovered, setHovered] = useState<string | null>(null);
 	// Starts at the server's load time so the first client render matches it, then ticks.
 	const [clock, setClock] = useState(result.at);
@@ -104,6 +110,22 @@ export function Dashboard({
 		const query = selectionQuery({ period, measure, solver: open });
 		if (query !== search) window.history.replaceState(null, "", `${pathname}${query}${hash}`);
 	}, [period, measure, open]);
+
+	// Back and forward: a section link adds a history entry, and the selection only rewrites the
+	// current one, so an earlier entry can hold another selection. The URL then leads.
+	useEffect(() => {
+		const onPop = () => {
+			const next = parseSelection(
+				Object.fromEntries(new URLSearchParams(window.location.search))
+			);
+			if (next.period !== period || next.measure !== measure) setSort(null);
+			setPeriod(next.period);
+			setMeasure(next.measure);
+			setOpen(knownSolver(snapshot, next.solver));
+		};
+		window.addEventListener("popstate", onPop);
+		return () => window.removeEventListener("popstate", onPop);
+	}, [period, measure, snapshot]);
 
 	// The age of the data ticks: it turns delayed 30 minutes after its newest block. A page that
 	// comes back into view reads the clock at once.

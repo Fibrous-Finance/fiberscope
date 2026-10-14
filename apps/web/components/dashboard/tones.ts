@@ -1,3 +1,5 @@
+import type { Measure, Row } from "@fiberscope/core";
+
 import { OTHERS } from "./context";
 
 /** Brand teal: marks the hovered solver everywhere it appears. It is never a solver's own color. */
@@ -18,4 +20,12 @@ export function tone(index: number, min = 0): string {
 /** Whether the solver at `index` is highlighted by the current hover. */
 export function isHot(hovered: string | null, id: string, index: number): boolean {
 	return hovered === id || (hovered === OTHERS && index >= TONES.length);
+}
+
+/**
+ * The `index` a row takes in `isHot`: its place in the table, or -1 for a row with none of the
+ * measure, which has no squares in the mosaic and is not among its "N others".
+ */
+export function hoverIndex(row: Row, measure: Measure): number {
+	return row.ranks[measure] === null ? -1 : row.rank - 1;
 }

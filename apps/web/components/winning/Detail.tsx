@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { useTranslations } from "next-intl";
@@ -10,6 +10,8 @@ import {
 	autoRange,
 	BASE,
 	DASH,
+	exportCoverage,
+	gasAxis,
 	linePath,
 	mediumAddress,
 	registrationOf,
@@ -21,8 +23,10 @@ import {
 import type { LinePath, Row, SolverRef, TapeCell } from "@fiberscope/core";
 
 import { useDashboard, useView } from "@/components/dashboard/context";
+import { ScrollMoreFade, useScrollMore } from "@/components/ui/ScrollMore";
 import { arrow } from "@/components/ui/Section";
-import { cellText, filteredText, useColumnLabels } from "@/components/winning/columns";
+import { cellText, filteredText, shareText, useColumnLabels } from "@/components/winning/columns";
+import { DotList } from "@/components/winning/DotList";
 import { useCopy } from "@/components/winning/useCopy";
 
 import { useFormat } from "@/lib/format";
@@ -48,6 +52,8 @@ const SMALL_LABEL =
 	"font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-mu uppercase";
 /** "Retired" in place of an address's actions. */
 const RETIRED = "text-[10.5px] tracking-[.06em] text-fa uppercase";
+/** A compact settlement link: a 44px target whose focus ring goes around its label instead. */
+const COMPACT_LINK = "flex min-h-11 items-center whitespace-nowrap quiet focus-label";
 /**
  * Time, trades, swaps, pair, volume, surplus, cost, gas, quoted by and links; the header and
  * every settlement share it.
@@ -90,7 +96,9 @@ function useDetail(row: Row) {
 
 	const noData = t("detail.stats.noAuctionData");
 	const gasAverage = view.gas.average;
-	const gasMax = view.gas.max;
+	// The scale ends where How efficiently's gas axis does, so a solver with a few costly trades
+	// does not squeeze everyone else into the start; one beyond the end sits at it.
+	const gasEnd = gasAxis(view.rows, gasAverage).max;
 	const gasDiff =
 		row.gasPerTrade !== null && gasAverage ? row.gasPerTrade / gasAverage - 1 : null;
 	const entrants = view.rows.filter((r) => r.entered);
@@ -107,17 +115,28 @@ function useDetail(row: Row) {
 			: null;
 	const swaps = view.swaps.average;
 	// Cost per trade and typical surplus, the solver's and the network's.
-	const { rows: figures, network } = surplusAndCost(snapshot!, view);
-	const own = figures.get(row.id);
+	const surplusCost = surplusAndCost(snapshot!, view);
+	const { network } = surplusCost;
+	const own = surplusCost.rows.get(row.id);
 	const typical = own?.typicalSurplusRate ?? null;
 	const auctionData = view.coverage.auction > 0;
-	// Filtered out, close losses and quotes: over the window's days with auction details, with
-	// "†" on their labels when those cover only part of it.
+	// Filtered out, close losses and quotes: over the window's days with auction details. Those
+	// are looked up after the auction data, so a window can have auction data but no details yet.
 	const details = auctionDetails(snapshot!, view);
 	const detail = details.coverage > 0 ? (details.solvers.get(row.id) ?? null) : null;
-	const detailPartial = details.coverage > 0 && details.coverage < view.days;
-	const detailLabel = (label: string) =>
-		detailPartial ? t("detail.labels.partial", { label }) : label;
+	const noDetails = auctionData ? t("detail.stats.noAuctionDetails") : noData;
+	// A figure that covers only part of the window carries its source's mark, the one Copy as
+	// Markdown gives it, and a line under the stats says how many days each mark covers. A source
+	// with no data in the window gets no mark: its figures read "—" and say why.
+	const { marks } = exportCoverage(view, surplusCost, details);
+	const sources = [
+		{ mark: marks.auction, covered: view.coverage.auction },
+		{ mark: marks.surplus, covered: surplusCost.coverage.surplus },
+		{ mark: marks.detail, covered: details.coverage },
+	].map((source) => (source.covered > 0 ? source : { ...source, mark: "" }));
+	const [auctionMark, surplusMark, detailMark] = sources.map((source) => source.mark);
+	const marked = (label: string, mark: string) =>
+		mark === "" ? label : t("detail.labels.partial", { label, mark });
 	const quoter = solverRefs(snapshot!);
 
 	// Without auction data in the window the strip stays empty, as the auction stats do.
@@ -148,7 +167,7 @@ function useDetail(row: Row) {
 			measure,
 			days: view.measure === "volume" ? view.coverage.auction : view.coverage.chain,
 		}),
-		share: f.percent(row.share, 1),
+		share: shareText(row, view.measure, f),
 		trend: t("detail.trend", {
 			points: tc("points", { value: f.points((last - first) * 100) }),
 			date: start,
@@ -185,7 +204,7 @@ function useDetail(row: Row) {
 			},
 			{
 				key: "volume",
-				label: labels.volume,
+				label: marked(labels.volume, auctionMark),
 				value: cellText(row, "volume", f),
 				note:
 					row.averageTrade === null
@@ -194,7 +213,7 @@ function useDetail(row: Row) {
 			},
 			{
 				key: "batchValue",
-				label: t("detail.labels.batchValue"),
+				label: marked(t("detail.labels.batchValue"), auctionMark),
 				value: f.usd(row.batchValue),
 				note:
 					batchValue === null
@@ -237,7 +256,7 @@ function useDetail(row: Row) {
 			},
 			{
 				key: "surplus",
-				label: t("detail.labels.surplus"),
+				label: marked(t("detail.labels.surplus"), surplusMark),
 				value:
 					typical === null
 						? DASH
@@ -252,7 +271,7 @@ function useDetail(row: Row) {
 			},
 			{
 				key: "participation",
-				label: labels.participation,
+				label: marked(labels.participation, auctionMark),
 				value: cellText(row, "participation", f),
 				note: row.entered
 					? t("detail.stats.participation", { percent: f.percent(participation) })
@@ -260,7 +279,7 @@ function useDetail(row: Row) {
 			},
 			{
 				key: "winRate",
-				label: labels.winRate,
+				label: marked(labels.winRate, auctionMark),
 				value: cellText(row, "winRate", f),
 				note:
 					row.entered && row.wonShare !== null
@@ -269,11 +288,11 @@ function useDetail(row: Row) {
 			},
 			{
 				key: "filteredOut",
-				label: detailLabel(t("detail.labels.filteredOut")),
+				label: marked(t("detail.labels.filteredOut"), detailMark),
 				value: filteredText(detail?.filteredShare ?? null, f),
 				note:
 					detail === null
-						? noData
+						? noDetails
 						: detail.solutions === 0
 							? t("detail.stats.noSolutions")
 							: t("detail.stats.filteredOut", {
@@ -283,22 +302,22 @@ function useDetail(row: Row) {
 			},
 			{
 				key: "closeLosses",
-				label: detailLabel(t("detail.labels.closeLosses")),
+				label: marked(t("detail.labels.closeLosses"), detailMark),
 				value: f.percent(detail?.closeLossShare ?? null),
 				note:
 					detail === null
-						? noData
+						? noDetails
 						: detail.losses === 0
 							? t("detail.stats.noLosses")
 							: t("detail.stats.closeLosses", { losses: detail.losses }),
 			},
 			{
 				key: "quotes",
-				label: detailLabel(t("detail.labels.quotes")),
+				label: marked(t("detail.labels.quotes"), detailMark),
 				value: detail === null ? DASH : f.int(detail.quotes),
 				note:
 					detail === null
-						? noData
+						? noDetails
 						: detail.quotes === 0
 							? t("detail.stats.noQuotes")
 							: t("detail.stats.quotes", {
@@ -308,11 +327,11 @@ function useDetail(row: Row) {
 			},
 			{
 				key: "settledItself",
-				label: detailLabel(t("detail.labels.settledItself")),
+				label: marked(t("detail.labels.settledItself"), detailMark),
 				value: f.percent(detail?.settledShare ?? null),
 				note:
 					detail === null
-						? noData
+						? noDetails
 						: detail.quotes === 0
 							? t("detail.stats.noQuotesShort")
 							: t("detail.stats.settledItself", {
@@ -320,10 +339,13 @@ function useDetail(row: Row) {
 								}),
 			},
 		],
-		/** "† Covers the last 7 of 30 days." under the stats; null when details cover the window. */
-		detailCoverage: detailPartial
-			? t("detail.detailCoverage", { covered: details.coverage, days: view.days })
-			: null,
+		/**
+		 * Under the stats, one line per mark: "† Covers the last 90 of 180 days." None when every
+		 * source covers the window.
+		 */
+		coverage: sources
+			.filter(({ mark }, i) => mark !== "" && sources.findIndex((s) => s.mark === mark) === i)
+			.map(({ mark, covered }) => t("detail.coverage", { mark, covered, days: view.days })),
 		auctions: {
 			title: t("detail.auctions", { count: cells.length }),
 			note:
@@ -342,9 +364,12 @@ function useDetail(row: Row) {
 			volume: rank(row.ranks.volume),
 		}),
 		gas: {
-			/** Positions on the scale, in % of the highest gas per trade. */
-			solver: row.gasPerTrade !== null && gasMax ? (row.gasPerTrade / gasMax) * 100 : null,
-			average: gasAverage !== null && gasMax ? (gasAverage / gasMax) * 100 : null,
+			/** Positions on the scale, in % of its end. */
+			solver:
+				row.gasPerTrade === null
+					? null
+					: (Math.min(row.gasPerTrade, gasEnd) / gasEnd) * 100,
+			average: gasAverage === null ? null : (gasAverage / gasEnd) * 100,
 			label: t("detail.gasScale", {
 				gas: f.gas(row.gasPerTrade),
 				average: f.gas(gasAverage),
@@ -373,12 +398,21 @@ function useDetail(row: Row) {
 			const values = { trades: s.trades, swaps: s.swaps, volume, surplus, cost, gas };
 			// Absent (not looked up) and null (no solver's quote) both read "—".
 			const quotedBy: SolverRef | null = s.quotedBy ? quoter(s.quotedBy) : null;
+			const time = view.end.time - s.time < RECENT_MS ? f.clock(s.time) : f.dayTime(s.time);
+			const pair = t("detail.pair", {
+				sell: s.pair.sell,
+				buy: s.pair.buy,
+				more: s.trades - 1,
+			});
+			// Every row has the same two links: their names say which settlement they open, as in
+			// Latest settlements under Who enters.
+			const link = { time, pair };
 			return {
 				tx: s.tx,
-				time: view.end.time - s.time < RECENT_MS ? f.clock(s.time) : f.dayTime(s.time),
+				time,
 				trades: f.int(s.trades),
 				swaps: f.int(s.swaps),
-				pair: t("detail.pair", { sell: s.pair.sell, buy: s.pair.buy, more: s.trades - 1 }),
+				pair,
 				volume,
 				surplus,
 				cost,
@@ -402,7 +436,9 @@ function useDetail(row: Row) {
 							]),
 				],
 				cow: COW_TX + s.tx,
+				cowLabel: tc("cowExplorerLabel", link),
 				scan: `${BASE.scan}/tx/${s.tx}`,
+				scanLabel: tc("basescanLabel", link),
 			};
 		}),
 	};
@@ -417,16 +453,21 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 	const t = useTranslations("Winning");
 	const tc = useTranslations("Common");
 	const [copied, copy] = useCopy(COPIED_MS);
+	const { ref: settlementsScroller, more: moreColumns } = useScrollMore();
+	const settlementsTitle = useId();
 	const narrow = width > 0 && width < NARROW_TABLE;
 	const tight = width > 0 && width < SHORT_ADDRESS_TABLE;
 	const pinned = { width: width > 0 ? width : "100%" };
 
+	// Both blocks keep 6px clear on the right, where the table's scroller would clip the focus
+	// ring of a control at the edge.
 	return (
 		<>
 			<div
 				style={pinned}
-				className={`sticky left-0 z-3 grid cursor-default gap-x-9 gap-y-7 bg-bg pt-6 pb-7 pl-[52px] ${narrow ? "grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]" : "grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]"}`}
+				className={`sticky left-0 z-3 grid cursor-default gap-x-9 gap-y-7 bg-bg pt-6 pr-1.5 pb-7 pl-[52px] ${narrow ? "grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]" : "grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]"}`}
 			>
+				<h3 className="sr-only">{row.label}</h3>
 				<div className="min-w-0">
 					<div className="label">{d.title}</div>
 					<div className="mt-2 flex items-baseline gap-2.5">
@@ -444,7 +485,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 					</div>
 					<div className="mt-7">
 						<div className="flex items-baseline justify-between gap-3">
-							<span className="label">{t("detail.addresses")}</span>
+							<h4 className="label">{t("detail.addresses")}</h4>
 							{d.registry === null ? null : (
 								<span className="font-mono text-[11px] leading-[normal] font-medium whitespace-nowrap text-fa">
 									{d.registry}
@@ -514,17 +555,24 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 							</div>
 						))}
 					</div>
-					{d.detailCoverage === null ? null : (
-						<div className="mt-4 font-mono text-[11px] leading-[normal] font-medium text-fa">
-							{d.detailCoverage}
+					{d.coverage.map((line, i) => (
+						<div
+							key={line}
+							className={`${i === 0 ? "mt-4" : "mt-1"} font-mono text-[11px] leading-[normal] font-medium text-fa`}
+						>
+							{line}
 						</div>
-					)}
+					))}
 				</div>
+				{/*
+				 * Underneath, the three sit side by side when each has room for the gas legend and a
+				 * rank line with one-digit ranks, else two to a row.
+				 */}
 				<div
-					className={`min-w-0 gap-x-9 gap-y-[18px] ${narrow ? "col-span-full grid grid-cols-3" : "flex flex-col"}`}
+					className={`min-w-0 gap-x-9 gap-y-[18px] ${narrow ? "col-span-full grid grid-cols-[repeat(auto-fit,minmax(270px,1fr))]" : "flex flex-col"}`}
 				>
 					<div>
-						<div className="label">{d.auctions.title}</div>
+						<h4 className="label">{d.auctions.title}</h4>
 						<AuctionStrip
 							cells={d.auctions.cells}
 							label={d.auctions.title}
@@ -533,13 +581,13 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 						<div className="mt-1.5 text-[12.5px] text-mu">{d.auctions.note}</div>
 					</div>
 					<div>
-						<div className="label">{t("detail.ranks")}</div>
+						<h4 className="label">{t("detail.ranks")}</h4>
 						<div className="mt-1.5 font-mono text-[13px] leading-[normal] font-medium">
 							{d.ranks}
 						</div>
 					</div>
 					<div>
-						<div className="label">{t("detail.gasVsNetwork")}</div>
+						<h4 className="label">{t("detail.gasVsNetwork")}</h4>
 						<div role="img" aria-label={d.gas.label} className="relative mt-2 h-5">
 							<div className="absolute inset-x-0 top-1/2 h-px bg-ln2" />
 							{d.gas.average === null ? null : (
@@ -555,7 +603,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 								/>
 							)}
 						</div>
-						<div className="mt-1 flex justify-between gap-2 font-mono text-[11px] leading-[normal] font-medium text-fa">
+						<div className="mt-1 flex justify-between gap-2 font-mono text-[11px] leading-[normal] font-medium whitespace-nowrap text-fa">
 							<span>{t("detail.lower")}</span>
 							<span>{t("detail.networkAverage")}</span>
 							<span>{t("detail.higher")}</span>
@@ -565,78 +613,125 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 			</div>
 			<div
 				style={pinned}
-				className="sticky left-0 z-3 cursor-default border-b border-ln bg-bg pt-1 pb-[30px] pl-[52px]"
+				className="sticky left-0 z-3 cursor-default border-b border-ln bg-bg pt-1 pr-1.5 pb-[30px] pl-[52px]"
 			>
-				<div className="label">{t("detail.settlements")}</div>
-				{/* Narrower than the grid, the settlements scroll sideways rather than squeeze the pair. */}
-				<div className="mt-1 overflow-x-auto">
-					<div className="min-w-[980px]">
+				<h4 id={settlementsTitle} className="label">
+					{t("detail.settlements")}
+				</h4>
+				{/*
+				 * Narrower than the grid, the settlements scroll sideways rather than squeeze the
+				 * pair, and a fade shows more columns follow. The scroller reaches into the block's
+				 * clear 6px and keeps them when it scrolls a link into view, so the link's focus
+				 * ring shows whole.
+				 */}
+				<div className="relative mt-1 -mr-1.5">
+					<div ref={settlementsScroller} className="scroll-pr-1.5 overflow-x-auto pr-1.5">
 						<div
-							className={`${SETTLEMENT_GRID} box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-fa uppercase`}
+							role="table"
+							aria-labelledby={settlementsTitle}
+							className="min-w-[980px]"
 						>
-							<span>{t("detail.settlementColumns.time")}</span>
-							<span className="text-right">
-								{t("detail.settlementColumns.trades")}
-							</span>
-							<span className="text-right">
-								{t("detail.settlementColumns.swaps")}
-							</span>
-							<span className="pl-1.5">{t("detail.settlementColumns.pair")}</span>
-							<span className="text-right">
-								{t("detail.settlementColumns.volume")}
-							</span>
-							<span className="text-right">
-								{t("detail.settlementColumns.surplus")}
-							</span>
-							<span className="text-right">{t("detail.settlementColumns.cost")}</span>
-							<span className="text-right">{t("detail.settlementColumns.gas")}</span>
-							<span className="pl-1.5">{t("detail.settlementColumns.quotedBy")}</span>
-							<span className="text-right">
-								{t("detail.settlementColumns.links")}
-							</span>
-						</div>
-						{d.settlements.map((s) => (
 							<div
-								key={s.tx}
-								className={`${SETTLEMENT_GRID} box-content h-[38px] border-b border-ln font-mono text-[12.5px] leading-[normal] font-medium`}
+								role="row"
+								className={`${SETTLEMENT_GRID} box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-fa uppercase`}
 							>
-								<span>{s.time}</span>
-								<span className="text-right">{s.trades}</span>
-								<span className="text-right">{s.swaps}</span>
-								<span className="truncate pl-1.5 font-sans text-[13px]">
-									{s.pair}
+								<span role="columnheader">
+									{t("detail.settlementColumns.time")}
 								</span>
-								<span className="text-right">{s.volume}</span>
-								<span className="text-right">{s.surplus}</span>
-								<span className="text-right">{s.cost}</span>
-								<span className="text-right">{s.gas}</span>
-								<span
-									title={s.quotedBy?.label}
-									className={`truncate pl-1.5 ${s.quotedBy?.unnamed ? "" : "font-sans text-[13px]"}`}
-								>
-									{s.quotedBy?.label ?? DASH}
+								<span role="columnheader" className="text-right">
+									{t("detail.settlementColumns.trades")}
 								</span>
-								<span className="flex justify-end gap-3.5 text-[12px]">
-									<a
-										href={s.cow}
-										target="_blank"
-										rel="noopener"
-										className="whitespace-nowrap quiet"
-									>
-										{tc.rich("cowExplorer", { arrow })}
-									</a>
-									<a
-										href={s.scan}
-										target="_blank"
-										rel="noopener"
-										className="whitespace-nowrap quiet"
-									>
-										{tc.rich("basescan", { arrow })}
-									</a>
+								<span role="columnheader" className="text-right">
+									{t("detail.settlementColumns.swaps")}
+								</span>
+								<span role="columnheader" className="pl-1.5">
+									{t("detail.settlementColumns.pair")}
+								</span>
+								<span role="columnheader" className="text-right">
+									{t("detail.settlementColumns.volume")}
+								</span>
+								<span role="columnheader" className="text-right">
+									{t("detail.settlementColumns.surplus")}
+								</span>
+								<span role="columnheader" className="text-right">
+									{t("detail.settlementColumns.cost")}
+								</span>
+								<span role="columnheader" className="text-right">
+									{t("detail.settlementColumns.gas")}
+								</span>
+								<span role="columnheader" className="pl-1.5">
+									{t("detail.settlementColumns.quotedBy")}
+								</span>
+								<span role="columnheader" className="text-right">
+									{t("detail.settlementColumns.links")}
 								</span>
 							</div>
-						))}
+							{d.settlements.map((s) => (
+								<div
+									key={s.tx}
+									role="row"
+									className={`${SETTLEMENT_GRID} box-content h-[38px] border-b border-ln font-mono text-[12.5px] leading-[normal] font-medium`}
+								>
+									<span role="cell">{s.time}</span>
+									<span role="cell" className="text-right">
+										{s.trades}
+									</span>
+									<span role="cell" className="text-right">
+										{s.swaps}
+									</span>
+									<span
+										role="cell"
+										className="truncate pl-1.5 font-sans text-[13px]"
+									>
+										{s.pair}
+									</span>
+									<span role="cell" className="text-right">
+										{s.volume}
+									</span>
+									<span role="cell" className="text-right">
+										{s.surplus}
+									</span>
+									<span role="cell" className="text-right">
+										{s.cost}
+									</span>
+									<span role="cell" className="text-right">
+										{s.gas}
+									</span>
+									<span
+										role="cell"
+										title={s.quotedBy?.label}
+										className={`truncate pl-1.5 ${s.quotedBy?.unnamed ? "" : "font-sans text-[13px]"}`}
+									>
+										{s.quotedBy?.label ?? DASH}
+									</span>
+									<span
+										role="cell"
+										className="flex justify-end gap-3.5 text-[12px]"
+									>
+										<a
+											href={s.cow}
+											target="_blank"
+											rel="noopener"
+											aria-label={s.cowLabel}
+											className="whitespace-nowrap quiet"
+										>
+											{tc.rich("cowExplorer", { arrow })}
+										</a>
+										<a
+											href={s.scan}
+											target="_blank"
+											rel="noopener"
+											aria-label={s.scanLabel}
+											className="whitespace-nowrap quiet"
+										>
+											{tc.rich("basescan", { arrow })}
+										</a>
+									</span>
+								</div>
+							))}
+						</div>
 					</div>
+					<ScrollMoreFade more={moreColumns} />
 				</div>
 			</div>
 		</>
@@ -655,6 +750,7 @@ export function DetailCompact({ row }: { row: Row }) {
 
 	return (
 		<div className="flex flex-col gap-[22px] border-b border-ln pt-4 pb-[22px] pl-[34px]">
+			<h3 className="sr-only">{row.label}</h3>
 			<div>
 				<div className="flex items-baseline gap-2.5">
 					<span className="font-mono text-[24px] leading-none font-medium tracking-[-0.04em]">
@@ -680,14 +776,17 @@ export function DetailCompact({ row }: { row: Row }) {
 						</div>
 					))}
 				</div>
-				{d.detailCoverage === null ? null : (
-					<div className="mt-3 font-mono text-[11px] leading-[normal] font-medium text-fa">
-						{d.detailCoverage}
+				{d.coverage.map((line, i) => (
+					<div
+						key={line}
+						className={`${i === 0 ? "mt-3" : "mt-1"} font-mono text-[11px] leading-[normal] font-medium text-fa`}
+					>
+						{line}
 					</div>
-				)}
+				))}
 			</div>
 			<div>
-				<div className={SMALL_LABEL}>{d.auctions.title}</div>
+				<h4 className={SMALL_LABEL}>{d.auctions.title}</h4>
 				<div aria-hidden="true" className="mt-2 flex h-4">
 					{d.auctions.cells.map((cell) => (
 						<span key={cell.id} className="grid h-full flex-1 place-items-center">
@@ -695,13 +794,14 @@ export function DetailCompact({ row }: { row: Row }) {
 						</span>
 					))}
 				</div>
-				<div className="mt-1.5 text-[12px] text-mu">
-					{t("detail.auctionsAndRanks", { auctions: d.auctions.note, ranks: d.ranks })}
-				</div>
+				<DotList
+					items={[d.auctions.note, d.ranks]}
+					className="mt-1.5 text-[12px] text-mu"
+				/>
 			</div>
 			<div>
 				<div className="flex items-baseline justify-between gap-2.5">
-					<span className={SMALL_LABEL}>{t("detail.addresses")}</span>
+					<h4 className={SMALL_LABEL}>{t("detail.addresses")}</h4>
 					{d.registry === null ? null : (
 						<span className="font-mono text-[10.5px] leading-[normal] font-medium text-fa">
 							{d.registry}
@@ -725,11 +825,12 @@ export function DetailCompact({ row }: { row: Row }) {
 								<span className={RETIRED}>{t("retired")}</span>
 							) : (
 								<>
+									{/* At least 44px wide: the side padding reaches into the gaps. */}
 									<button
 										type="button"
 										onClick={() => copy(a.address)}
 										aria-label={copied === a.address ? undefined : a.copyLabel}
-										className="-my-[15px] py-[15px] whitespace-nowrap quiet"
+										className="-mx-2 -my-[15px] min-w-11 px-2 py-[15px] whitespace-nowrap quiet"
 									>
 										{copied === a.address ? tc("copied") : tc("copy")}
 									</button>
@@ -748,7 +849,7 @@ export function DetailCompact({ row }: { row: Row }) {
 				))}
 			</div>
 			<div>
-				<div className={SMALL_LABEL}>{t("detail.settlements")}</div>
+				<h4 className={SMALL_LABEL}>{t("detail.settlements")}</h4>
 				{d.settlements.map((s) => (
 					<div key={s.tx} className="border-b border-ln pt-2.5 pb-1">
 						<div className="flex justify-between gap-2.5 font-mono text-[12.5px] leading-[normal] font-medium">
@@ -758,9 +859,11 @@ export function DetailCompact({ row }: { row: Row }) {
 						{/*
 						 * One wrapping list. Each figure carries its "·", clipped where it would start a
 						 * line; the links end it, 44px tall without spacing the lines apart. Only the
-						 * sides clip, so the links' overhang above and below stays tappable.
+						 * sides clip, with room on the right for a focus ring, so the links' overhang
+						 * above and below stays tappable. A link draws its ring around its label, not
+						 * its 44px box, which would cross the line above (as in Latest settlements).
 						 */}
-						<div className="overflow-x-clip">
+						<div className="-mr-1 overflow-x-clip pr-1">
 							<div className="-ml-3.5 flex flex-wrap items-center font-mono text-[11.5px] leading-[normal] font-medium text-mu">
 								{s.items.map((item) => (
 									<span
@@ -775,17 +878,19 @@ export function DetailCompact({ row }: { row: Row }) {
 										href={s.cow}
 										target="_blank"
 										rel="noopener"
-										className="flex min-h-11 items-center whitespace-nowrap quiet"
+										aria-label={s.cowLabel}
+										className={COMPACT_LINK}
 									>
-										{tc.rich("explorer", { arrow })}
+										<span>{tc.rich("explorer", { arrow })}</span>
 									</a>
 									<a
 										href={s.scan}
 										target="_blank"
 										rel="noopener"
-										className="flex min-h-11 items-center whitespace-nowrap quiet"
+										aria-label={s.scanLabel}
+										className={COMPACT_LINK}
 									>
-										{tc.rich("basescan", { arrow })}
+										<span>{tc.rich("basescan", { arrow })}</span>
 									</a>
 								</span>
 							</div>

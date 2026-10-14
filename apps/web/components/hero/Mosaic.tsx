@@ -46,13 +46,15 @@ export function Mosaic({ view, leader }: { view: View; leader: Row }) {
 	);
 
 	const { rows, measure } = view;
+	const value = (row: Row) => (measure === "volume" ? (row.volume ?? 0) : row[measure]);
 	const field = mosaic(
-		rows.map((row) => (measure === "volume" ? (row.volume ?? 0) : row[measure])),
+		rows.map(value),
 		layout.contentWidth,
 		layout.compact ? MOSAIC_COMPACT : MOSAIC_WIDE
 	);
 	const named = rows.slice(0, LEGEND_SIZE);
-	const rest = rows.slice(LEGEND_SIZE);
+	// Solvers without any of the measure have no squares, so "N others" leaves them out.
+	const rest = rows.slice(LEGEND_SIZE).filter((row) => value(row) > 0);
 	const restShare = f.percent(
 		rest.reduce((sum, row) => sum + row.share, 0),
 		1
@@ -82,8 +84,9 @@ export function Mosaic({ view, leader }: { view: View; leader: Row }) {
 
 	return (
 		<div className="mt-[clamp(36px,5vw,60px)]">
-			<div className="mb-3 flex items-baseline justify-between gap-4 font-mono text-[12px] leading-[normal] font-medium text-mu">
-				<span className="flex min-w-0 items-baseline gap-2.5">
+			{/* On phones the leader and the readout get a line each: side by side, both were cut. */}
+			<div className="mb-3 flex items-baseline justify-between gap-4 font-mono text-[12px] leading-[normal] font-medium text-mu max-wide:flex-col max-wide:items-start max-wide:gap-1.5">
+				<span className="flex max-w-full min-w-0 items-baseline gap-2.5">
 					<span
 						className={`truncate text-[15px] font-medium text-fg ${leader.unnamed ? "font-mono" : "font-sans"}`}
 					>
@@ -91,7 +94,7 @@ export function Mosaic({ view, leader }: { view: View; leader: Row }) {
 					</span>
 					<span className="text-fg">{f.percent(leader.share, 1)}</span>
 				</span>
-				<span className="truncate text-right">{readout}</span>
+				<span className="max-w-full truncate text-right max-wide:text-left">{readout}</span>
 			</div>
 			<svg
 				role="img"

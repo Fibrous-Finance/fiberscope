@@ -6,14 +6,17 @@ import { auctionDetails, quotesAxis } from "@fiberscope/core";
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
-import { compactTickClass } from "@/components/ui/axis";
+import { Ticks } from "@/components/ui/axis";
 import { FootLine } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
 
-/** Name | bar | values, as the entered bars: the values column widens on desktop for verified. */
+/**
+ * Name | bar | values, like the entered bars, with a values column that holds the widest figures:
+ * "<0.1% · 100%", and on desktop, with verified, "<0.1% · 100% · 100%".
+ */
 const BAR_GRID =
-	"grid grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_clamp(84px,12vw,150px)] gap-4 wide:grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_clamp(84px,18vw,220px)]";
+	"grid grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_92px] gap-4 wide:grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_clamp(144px,18vw,220px)]";
 
 /**
  * Quotes, between the auction tape and Latest settlements: whose quote each trade's order was
@@ -38,16 +41,12 @@ export function Quotes({ rankIndex }: { rankIndex: Map<string, number> }) {
 	// Auction details cover fewer days than the window: the sentence names them ("the last 7
 	// days", or while delayed "the 7 days to 09:49 UTC"), a footnote says so.
 	const partial = coverage < view.days;
-	const period = {
-		period: tc(`period.${view.period}`),
-		delayed: status.delayed ? "yes" : "no",
-		asOf: status.asOf ?? "",
-	};
+	const span = status.delayed
+		? th("span.to", { days: coverage, asOf: status.asOf ?? "" })
+		: th("span.last", { days: coverage });
 	const sentence = has
 		? t("sentence", {
-				span: status.delayed
-					? th("span.to", { days: coverage, asOf: status.asOf ?? "" })
-					: th("span.last", { days: coverage }),
+				span,
 				quoted: f.int(network.quotes),
 				trades: f.int(network.trades),
 				verified: f.percent(network.verifiedShare, 1),
@@ -56,19 +55,30 @@ export function Quotes({ rankIndex }: { rankIndex: Map<string, number> }) {
 				settled: f.percent(network.settledShare, 1),
 			})
 		: coverage === 0
-			? t("empty", period)
-			: t("noQuotes", period);
+			? t("empty", {
+					period: tc(`period.${view.period}`),
+					delayed: status.delayed ? "yes" : "no",
+					asOf: status.asOf ?? "",
+					// With auction data but no details yet, the details are what's missing.
+					auctions: view.coverage.auction > 0 ? "some" : "none",
+				})
+			: t("noQuotes", { span });
 
 	const axis = quotesAxis(top?.figures.quoteShare ?? 0);
 	const gridline = ((axis.ticks[1] ?? axis.max) / axis.max) * 100;
 	const at = (share: number) => `${Math.min(1, share / axis.max) * 100}%`;
-	// The table's solvers that gave no quote in the window.
+	const ticks = axis.ticks.map((tick) => ({ label: f.percent(tick), x: tick / axis.max }));
+	// The table's solvers that took part in auctions in those days but gave no quote. One that
+	// did not take part then is left out: the note would read as if it had.
 	const silent = view.rows
-		.filter((row) => (details.solvers.get(row.id)?.quotes ?? 0) === 0)
+		.filter((row) => {
+			const figures = details.solvers.get(row.id);
+			return figures !== undefined && figures.solutions > 0 && figures.quotes === 0;
+		})
 		.map((row) => row.label);
 
 	return (
-		<div id="quotes" className="mt-16 scroll-mt-[60px]">
+		<div id="quotes" className="mt-16">
 			<div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2">
 				<h3 className="text-[15px] font-medium">{t("title")}</h3>
 				{has ? (
@@ -110,6 +120,7 @@ export function Quotes({ rankIndex }: { rankIndex: Map<string, number> }) {
 									className={`${BAR_GRID} h-[31px] items-center border-t border-ln`}
 								>
 									<span
+										title={quoter.label}
 										className={`truncate text-[13.5px] font-medium transition-colors duration-200 ${quoter.unnamed ? "font-mono" : ""} ${hot ? "text-teal" : ""}`}
 									>
 										{quoter.label}
@@ -156,31 +167,13 @@ export function Quotes({ rankIndex }: { rankIndex: Map<string, number> }) {
 							className={`${BAR_GRID} border-t border-ln2 pt-2 font-mono text-[11px] leading-[normal] font-medium text-fa`}
 						>
 							<span />
-							<span className="relative h-3.5">
-								{axis.ticks.map((tick, index) => {
-									const x = tick / axis.max;
-									const value = f.percent(tick);
-									return (
-										<span
-											key={tick}
-											className={`absolute whitespace-nowrap ${x === 0 ? "" : x === 1 ? "-translate-x-full" : "-translate-x-1/2"} ${compactTickClass(index, axis.ticks.length)}`}
-											style={{ left: `${x * 100}%` }}
-										>
-											{x === 1 ? (
-												<>
-													{/* Compact tracks have no room for the words. */}
-													<span className="max-wide:hidden">
-														{t("axis.end", { value })}
-													</span>
-													<span className="wide:hidden">{value}</span>
-												</>
-											) : (
-												value
-											)}
-										</span>
-									);
-								})}
-							</span>
+							{/* Compact tracks have no room for the words. */}
+							<Ticks ticks={ticks} className="wide:hidden" />
+							<Ticks
+								ticks={ticks}
+								end={t("axis.end", { value: f.percent(axis.max) })}
+								className="max-wide:hidden"
+							/>
 							<span className="text-right text-balance max-wide:hidden">
 								{t("axis.ratesWide")}
 							</span>

@@ -110,12 +110,21 @@ describe("auctionSolutions", () => {
 		);
 	});
 
-	it("gives a tie as a rival with no gap", () => {
+	it("gives a tie as a rival with no gap, and names every solver that tied", () => {
 		const s = snapshot(1, [
 			{ solver: "a", score: 2, winner: true },
 			{ solver: "b", score: 2 },
+			{ solver: "c", score: 2 },
+			{ solver: "d", score: 1.5 },
+			// Filtered out above the winning score: no tie.
+			{ solver: "e", score: 2.5, filteredOut: true },
 		]);
-		assert.equal(auctionSolutions(s, 1)!.rival?.gap, 0);
+		const a = auctionSolutions(s, 1)!;
+		assert.equal(a.rival?.gap, 0);
+		assert.deepEqual(
+			a.ties.map((solver) => solver.id),
+			["b", "c"]
+		);
 	});
 
 	it("gives no gaps with several winners, nor without a rival that passed the filter", () => {
@@ -127,6 +136,7 @@ describe("auctionSolutions", () => {
 		const a = auctionSolutions(several, 29_514_024)!;
 		assert.equal(a.single, false);
 		assert.equal(a.rival, null);
+		assert.deepEqual(a.ties, []);
 		assert.deepEqual(
 			a.rows.flatMap((r) => r.solutions.map((x) => x.gap)),
 			[null, null, null]
@@ -136,6 +146,17 @@ describe("auctionSolutions", () => {
 			{ solver: "b", score: 3, filteredOut: true },
 		]);
 		assert.equal(auctionSolutions(alone, 2)!.rival, null);
+	});
+
+	it("links the settlement of the first winner that settled", () => {
+		const s = snapshot(3, [
+			{ solver: "a", score: 2, winner: true },
+			{ solver: "b", score: 1, winner: true },
+		]);
+		s.latestAuctions[0]!.winners[0]!.tx = null;
+		assert.equal(auctionSolutions(s, 3)!.tx, "0xb");
+		s.latestAuctions[0]!.winners[1]!.tx = null;
+		assert.equal(auctionSolutions(s, 3)!.tx, null);
 	});
 
 	it("knows only the latest auctions", () => {

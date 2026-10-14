@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { KeyboardEvent, Ref } from "react";
 
 import { useTranslations } from "next-intl";
@@ -15,6 +15,7 @@ import { useFormat } from "@/lib/format";
 /** One column per auction; compact pages show the latest half. */
 const WIDE_COLUMNS = 48;
 const COMPACT_COLUMNS = 24;
+const NBSP = "\u00a0";
 
 /**
  * The name column: as wide as the bars' names on wide pages, 112px on compact ones, room for a
@@ -39,10 +40,11 @@ export function tapeAuctions(tape: View["tape"], compact: boolean): TapeAuction[
 }
 
 /**
- * The latest auctions, one column each and one row per solver. One auction is selected: a click
- * or tap selects a column and opens its solutions under the tape, while hovering a column only
- * previews it in the readout. The tape is a single tab stop: ← → Home End move the selection,
- * Enter or Space opens or closes the solutions, Escape closes them. Cells are plain marks.
+ * The latest auctions, one column each and one row per solver that entered one of them. One
+ * auction is selected: a click or tap selects a column and opens its solutions under the tape,
+ * while hovering a column only previews it in the readout. The tape is a single tab stop, to
+ * assistive tech a grid with one cell per auction: ← → Home End move the selection, Enter or Space
+ * opens or closes the solutions, Escape closes them. Cells are plain marks.
  */
 export function Tape({
 	ref,
@@ -62,7 +64,7 @@ export function Tape({
 	rankIndex: Map<string, number>;
 	/** The selected auction's id, one of `auctions`. */
 	selected: number;
-	/** The selected auction's solutions are open under the tape. */
+	/** The selected auction's solutions are open under the tape, in `#fs-solutions`. */
 	open: boolean;
 	onSelect: (id: number) => void;
 	onOpenChange: (open: boolean) => void;
@@ -71,6 +73,7 @@ export function Tape({
 	const tc = useTranslations("Common");
 	const f = useFormat();
 	const { hovered, setHovered } = useHover();
+	const cellId = useId();
 	// The column under the pointer, which the readout previews.
 	const [pointed, setPointed] = useState<number | null>(null);
 	// The selected column shows the focus ring only while the tape has keyboard focus.
@@ -83,6 +86,21 @@ export function Tape({
 	const columnBox = (index: number) => ({
 		left: `${(index / count) * 100}%`,
 		width: `${100 / count}%`,
+	});
+	// A row per solver that entered one of the auctions shown: on compact pages, solvers whose
+	// entries are all older than the latest 24 have none.
+	const lines = rows
+		.map((row) => ({ row, cells: row.cells.slice(-count) }))
+		.filter(({ cells }) => cells.some((cell) => cell.state !== "absent"));
+	// The readout wraps only between its items and between winners: each name stays whole.
+	const readout = (auction: TapeAuction) => ({
+		id: f.int(auction.id),
+		time: f.clock(auction.time),
+		entered: auction.entered,
+		winners: auction.winners.length,
+		names: auction.winners
+			.map((winner) => winner.label.replaceAll(" ", NBSP))
+			.join(`${NBSP}+ `),
 	});
 
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -117,28 +135,20 @@ export function Tape({
 				<h3 className="text-[15px] font-medium max-wide:basis-full">
 					{t("title", { count })}
 				</h3>
-				{/* Quiet while the solutions are open: a screen reader hears one of the two. */}
-				<span
-					aria-live={open ? "off" : "polite"}
-					className="font-mono text-[12px] leading-[normal] font-medium text-mu"
-				>
+				{/* The grid reads out the selection; the readout is for the eye. */}
+				<span className="min-w-0 font-mono text-[12px] leading-[normal] font-medium wrap-break-word text-mu">
 					{t.rich("readout", {
-						id: f.int(auction.id),
-						time: f.clock(auction.time),
-						entered: auction.entered,
-						winners: auction.winners.length,
-						names: auction.winners.map((winner) => winner.label).join(" + "),
-						winner: (chunks) => (
-							<span className="whitespace-nowrap text-fg">{chunks}</span>
-						),
+						...readout(auction),
+						winner: (chunks) => <span className="text-fg">{chunks}</span>,
 					})}
 				</span>
 			</div>
 			<div
 				ref={ref}
 				tabIndex={0}
-				role="group"
+				role="grid"
 				aria-label={t("label", { count })}
+				aria-activedescendant={`${cellId}-${column}`}
 				onKeyDown={onKeyDown}
 				onFocus={(event) => setKeyboard(event.currentTarget.matches(":focus-visible"))}
 				onBlur={() => setKeyboard(false)}
@@ -166,11 +176,36 @@ export function Tape({
 							/>
 						) : null}
 					</div>
-					{rows.map((row) => (
+					{/*
+					 * One cell per auction, over its column, named as the readout names it. The
+					 * selected one says whether its solutions are open.
+					 */}
+					<div
+						role="row"
+						className={`pointer-events-none absolute inset-y-0 right-0 ${CELLS_LEFT}`}
+					>
+						{auctions.map((cell, index) => (
+							<div
+								key={cell.id}
+								id={`${cellId}-${index}`}
+								role="gridcell"
+								aria-selected={index === column}
+								aria-expanded={open && index === column}
+								aria-controls={index === column ? "fs-solutions" : undefined}
+								aria-label={t.markup("readout", {
+									...readout(cell),
+									winner: (chunks) => chunks,
+								})}
+								className="absolute inset-y-0"
+								style={columnBox(index)}
+							/>
+						))}
+					</div>
+					{lines.map(({ row, cells }) => (
 						<TapeRow
 							key={row.id}
 							row={row}
-							count={count}
+							cells={cells}
 							hot={isHot(hovered, row.id, rankIndex.get(row.id) ?? -1)}
 							onHover={setHovered}
 							onPoint={setPointed}
@@ -181,7 +216,10 @@ export function Tape({
 						/>
 					))}
 				</div>
-				<div className="mt-2 flex font-mono text-[11px] leading-[normal] font-medium text-fa">
+				<div
+					aria-hidden="true"
+					className="mt-2 flex font-mono text-[11px] leading-[normal] font-medium text-fa"
+				>
 					<span className={NAME_COLUMN} />
 					<span className="flex flex-1 justify-between">
 						<span>{f.clock(auctions[0].time)}</span>
@@ -195,15 +233,15 @@ export function Tape({
 
 function TapeRow({
 	row,
-	count,
+	cells,
 	hot,
 	onHover,
 	onPoint,
 	onPick,
 }: {
 	row: TapeRowData;
-	/** Latest auctions shown. */
-	count: number;
+	/** Its cells in the auctions shown. */
+	cells: TapeCell[];
 	hot: boolean;
 	onHover: (id: string | null) => void;
 	/** The pointer entered a column. */
@@ -213,20 +251,26 @@ function TapeRow({
 }) {
 	return (
 		<div
-			onMouseEnter={() => onHover(row.id)}
+			aria-hidden="true"
+			// Only a mouse hovers: a tap picks an auction and highlights no solver.
+			onPointerEnter={(event) => {
+				if (event.pointerType === "mouse") onHover(row.id);
+			}}
 			className="relative flex h-5 items-center wide:h-[17px]"
 		>
 			<div
+				title={row.label}
 				className={`${NAME_COLUMN} truncate text-[12px] ${row.unnamed ? "font-mono" : ""} ${hot ? "text-fg" : "text-mu"}`}
 			>
 				{row.label}
 			</div>
 			<div className="flex h-full flex-1">
-				{row.cells.slice(-count).map((cell, index) => (
+				{cells.map((cell, index) => (
 					<span
 						key={index}
-						aria-hidden="true"
-						onMouseEnter={() => onPoint(index)}
+						onPointerEnter={(event) => {
+							if (event.pointerType === "mouse") onPoint(index);
+						}}
 						onClick={() => onPick(index)}
 						className="grid flex-1 cursor-pointer place-items-center"
 					>

@@ -5,8 +5,8 @@ import { useTranslations } from "next-intl";
 import { FEW_TRADES, surplusAndCost, surplusAxis, surplusRows } from "@fiberscope/core";
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
-import { isHot } from "@/components/dashboard/tones";
-import { compactTickClass } from "@/components/ui/axis";
+import { hoverIndex, isHot } from "@/components/dashboard/tones";
+import { Ticks } from "@/components/ui/axis";
 import { FootLine } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
@@ -89,7 +89,7 @@ export function Surplus() {
 	const track = t("header.track", { average: f.bps(average) });
 
 	return (
-		<div id="surplus" className="mt-16 scroll-mt-[60px]">
+		<div id="surplus" className="mt-16">
 			<div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2">
 				<h3 className="text-[15px] font-medium">{t("title")}</h3>
 				{has ? (
@@ -143,7 +143,7 @@ export function Surplus() {
 							const typical = figures.typicalSurplusRate;
 							const all = figures.surplusRate;
 							const trades = figures.surplusTrades ?? 0;
-							const hot = isHot(hovered, row.id, row.rank - 1);
+							const hot = isHot(hovered, row.id, hoverIndex(row, view.measure));
 							// Without typical trades there is no dot; the line starts at 0.
 							const x = typical === null ? 0 : at(typical);
 							const gap = all === null ? 0 : at(all) - x;
@@ -224,20 +224,12 @@ export function Surplus() {
 							className={`${GRID} border-t border-ln2 pt-2 font-mono text-[11px] leading-[normal] font-medium text-fa`}
 						>
 							<span />
-							<span className="relative h-3.5">
-								{axis.ticks.map((tick, index) => {
-									const x = tick / axis.max;
-									return (
-										<span
-											key={tick}
-											className={`absolute ${x === 0 ? "" : x === 1 ? "-translate-x-full" : "-translate-x-1/2"} ${compactTickClass(index, axis.ticks.length)}`}
-											style={{ left: `${x * 100}%` }}
-										>
-											{f.bps(tick)}
-										</span>
-									);
-								})}
-							</span>
+							<Ticks
+								ticks={axis.ticks.map((tick) => ({
+									label: f.bps(tick),
+									x: tick / axis.max,
+								}))}
+							/>
 						</div>
 					</div>
 					<FootLine source={t("source", { network: tc("network") })}>

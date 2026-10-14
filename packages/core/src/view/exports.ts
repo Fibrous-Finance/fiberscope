@@ -1,7 +1,7 @@
 import type { AuctionDetails } from "./details.ts";
 import type { SurplusCost, SurplusCostFigures } from "./surplus.ts";
 import { DAY_MS } from "./view.ts";
-import type { Row, View } from "./view.ts";
+import type { Measure, Row, View } from "./view.ts";
 
 /**
  * The leaderboard's exports, Download CSV and Copy as Markdown, and the days each source covers
@@ -147,14 +147,17 @@ const CSV_COLUMNS = [
 ];
 
 /**
- * The leaderboard as CSV, its rows in the given order. Money keeps its cents (cost per trade to
- * four decimals); volume, batch value and gas are whole. `_pct` columns are percentages, `_share`
- * columns 0–1 fractions; solutions and quotes are counts over the detail days, and fees are on the
- * trades the solver settled. The last five columns say which days the others cover; an empty
- * "from" means the source has no data in the window, and the columns it feeds are empty.
+ * The leaderboard as CSV, its rows in the given order, ranked by `measure`: a row without any of
+ * it has no rank. Money keeps its cents (cost per trade to four decimals); volume, batch value and
+ * gas are whole. `_pct` columns are percentages; `_share` columns are 0–1 fractions to three
+ * decimals, `filtered_out_share` and `quotes_share` to four, the tenth of a percent the page gives
+ * them in. Solutions and quotes are counts over the detail days, and fees are on the trades the
+ * solver settled. The last five columns say which days the others cover; an empty "from" means
+ * the source has no data in the window, and the columns it feeds are empty.
  */
 export function leaderboardCsv(
 	rows: readonly Row[],
+	measure: Measure,
 	figures: SurplusCost,
 	details: AuctionDetails,
 	coverage: ExportCoverage
@@ -177,9 +180,9 @@ export function leaderboardCsv(
 		// Without auction details in the window, none of their figures exists.
 		const detail = details.coverage > 0 ? details.solvers.get(row.id) : undefined;
 		return [
-			row.rank,
+			row.ranks[measure] ?? "",
 			`"${row.label.replaceAll('"', '""')}"`,
-			decimals(row.share, 2, 100),
+			decimals(row.shares[measure], 2, 100),
 			row.batches,
 			row.trades,
 			decimals(row.volume, 0),

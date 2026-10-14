@@ -6,7 +6,7 @@ import { auctionDetails } from "./details.ts";
 import { exportCoverage, exportedSurplus, leaderboardCsv } from "./exports.ts";
 import { surplusAndCost } from "./surplus.ts";
 import { buildView } from "./view.ts";
-import type { Period } from "./view.ts";
+import type { Measure, Period } from "./view.ts";
 
 const END = Date.UTC(2026, 9, 3, 15, 21, 51);
 const DAY = 86_400_000;
@@ -69,12 +69,15 @@ function snapshot(coverage: Coverage, solvers: SnapshotSolver[]): Snapshot {
 	};
 }
 
-function exported(s: Snapshot, period: Period) {
-	const view = buildView(s, period, "batches");
+function exported(s: Snapshot, period: Period, measure: Measure = "batches") {
+	const view = buildView(s, period, measure);
 	const figures = surplusAndCost(s, view);
 	const details = auctionDetails(s, view);
 	const coverage = exportCoverage(view, figures, details);
-	return { coverage, csv: leaderboardCsv(view.rows, figures, details, coverage).split("\n") };
+	return {
+		coverage,
+		csv: leaderboardCsv(view.rows, measure, figures, details, coverage).split("\n"),
+	};
 }
 
 const one = (coverage: Coverage) =>
@@ -267,6 +270,25 @@ describe("leaderboardCsv", () => {
 			detailless.endsWith(
 				`,0.403${",".repeat(10)}2026-10-02T15:21:51Z,2026-10-03T15:21:51Z,2026-10-02T15:21:51Z,2026-10-02T15:21:51Z,`
 			)
+		);
+	});
+
+	it("leaves a row without any of the measure unranked", () => {
+		// B's only batch falls on the day before the auction data: no volume, so no rank by it.
+		const { csv } = exported(
+			snapshot({ chainDays: 2, auctionDays: 1, surplusDays: 1 }, [
+				solver("a", { batches: [1, 0], trades: [1, 0], volume: [50] }),
+				solver("b", { batches: [0, 1], trades: [0, 1] }),
+			]),
+			"7d",
+			"volume"
+		);
+		assert.deepEqual(
+			csv.slice(1).map((line) => line.split(",").slice(0, 6)),
+			[
+				["1", '"A"', "100.00", "1", "1", "50"],
+				["", '"B"', "", "1", "1", ""],
+			]
 		);
 	});
 });

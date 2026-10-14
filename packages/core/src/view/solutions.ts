@@ -29,7 +29,10 @@ export interface AuctionSolutions {
 	id: number;
 	/** The auction's start (Unix ms). */
 	time: number;
-	/** The first winner's settlement; null when none settled. */
+	/**
+	 * The settlement of the first winner that settled; null when none did. A winner that never
+	 * settled has no transaction, though a co-winner's may.
+	 */
 	tx: string | null;
 	/** Solutions in the auction. */
 	solutions: number;
@@ -50,6 +53,11 @@ export interface AuctionSolutions {
 	rows: SolutionsRow[];
 	/** The best solution from another solver that passed the filter; only when `single`. */
 	rival: { solver: SolverRef; gap: number } | null;
+	/**
+	 * The other solvers whose best solution passed the filter with the winning score, in row
+	 * order; empty unless `single`.
+	 */
+	ties: SolverRef[];
 	/** The solvers with filtered-out solutions, in row order. */
 	filtered: { solver: SolverRef; filtered: number; solutions: number }[];
 }
@@ -93,13 +101,16 @@ export function auctionSolutions(snapshot: Snapshot, id: number): AuctionSolutio
 	return {
 		id: auction.id,
 		time: auction.time,
-		tx: auction.winners[0]?.tx ?? null,
+		tx: auction.winners.find((w) => w.tx !== null)?.tx ?? null,
 		solutions: auction.solutions.length,
 		solvers: ordered.length,
 		winners: winning.map((s) => ({ solver: refOf(s.solver), score: s.score })),
 		single: best !== null,
 		rows: ordered,
 		rival: rival && rivalGap !== null ? { solver: refOf(rival.id), gap: rivalGap } : null,
+		ties: ordered
+			.filter((row) => solutionState(row.solutions[0]!) === "same")
+			.map((row) => refOf(row.id)),
 		filtered: ordered
 			.map((row) => ({
 				solver: refOf(row.id),

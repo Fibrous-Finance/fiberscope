@@ -59,7 +59,10 @@ export interface SolverRef {
 }
 
 export interface Row extends SolverRef {
-	/** Rank by the active measure, from 1. */
+	/**
+	 * Place by the active measure, from 1. Rows without any of the measure come last, and their
+	 * `ranks` entry for it is null: the table shows them unranked.
+	 */
 	rank: number;
 	addresses: SolverAddress[];
 	batches: number;
@@ -73,7 +76,11 @@ export interface Row extends SolverRef {
 	/** Volume ÷ batches over the auction-covered days. */
 	batchValue: number | null;
 	tradesPerBatch: number | null;
-	/** USD over the auction-covered days; null when the window has no auction data. */
+	/**
+	 * USD over the auction-covered days. Null when the window has no auction data, or the solver no
+	 * trade on those days: its batches all predate the auction data, and $0 would claim more than
+	 * is known.
+	 */
 	volume: number | null;
 	/** Volume ÷ trades over the same auction-covered days. */
 	averageTrade: number | null;
@@ -92,6 +99,10 @@ export interface Row extends SolverRef {
 	shares: Record<Measure, number | null>;
 	/** Share of the active measure. */
 	share: number;
+	/**
+	 * Rank by each measure among the rows, from 1; null for a measure the solver has none of (for
+	 * volume, also without a volume figure).
+	 */
 	ranks: Record<Measure, number | null>;
 	/** Places gained since the earlier window (negative: lost); null when there is no rank to compare. */
 	rankChange: number | null;
@@ -146,7 +157,10 @@ export interface Entrant extends SolverRef {
 
 export interface TapeCell {
 	state: "won" | "entered" | "absent";
-	/** The settlement to open: the solver's own when it won, otherwise the first winner's. */
+	/**
+	 * The settlement to open: the solver's own when it won and settled, otherwise the first
+	 * winner's that settled; null when none did.
+	 */
 	tx: string | null;
 }
 
@@ -201,7 +215,6 @@ export interface View {
 	gas: {
 		/** Trade-weighted average across all solvers. */
 		average: number | null;
-		max: number | null;
 		lowest: Row | null;
 		minBatches: number;
 	};
@@ -267,14 +280,15 @@ function rankBy<T>(items: readonly T[], value: (item: T) => number): Map<T, numb
 	return new Map(ranked.map((item, i) => [item, i + 1]));
 }
 
-/** The settlement a tape cell opens for `solverId`: its own when it won, else the first winner's. */
+/**
+ * The settlement a tape cell opens for `solverId`: its own when it won and settled, else the first
+ * winner's that settled (the first winner may never have settled).
+ */
 export function tapeCell(auction: AuctionSummary, solverId: string): TapeCell {
+	const settled = auction.winners.find((w) => w.tx !== null)?.tx ?? null;
 	const own = auction.winners.find((w) => w.solver === solverId);
-	if (own) return { state: "won", tx: own.tx };
-	return {
-		state: auction.entered.includes(solverId) ? "entered" : "absent",
-		tx: auction.winners[0]?.tx ?? null,
-	};
+	if (own) return { state: "won", tx: own.tx ?? settled };
+	return { state: auction.entered.includes(solverId) ? "entered" : "absent", tx: settled };
 }
 
 export function buildView(snapshot: Snapshot, period: Period, measure: Measure): View {
@@ -295,11 +309,13 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 		const ref = solverRef(s);
 		const batches = sum(s.batches, 0, chain);
 		const trades = sum(s.trades, 0, chain);
-		const volume = auction > 0 ? sum(s.volume, 0, auction) : null;
 		const entered = hasAuctions ? sum(s.entered, 0, auction) : null;
 		const won = hasAuctions ? sum(s.won, 0, auction) : null;
 		const tradesWithPrices = sum(s.trades, 0, auction);
 		const batchesWithPrices = sum(s.batches, 0, auction);
+		// Without a trade on the days with auction data (none in the window, or all its batches
+		// before them), the solver's volume is unknown, as its batch value is.
+		const volume = tradesWithPrices > 0 ? sum(s.volume, 0, auction) : null;
 		return {
 			ref,
 			source: s,
@@ -309,8 +325,7 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 			gas: sum(s.gas, 0, chain),
 			swaps: sum(s.swaps, 0, chain),
 			volume,
-			averageTrade:
-				volume !== null && tradesWithPrices > 0 ? volume / tradesWithPrices : null,
+			averageTrade: volume !== null ? volume / tradesWithPrices : null,
 			batchValue:
 				volume !== null && batchesWithPrices > 0 ? volume / batchesWithPrices : null,
 			entered,
@@ -543,7 +558,6 @@ export function buildView(snapshot: Snapshot, period: Period, measure: Measure):
 		biggestGain,
 		gas: {
 			average: gasTrades > 0 ? withGas.reduce((a, r) => a + r.gas, 0) / gasTrades : null,
-			max: byGas.length > 0 ? (byGas[byGas.length - 1]!.gasPerTrade ?? null) : null,
 			lowest: byGas.find((r) => r.batches >= minBatches) ?? byGas[0] ?? null,
 			minBatches,
 		},

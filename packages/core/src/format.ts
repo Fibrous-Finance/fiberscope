@@ -28,7 +28,10 @@ export interface Format {
 	bps(ratio: number | null): string;
 	/** A 0–1 ratio in basis points with one decimal, for fees: 3.7 · <0.1 */
 	bps1(ratio: number | null): string;
-	/** A solution's score in USD: $4.5783 under $100, $165.47 under $10,000, then $12,345 */
+	/**
+	 * A solution's score in USD: $0.00413 under $0.10 (three significant digits), $4.5783 under
+	 * $100, $165.47 under $10,000, then $12,345; <$0.0001 below $0.0001
+	 */
 	score(value: number | null): string;
 	/** How far below the winning score, from a 0–1 ratio: 0.12% · 5.4% · 18% · <0.01% · >99% */
 	gap(ratio: number | null): string;
@@ -38,7 +41,7 @@ export interface Format {
 	percent(ratio: number | null, digits?: number): string;
 	/** Signed percentage points without the unit: +6.5 · −0.3 · ±0.0 */
 	points(value: number): string;
-	/** A multiple: 3.6× */
+	/** A multiple: 3.6×; under 1.1× with two decimals, 1.02×, so a lead never reads 1.0× */
 	times(value: number): string;
 	/** Names joined as the sentences list them: "Nexroute, Sector Finance and Rosato" */
 	list(items: readonly string[]): string;
@@ -80,6 +83,17 @@ const EN_MONTHS = [
 	"Dec",
 ];
 
+/**
+ * A positive `value` rounded to `digits` decimals the way `Intl.NumberFormat` rounds it: half up,
+ * on the shortest decimal that reads back as `value`. `toFixed` rounds the binary value instead,
+ * which takes 9.95 (9.9499… in binary) down where Intl takes it up. The tiers below decide with
+ * this, so each starts exactly where the one below would round up into it.
+ */
+function rounded(value: number, digits: number): number {
+	const [mantissa, exponent = "0"] = String(value).split("e");
+	return Math.round(Number(`${mantissa}e${Number(exponent) + digits}`)) / 10 ** digits;
+}
+
 export function createFormat(locale: string): Format {
 	const english = locale === "en" || locale.startsWith("en-");
 	const number = (options: Intl.NumberFormatOptions) => new Intl.NumberFormat(locale, options);
@@ -112,6 +126,12 @@ export function createFormat(locale: string): Format {
 		currency: "USD",
 		minimumFractionDigits: 4,
 		maximumFractionDigits: 4,
+	});
+	const smallScoreUsd = number({
+		style: "currency",
+		currency: "USD",
+		minimumSignificantDigits: 3,
+		maximumSignificantDigits: 3,
 	});
 	const gasK = number({ notation: "compact", maximumFractionDigits: 0 });
 	const gasM = number({
@@ -172,7 +192,7 @@ export function createFormat(locale: string): Format {
 		// Under half a cent, two decimals would print "$0.00".
 		if (value < 0.005) return `<${centsUsd.format(0.01)}`;
 		// Where cents would round up to "$100.00", whole dollars take over.
-		return Number(value.toFixed(2)) < 100 ? centsUsd.format(value) : usd(value);
+		return rounded(value, 2) < 100 ? centsUsd.format(value) : usd(value);
 	};
 
 	return {
@@ -188,8 +208,8 @@ export function createFormat(locale: string): Format {
 			if (value <= 0) return "0¢";
 			const cents = Math.round(value * 1e6) / 1e4;
 			if (cents < 0.05) return `<${fixed(0.1, 1)}¢`;
-			// Each step starts where the one below would round up into it: 9.96¢ reads "10¢".
-			if (Number(cents.toFixed(1)) < 10) return `${fixed(cents, 1)}¢`;
+			// Each step starts where the one below would round up into it: 9.95¢ reads "10¢".
+			if (rounded(cents, 1) < 10) return `${fixed(cents, 1)}¢`;
 			if (Math.round(cents) < 100) return `${integer.format(Math.round(cents))}¢`;
 			return usdCents(value);
 		},
@@ -203,19 +223,22 @@ export function createFormat(locale: string): Format {
 		score(value) {
 			if (value === null) return DASH;
 			if (value <= 0) return wholeUsd.format(0);
-			if (value < 0.00005) return `<${scoreUsd.format(0.0001)}`;
-			// Four decimals tell apart scores 0.1% apart, as the solutions compare them; each
-			// step starts where the one below would round up into it.
-			if (Number(value.toFixed(4)) < 100) return scoreUsd.format(value);
-			if (Number(value.toFixed(2)) < 10_000) return centsUsd.format(value);
+			if (value < 0.0001) return `<${scoreUsd.format(0.0001)}`;
+			// Solutions are told apart by how far below the winning score they came, so a score
+			// keeps the digits that separate scores 1% apart: three significant ones under $0.10
+			// ($0.00413 and $0.00408, which four decimals would both write $0.0041), then four
+			// decimals, then cents. Each tier starts where the one below would round up into it.
+			if (rounded(value, 4) < 0.1) return smallScoreUsd.format(value);
+			if (rounded(value, 4) < 100) return scoreUsd.format(value);
+			if (rounded(value, 2) < 10_000) return centsUsd.format(value);
 			return wholeUsd.format(value);
 		},
 		gap(ratio) {
 			if (ratio === null) return DASH;
 			if (ratio <= 0) return percentFormat(0).format(0);
 			if (ratio < 0.00005) return `<${percentFormat(2).format(0.0001)}`;
-			if (Number((ratio * 100).toFixed(2)) < 1) return percentFormat(2).format(ratio);
-			if (Number((ratio * 100).toFixed(1)) < 10) return percentFormat(1).format(ratio);
+			if (rounded(ratio, 4) < 0.01) return percentFormat(2).format(ratio);
+			if (rounded(ratio, 3) < 0.1) return percentFormat(1).format(ratio);
 			// A solution that scored a little above zero is not "100%" below the winner.
 			if (ratio < 1 && ratio >= 0.995) return `>${percentFormat(0).format(0.99)}`;
 			return percentFormat(0).format(ratio);
@@ -239,7 +262,8 @@ export function createFormat(locale: string): Format {
 			const sign = value >= 0.05 ? "+" : value <= -0.05 ? "−" : "±";
 			return sign + fixed(Math.abs(value), 1);
 		},
-		times: (value) => `${fixed(value, 1)}×`,
+		// One decimal would show a lead of a few percent as "1.0×", next to the word "leads".
+		times: (value) => `${fixed(value, rounded(value, 2) < 1.1 ? 2 : 1)}×`,
 		time: (ms) => hm.format(ms),
 		clock: (ms) => hms.format(ms),
 		day,

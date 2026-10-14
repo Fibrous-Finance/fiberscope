@@ -1,6 +1,7 @@
 import { useTranslations } from "next-intl";
 
-import type { Format, Row, SortKey } from "@fiberscope/core";
+import { DASH } from "@fiberscope/core";
+import type { Format, Measure, Row, SortKey } from "@fiberscope/core";
 
 /** The sortable columns, in table order. */
 export const COLUMNS: readonly SortKey[] = [
@@ -12,6 +13,11 @@ export const COLUMNS: readonly SortKey[] = [
 	"participation",
 	"winRate",
 ];
+
+/** The columns after the share, which `cellText` writes. */
+export const VALUE_COLUMNS = COLUMNS.filter(
+	(key): key is Exclude<SortKey, "share"> => key !== "share"
+);
 
 /** Columns that need auction data: "Volume†" when it covers only part of the window. */
 const AUCTION_COLUMNS: Partial<Record<SortKey, true>> = {
@@ -50,11 +56,25 @@ export function useHeaderLabels(partial: boolean): Record<SortKey, string> {
 	) as Record<SortKey, string>;
 }
 
-/** A sortable column's value as the table shows it. */
-export function cellText(row: Row, key: SortKey, f: Format): string {
+/**
+ * The # column, in the table, the compact list and Copy as Markdown: the rank by the active
+ * measure, "—" for a row with none of it.
+ */
+export function rankText(row: Row, measure: Measure): string {
+	return row.ranks[measure]?.toString() ?? DASH;
+}
+
+/**
+ * The share column, in the table, the compact list, the detail and Copy as Markdown: the active
+ * measure's share, "—" for a row with none of it, as its rank.
+ */
+export function shareText(row: Row, measure: Measure, f: Format): string {
+	return f.percent(row.shares[measure], 1);
+}
+
+/** A value column as the table shows it. */
+export function cellText(row: Row, key: Exclude<SortKey, "share">, f: Format): string {
 	switch (key) {
-		case "share":
-			return f.percent(row.share, 1);
 		case "batches":
 			return f.int(row.batches);
 		case "trades":

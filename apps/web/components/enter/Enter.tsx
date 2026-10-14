@@ -8,11 +8,12 @@ import { auctionDetails } from "@fiberscope/core";
 import type { DetailFigures, Entrant } from "@fiberscope/core";
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
-import { isHot } from "@/components/dashboard/tones";
+import { hoverIndex, isHot } from "@/components/dashboard/tones";
 import { LatestSettlements } from "@/components/enter/LatestSettlements";
 import { Quotes } from "@/components/enter/Quotes";
 import { Solutions } from "@/components/enter/Solutions";
 import { Tape, tapeAuctions } from "@/components/enter/Tape";
+import { Ticks } from "@/components/ui/axis";
 import { FootLine, Section } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
@@ -59,8 +60,8 @@ export function Enter() {
 	const details = auctionDetails(snapshot!, view);
 	const partial = details.coverage > 0 && details.coverage < view.days;
 
-	// The rank in `view.rows` decides whether "N others" in the legend highlights a solver.
-	const rankIndex = new Map(view.rows.map((row, index) => [row.id, index]));
+	// The place in `view.rows` decides whether "N others" in the legend highlights a solver.
+	const rankIndex = new Map(view.rows.map((row) => [row.id, hoverIndex(row, view.measure)]));
 
 	const sentence =
 		competition && top
@@ -89,11 +90,7 @@ export function Enter() {
 	const note = [
 		selected ? t(layout.compact ? "noteCompact" : "note") : null,
 		missing.length > 0
-			? t("noAuctions", {
-					names: new Intl.ListFormat(f.locale, { type: "unit", style: "short" }).format(
-						missing.map((row) => row.label)
-					),
-				})
+			? t("noAuctions", { names: f.list(missing.map((row) => row.label)) })
 			: null,
 	]
 		.filter(Boolean)
@@ -126,18 +123,17 @@ export function Enter() {
 								onSelect={setPicked}
 								onOpenChange={setOpen}
 							/>
-							{open ? (
-								<Solutions
-									id={selected.id}
-									compact={layout.compact}
-									rankIndex={rankIndex}
-									onClose={() => {
-										setOpen(false);
-										// Close takes itself away: the focus goes back to the tape.
-										tapeRef.current?.focus({ preventScroll: true });
-									}}
-								/>
-							) : null}
+							{/* Mounted while closed too: its sentence is a live region. */}
+							<Solutions
+								id={open ? selected.id : null}
+								compact={layout.compact}
+								rankIndex={rankIndex}
+								onClose={() => {
+									setOpen(false);
+									// Close takes itself away: the focus goes back to the tape.
+									tapeRef.current?.focus({ preventScroll: true });
+								}}
+							/>
 						</>
 					) : null}
 					<FootLine source={t("source")}>{note}</FootLine>
@@ -178,6 +174,7 @@ function Bars({
 	const t = useTranslations("Enter");
 	const f = useFormat();
 	const { hovered, setHovered } = useHover();
+	const ticks = [0, 0.5, 1].map((x) => ({ x, label: f.percent(x) }));
 
 	return (
 		<>
@@ -211,6 +208,7 @@ function Bars({
 							className={`${BAR_GRID} h-[31px] items-center border-t border-ln`}
 						>
 							<span
+								title={entrant.label}
 								className={`truncate text-[13.5px] font-medium ${entrant.unnamed ? "font-mono" : ""} ${hot ? "text-teal" : ""}`}
 							>
 								{entrant.label}
@@ -245,17 +243,13 @@ function Bars({
 					className={`${BAR_GRID} border-t border-ln2 pt-2 font-mono text-[11px] leading-[normal] font-medium text-fa`}
 				>
 					<span />
-					<span className="relative h-3.5">
-						<span className="absolute left-0">{f.percent(0)}</span>
-						<span className="absolute left-1/2 -translate-x-1/2">{f.percent(0.5)}</span>
-						{/* Below 760px the full label would run into "50%". */}
-						<span className="absolute right-0">
-							<span className="max-wide:hidden">
-								{t("axis.end", { value: f.percent(1) })}
-							</span>
-							<span className="wide:hidden">{f.percent(1)}</span>
-						</span>
-					</span>
+					{/* Compact tracks have no room for the words. */}
+					<Ticks ticks={ticks} className="wide:hidden" />
+					<Ticks
+						ticks={ticks}
+						end={t("axis.end", { value: f.percent(1) })}
+						className="max-wide:hidden"
+					/>
 					{/* Where the values column is narrower than the label, it wraps at a "·". */}
 					<span className="text-right text-balance">
 						{t(compact ? "axis.rates" : "axis.ratesFiltered", {

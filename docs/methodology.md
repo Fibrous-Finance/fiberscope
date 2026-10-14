@@ -70,8 +70,9 @@ ETH is priced as WETH.
 ### Share and rank
 
 A solver's share is its portion of all batches, trades or volume in the window. The table ranks
-every solver with a batch in the window by the selected measure. The overview's **Lead over #2**
-is the leader's share divided by the runner-up's.
+every solver with a batch in the window by the selected measure. A solver with no trade on the
+window's days with auction data has no volume figure rather than $0, and no rank by volume. The
+overview's **Lead over #2** is the leader's share divided by the runner-up's.
 
 ### Gas/trade
 

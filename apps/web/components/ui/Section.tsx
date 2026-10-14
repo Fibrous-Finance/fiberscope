@@ -12,11 +12,7 @@ export function Section({
 	children: ReactNode;
 }) {
 	return (
-		<section
-			id={id}
-			aria-busy={busy || undefined}
-			className="scroll-mt-[60px] pt-[clamp(84px,11vw,140px)]"
-		>
+		<section id={id} aria-busy={busy || undefined} className="pt-[clamp(84px,11vw,140px)]">
 			{children}
 		</section>
 	);

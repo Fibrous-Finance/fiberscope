@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import type { CSSProperties, Dispatch, HTMLAttributes, SetStateAction } from "react";
+import { useId } from "react";
+import type { CSSProperties, HTMLAttributes } from "react";
 
 import { useTranslations } from "next-intl";
 
@@ -9,41 +9,32 @@ import { autoRange, FIRST_DIRECTION, linePath } from "@fiberscope/core";
 import type { Measure, Row } from "@fiberscope/core";
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
-import { BAR_MIN_TONE, isHot, TEAL, tone } from "@/components/dashboard/tones";
+import { BAR_MIN_TONE, hoverIndex, isHot, TEAL, tone } from "@/components/dashboard/tones";
+import { ScrollMoreFade, useScrollMore } from "@/components/ui/ScrollMore";
 import { arrow, Caret } from "@/components/ui/Section";
-import { cellText, COLUMNS, useHeaderLabels } from "@/components/winning/columns";
+import {
+	cellText,
+	COLUMNS,
+	rankText,
+	shareText,
+	useHeaderLabels,
+	VALUE_COLUMNS,
+} from "@/components/winning/columns";
 import { DetailCompact, DetailWide } from "@/components/winning/Detail";
+import { DotList } from "@/components/winning/DotList";
 
 import { useFormat } from "@/lib/format";
 
-/** #, Solver, Share, six numbers and the sparkline; the header and every row share it. */
+/**
+ * #, Solver, Share, six numbers and the sparkline; the header and every row share it. Its least
+ * width, 860px of columns and nine 16px gaps, is the table's min-width.
+ */
 const GRID =
 	"grid grid-cols-[36px_minmax(180px,1.6fr)_minmax(140px,1.3fr)_minmax(64px,.7fr)_minmax(64px,.7fr)_minmax(76px,.8fr)_minmax(76px,.8fr)_minmax(70px,.7fr)_minmax(70px,.7fr)_84px] items-center gap-x-4";
 /** Once the table is scrolled sideways, the sticky Solver column ends in a hairline. */
 const EDGE = "shadow-[inset_-1px_0_0_var(--ln2)]";
 /** Sparklines span at least 4 percentage points. */
 const SPARK_MIN_SPAN = 0.04;
-
-/** How far the table is scrolled sideways. */
-interface Scroll {
-	/** Visible width of the table; 0 until measured. */
-	width: number;
-	/** Scrolled away from the left edge. */
-	scrolled: boolean;
-	/** Columns are hidden to the right. */
-	more: boolean;
-}
-
-function measure(el: HTMLElement, setScroll: Dispatch<SetStateAction<Scroll>>) {
-	const width = el.clientWidth;
-	const scrolled = el.scrollLeft > 1;
-	const more = el.scrollLeft + width < el.scrollWidth - 1;
-	setScroll((prev) =>
-		prev.width === width && prev.scrolled === scrolled && prev.more === more
-			? prev
-			: { width, scrolled, more }
-	);
-}
 
 /**
  * The desktop table (760px and up). Below about 1100px it scrolls sideways: # and Solver stay
@@ -53,44 +44,33 @@ export function Table({ rows }: { rows: Row[] }) {
 	const view = useView();
 	const { sort, setSort, open, setOpen } = useDashboard();
 	const { hovered, setHovered } = useHover();
+	const f = useFormat();
 	const t = useTranslations("Winning.columns");
 	const tw = useTranslations("Winning");
-	const scroller = useRef<HTMLDivElement>(null);
-	const [scroll, setScroll] = useState<Scroll>({ width: 0, scrolled: false, more: false });
-
-	useEffect(() => {
-		const el = scroller.current;
-		if (!el) return;
-		const observer = new ResizeObserver(() => measure(el, setScroll));
-		observer.observe(el);
-		return () => observer.disconnect();
-	}, []);
+	const { ref: scroller, more, scrolled, width } = useScrollMore();
 
 	const leaderShare = view.rows[0]?.share ?? 0;
 	const labels = useHeaderLabels(view.coverage.auction < view.days);
 
 	return (
 		<div className="relative mt-8 hidden wide:block">
-			<div
-				ref={scroller}
-				onScroll={(event) => measure(event.currentTarget, setScroll)}
-				className="overflow-x-auto"
-			>
+			<div ref={scroller} className="overflow-x-auto">
 				{/* A table to assistive tech: the sorted column says so with aria-sort. */}
-				<div role="table" aria-label={tw("title")} className="min-w-[1000px] tabular-nums">
+				<div role="table" aria-label={tw("title")} className="min-w-[1004px] tabular-nums">
 					<div
 						role="row"
 						className={`${GRID} box-content h-10 border-b border-ln2 label whitespace-nowrap`}
 					>
+						{/* Inset like the ranks below, which keep clear of a row's inset focus ring. */}
 						<span
 							role="columnheader"
-							className="sticky left-0 z-1 flex items-center self-stretch bg-bg"
+							className="sticky left-0 z-1 flex items-center self-stretch bg-bg pl-2"
 						>
 							{t("rank")}
 						</span>
 						<span
 							role="columnheader"
-							className={`sticky left-9 z-1 -ml-4 flex items-center self-stretch bg-bg pl-4 ${scroll.scrolled ? EDGE : ""}`}
+							className={`sticky left-9 z-1 -ml-4 flex items-center self-stretch bg-bg pl-4 ${scrolled ? EDGE : ""}`}
 						>
 							{t("solver")}
 						</span>
@@ -137,28 +117,29 @@ export function Table({ rows }: { rows: Row[] }) {
 						<TableRow
 							key={row.id}
 							row={row}
+							rank={rankText(row, view.measure)}
+							share={shareText(row, view.measure, f)}
 							open={open === row.id}
-							hot={isHot(hovered, row.id, row.rank - 1)}
+							hot={isHot(hovered, row.id, hoverIndex(row, view.measure))}
 							leaderShare={leaderShare}
 							sparkDays={view.sparkDays}
-							scrolled={scroll.scrolled}
-							width={open === row.id ? scroll.width : 0}
+							scrolled={scrolled}
+							width={open === row.id ? width : 0}
 							setOpen={setOpen}
 							setHovered={setHovered}
 						/>
 					))}
 				</div>
 			</div>
-			<div
-				aria-hidden="true"
-				className={`pointer-events-none absolute inset-y-0 right-0 z-2 w-14 bg-[linear-gradient(90deg,transparent,var(--bg))] transition-opacity duration-200 ${scroll.more ? "opacity-100" : "opacity-0"}`}
-			/>
+			<ScrollMoreFade more={more} />
 		</div>
 	);
 }
 
 function TableRow({
 	row,
+	rank,
+	share,
 	open,
 	hot,
 	leaderShare,
@@ -169,6 +150,8 @@ function TableRow({
 	setHovered,
 }: {
 	row: Row;
+	rank: string;
+	share: string;
 	open: boolean;
 	/** Highlighted by the hover anywhere on the page. */
 	hot: boolean;
@@ -200,8 +183,8 @@ function TableRow({
 				onMouseLeave={() => setHovered(null)}
 				className={`${GRID} focus-inset box-content h-[50px] cursor-pointer border-b border-ln font-mono text-[13px] leading-[normal] font-medium transition-colors duration-150 ${hot || open ? "bg-hov" : ""}`}
 			>
-				<span role="cell" className={`${pinned} left-0 text-mu`}>
-					{row.rank}
+				<span role="cell" className={`${pinned} left-0 pl-2 text-mu`}>
+					{rank}
 				</span>
 				<span
 					role="cell"
@@ -227,9 +210,9 @@ function TableRow({
 							className="block h-full rounded-[2px] transition-colors duration-200"
 						/>
 					</span>
-					<span className="flex-[0_0_46px] text-right">{f.percent(row.share, 1)}</span>
+					<span className="flex-[0_0_46px] text-right">{share}</span>
 				</span>
-				{COLUMNS.slice(1).map((key) => (
+				{VALUE_COLUMNS.map((key) => (
 					<span key={key} role="cell" className="text-right">
 						{cellText(row, key, f)}
 					</span>
@@ -268,6 +251,9 @@ export function List({ rows }: { rows: Row[] }) {
 	const { open, setOpen } = useDashboard();
 	const { hovered } = useHover();
 	const leaderShare = view.rows[0]?.share ?? 0;
+	// The table's mark for figures that auction data covers only in part ("Volume†"): the list has
+	// no headers, so its figures carry it.
+	const mark = view.coverage.auction < view.days ? "†" : "";
 
 	return (
 		<div className="mt-6 border-t border-ln2 tabular-nums wide:hidden">
@@ -276,8 +262,9 @@ export function List({ rows }: { rows: Row[] }) {
 					key={row.id}
 					row={row}
 					measure={view.measure}
+					mark={mark}
 					open={open === row.id}
-					hot={isHot(hovered, row.id, row.rank - 1)}
+					hot={isHot(hovered, row.id, hoverIndex(row, view.measure))}
 					leaderShare={leaderShare}
 					setOpen={setOpen}
 				/>
@@ -289,6 +276,7 @@ export function List({ rows }: { rows: Row[] }) {
 function ListRow({
 	row,
 	measure,
+	mark,
 	open,
 	hot,
 	leaderShare,
@@ -296,6 +284,8 @@ function ListRow({
 }: {
 	row: Row;
 	measure: Measure;
+	/** "†" after the figures auction data covers in part; empty when it covers the window. */
+	mark: string;
 	open: boolean;
 	hot: boolean;
 	leaderShare: number;
@@ -307,18 +297,20 @@ function ListRow({
 		measure,
 		count: measure === "volume" ? 0 : row[measure],
 		volume: f.usd(row.volume),
+		mark: row.volume === null ? "" : mark,
 	});
-	const gas = f.gas(row.gasPerTrade);
+	const gas = t("meta.gas", { gas: f.gas(row.gasPerTrade) });
 
 	return (
 		<>
 			<RowButton
 				open={open}
 				onToggle={() => setOpen(open ? null : row.id)}
-				className="focus-inset grid cursor-pointer grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1.5 border-b border-ln py-3.5"
+				className="focus-inset grid cursor-pointer grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1.5 border-b border-ln py-3.5 pr-1.5"
 			>
-				<span className="font-mono text-[12px] leading-[normal] font-medium text-mu">
-					{row.rank}
+				{/* Clear of the inset focus ring on both sides: the rank here, the rest by the row. */}
+				<span className="pl-1.5 font-mono text-[12px] leading-[normal] font-medium text-mu">
+					{rankText(row, measure)}
 				</span>
 				<span className="flex min-w-0 items-center gap-2">
 					<span
@@ -329,7 +321,7 @@ function ListRow({
 					<RankChange row={row} />
 				</span>
 				<span className="flex items-center gap-2 font-mono text-[14px] leading-[normal] font-medium">
-					{f.percent(row.share, 1)}
+					{shareText(row, measure, f)}
 					<Caret open={open} className="text-fa" />
 				</span>
 				<span className="col-[2/4] h-[3px] rounded-[2px] bg-ln">
@@ -338,16 +330,22 @@ function ListRow({
 						className="block h-full rounded-[2px]"
 					/>
 				</span>
-				<span className="col-[2/4] font-mono text-[11.5px] leading-[normal] font-medium text-mu">
-					{row.entered
-						? t("meta", {
-								value,
-								entered: f.percent(row.participation),
-								winRate: f.percent(row.winRate),
-								gas,
-							})
-						: t("metaNoAuctions", { value, gas })}
-				</span>
+				<DotList
+					items={
+						row.entered
+							? [
+									value,
+									t("meta.entered", {
+										entered: f.percent(row.participation),
+										mark,
+									}),
+									t("meta.winRate", { winRate: f.percent(row.winRate), mark }),
+									gas,
+								]
+							: [value, gas, t("meta.noAuctions")]
+					}
+					className="col-[2/4] font-mono text-[11.5px] leading-[normal] font-medium text-mu"
+				/>
 			</RowButton>
 			{open ? <DetailCompact row={row} /> : null}
 		</>
@@ -363,7 +361,7 @@ function RankChange({ row }: { row: Row }) {
 	const places = Math.abs(change);
 	return (
 		<span
-			className={`font-mono text-[10.5px] leading-[normal] font-medium ${direction === "down" ? "text-fa" : "text-fg"}`}
+			className={`font-mono text-[10.5px] leading-[normal] font-medium ${direction === "down" ? "text-mu" : "text-fg"}`}
 		>
 			<span aria-hidden="true">{t("short", { direction, places })}</span>
 			<span className="sr-only">{t("spoken", { direction, places })}</span>

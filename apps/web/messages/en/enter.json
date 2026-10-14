@@ -12,13 +12,13 @@
 	"rates": "{participation} · <win>{winRate}</win>",
 	"axis": {
 		"end": "{value} of auctions",
-		"rates": "in · win rate",
-		"ratesFiltered": "in\u00a0· win rate\u00a0· filtered out{partial, select, yes {†} other {}}"
+		"rates": "in\u00a0· win\u00a0rate",
+		"ratesFiltered": "in\u00a0· win\u00a0rate\u00a0· filtered\u00a0out{partial, select, yes {†} other {}}"
 	},
 	"tape": {
 		"title": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}",
-		"label": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}. Left and right arrow keys move between auctions. Home and End jump to the first and last. Enter shows the selected auction’s solutions.",
-		"readout": "#{id} · {time}\u00a0UTC · {entered} entered · {winners, plural, =0 {no winner} other {won by <winner>{names}</winner>}}"
+		"label": "{count, plural, one {Latest auction} other {Latest #\u00a0auctions}}. Left and right arrow keys move between auctions. Home and End jump to the first and last. Enter or Space opens or closes the selected auction’s solutions, and Escape closes them.",
+		"readout": "#{id}\u00a0· {time}\u00a0UTC\u00a0· {entered}\u00a0entered\u00a0· {winners, plural, =0 {no\u00a0winner} other {won\u00a0by\u00a0<winner>{names}</winner>}}"
 	},
 	"note": "Click an auction to see its solutions. Filtered out: the share of a solver’s solutions that CoW’s fairness filter removed; a filtered-out solution cannot win.",
 	"noteCompact": "Tap an auction to see its solutions.",
@@ -31,35 +31,31 @@
 			"time": "Time\u00a0UTC",
 			"solver": "Solver",
 			"trades": "Trades",
-			"swaps": "Swaps",
 			"pair": "Pair",
 			"volume": "Volume",
 			"surplus": "Surplus",
 			"cost": "Cost",
-			"gas": "Gas",
 			"links": "Links",
 			"protocolFee": "Protocol fee",
 			"partnerFee": "Partner fee",
 			"quotedBy": "Quoted by"
 		},
-		"pair": "{sell} → {buy}{more, plural, =0 {} other { +#}}",
+		"pair": "<swap>{sell} → {buy}</swap>{more, plural, =0 {} other {<extra>\u00a0+#</extra>}}",
 		"more": "Show {count} more",
 		"fewer": "Show fewer",
 		"note": "Transaction cost: what the transaction paid on Base, including the L1 data fee. Fees: charged on the settlement’s trades by CoW’s protocol and by partners. Quoted by: the solver whose quote the first trade’s order was placed with.",
 		"source": "Source: CoW Protocol API · {network} settlement events",
 		"items": {
 			"trades": "{trades, plural, one {#\u00a0trade} other {#\u00a0trades}}",
-			"swaps": "{swaps, plural, one {#\u00a0swap} other {#\u00a0swaps}}",
 			"volume": "{volume}",
 			"surplus": "{surplus}\u00a0surplus",
 			"cost": "{cost}\u00a0cost",
-			"gas": "{gas}\u00a0gas",
-			"protocolFee": "{fee} protocol fee",
-			"partnerFee": "{fee} partner fee",
+			"protocolFee": "{fee}\u00a0protocol fee",
+			"partnerFee": "{fee}\u00a0partner fee",
 			"quotedBy": "quoted by {solver}"
 		},
 		"fees": "In {span}, CoW’s protocol fees totaled {protocol} ({protocolBps}\u00a0bps of volume) and partner fees {partner} ({partnerBps}\u00a0bps).",
-		"feesEmpty": "No fee data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet. Fees need auction data."
+		"feesEmpty": "No fee data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet.{auctions, select, none { Fees need auction data.} other {}}"
 	},
 	"ratesFiltered": "{participation} · <win>{winRate}</win> · {filtered}",
 	"barFiltered": "Entered {participation} of auctions, won {wonShare} of all auctions, {filtered} of its solutions filtered out",
@@ -89,12 +85,13 @@
 			"filtered": "Filtered out"
 		},
 		"head": "{solutions, plural, one {1\u00a0solution from {solver}} other {#\u00a0solutions from {solvers, plural, one {#\u00a0solver} other {#\u00a0solvers}}}}",
-		"single": "{head}. {winner} won with a score of {score}; the best rival, {rival}’s, scored {gap} lower.",
-		"singleTie": "{head}. {winner} won with a score of {score}; {rival}’s best solution had the same score.",
-		"singleNoRival": "{head}. {winner} won with a score of {score}; no other solver’s solution passed the filter.",
-		"singleOnly": "{head}. {winner} won with a score of {score}.",
-		"oneSolution": "{head} won with a score of {score}.",
-		"multi": "{head}. {winners} won together, settling different orders, with scores of {scores}. Each losing solution competed with the winner whose orders it would also have settled. The scores alone don’t show this, so no gaps are given.",
+		"single": "{head}. {winner} won with a score of {score}; the best rival, {rival}’s, scored {bound, select, below {less than {gap}} above {more than {gap}} other {{gap}}} lower.",
+		"singleTie": "{head}. {winner} won with a score of {score}; {ties, plural, one {{rivals} best solution} other {{rivals} best solutions}} had the same score.",
+		"possessive": "{solver}’s",
+		"singleNoRival": "{head}. {winner} won{scored, select, yes { with a score of {score}} other {}}; no other solver’s solution passed the filter.",
+		"singleOnly": "{head}. {winner} won{scored, select, yes { with a score of {score}} other {}}.",
+		"oneSolution": "{head} won{scored, select, yes { with a score of {score}} other {}}.",
+		"multi": "{head}. {winners} won together, settling different orders{scored, select, yes {, with scores of {scores}} other {}}. Each losing solution competed with the winner whose orders it would also have settled. The scores alone don’t show this, so no gaps are given.",
 		"none": "{head}. No solution won.",
 		"filteredOne": "{solver}’s solution was filtered out.",
 		"filteredSome": "{count, plural, one {1 of {solver}’s {total}\u00a0solutions was filtered out.} other {# of {solver}’s {total}\u00a0solutions were filtered out.}}",
@@ -117,8 +114,8 @@
 		"title": "Quotes",
 		"scope": "Share of quoted trades{partial, select, yes {†} other {}}",
 		"sentence": "In {span}, {quoted} of {trades}\u00a0trades were placed with a solver’s quote. CoW had verified {verified} of those quotes by simulating them. {solver} gave {share} of all those quotes. The solver that gave the quote settled {settled} of those trades itself.",
-		"empty": "No quote data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet. Quotes need auction data.",
-		"noQuotes": "No trade in {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} was placed with a solver’s quote.",
+		"empty": "No quote data for {delayed, select, yes {the {period} to {asOf}} other {the last {period}}} yet.{auctions, select, none { Quotes need auction data.} other {}}",
+		"noQuotes": "No trade in {span} was placed with a solver’s quote.",
 		"legend": {
 			"quoted": "Quoted",
 			"settled": "Settled itself"
@@ -127,8 +124,8 @@
 		"ratesWide": "{share} · <own>{settled}</own> · {verified}",
 		"axis": {
 			"end": "{value} of quoted trades",
-			"rates": "share · settled itself",
-			"ratesWide": "share\u00a0· settled itself\u00a0· verified"
+			"rates": "share\u00a0· settled\u00a0itself",
+			"ratesWide": "share\u00a0· settled\u00a0itself\u00a0· verified"
 		},
 		"bar": "Gave the quote for {share} of quoted trades and settled {settled} of those itself; {verified} of its quotes were verified",
 		"note": "Verified: CoW checked the quote by simulating it. Settled itself: the solver that gave the quote also settled the trade. Not quote rewards.",

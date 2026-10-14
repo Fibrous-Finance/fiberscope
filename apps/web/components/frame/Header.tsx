@@ -43,7 +43,7 @@ export function Header({
 				<a
 					href={away ? "/" : "#"}
 					aria-label={t("home")}
-					className="flex flex-none items-baseline text-[20px] leading-none font-semibold tracking-[-0.035em] text-fg hover:no-underline"
+					className="flex flex-none items-baseline text-[20px] leading-none font-semibold tracking-[-0.035em] text-fg hover:no-underline max-wide:-my-3 max-wide:py-3"
 				>
 					<Logo />
 				</a>
@@ -110,8 +110,8 @@ function Nav({ away }: { away?: boolean }) {
 }
 
 /**
- * The network picker, a disclosure: Escape or a click outside closes it. Closing from inside the
- * popup puts focus back on the button, which would otherwise be lost with the popup.
+ * The network picker, a disclosure: Escape, a click outside or focus moving out closes it. Closing
+ * from inside the popup puts focus back on the button, which would otherwise be lost with the popup.
  */
 function NetworkMenu() {
 	const t = useTranslations("Header.network");
@@ -140,7 +140,15 @@ function NetworkMenu() {
 	}, [open]);
 
 	return (
-		<div ref={ref} className="relative">
+		<div
+			ref={ref}
+			// Tabbing out closes it; a click elsewhere leaves no new focus and is handled above.
+			onBlur={(event) => {
+				const next = event.relatedTarget;
+				if (next && !event.currentTarget.contains(next)) setOpen(false);
+			}}
+			className="relative"
+		>
 			<button
 				ref={button}
 				type="button"
@@ -155,33 +163,36 @@ function NetworkMenu() {
 				<Caret open={open} className="text-mu" />
 			</button>
 			{open ? (
-				<div
+				<ul
 					id={popup}
 					className="absolute top-[50px] -right-3 z-30 w-[220px] rounded-[12px] border border-ln2 bg-bg p-1.5 text-[14px] wide:top-11"
 				>
-					<button
-						type="button"
-						onClick={() => {
-							button.current?.focus();
-							setOpen(false);
-						}}
-						className="flex w-full items-baseline justify-between rounded-[8px] border-0 bg-hov px-2.5 py-[9px] text-left text-fg"
-					>
-						<span>{tc("network")}</span>
-						<span className="font-mono text-[11px] font-medium text-act">
-							{t("live")}
-						</span>
-					</button>
+					<li>
+						<button
+							type="button"
+							aria-current="true"
+							onClick={() => {
+								button.current?.focus();
+								setOpen(false);
+							}}
+							className="flex w-full items-baseline justify-between rounded-[8px] border-0 bg-hov px-2.5 py-[9px] text-left text-fg"
+						>
+							<span>{tc("network")}</span>
+							<span className="font-mono text-[11px] font-medium text-act">
+								{t("live")}
+							</span>
+						</button>
+					</li>
 					{(["ethereum", "arbitrum", "gnosis"] as const).map((key) => (
-						<div
+						<li
 							key={key}
 							className="flex items-baseline justify-between px-2.5 py-[9px] text-mu"
 						>
 							<span>{t(key)}</span>
 							<span className="font-mono text-[11px] font-medium">{t("soon")}</span>
-						</div>
+						</li>
 					))}
-				</div>
+				</ul>
 			) : null}
 		</div>
 	);
@@ -192,13 +203,17 @@ interface Pill {
 	dot: string;
 	label: string;
 	tone?: string;
-	/** The compact label, when it differs. */
+	/** The label below 860px, when it differs. */
 	short?: string;
-	/** The compact layout shows only the dot; the label stays for screen readers. */
+	/** Below 860px only the dot shows; the label stays for screen readers. */
 	quiet?: boolean;
 }
 
-/** The data status: a dot and a label, one word in the compact layout so the header fits at 360px. */
+/**
+ * The data status: a dot and a label. Below 860px the label does not fit next to the nav, so the
+ * pill shows only the dot when live and one word otherwise; that is also what lets the header fit
+ * at 360px.
+ */
 function StatusPill({ status, away }: { status: HeaderStatus; away?: boolean }) {
 	const t = useTranslations("Header.status");
 	const f = useFormat();
@@ -249,7 +264,7 @@ function StatusPill({ status, away }: { status: HeaderStatus; away?: boolean }) 
 				short: t("errorShort"),
 			};
 	}
-	const compact = pill.short ? "max-wide:hidden" : pill.quiet ? "max-wide:sr-only" : "";
+	const compact = pill.short ? "max-[860px]:hidden" : pill.quiet ? "max-[860px]:sr-only" : "";
 
 	return (
 		<span
@@ -260,7 +275,7 @@ function StatusPill({ status, away }: { status: HeaderStatus; away?: boolean }) 
 			<span className={`size-[7px] flex-none rounded-full ${pill.dot}`} />
 			<span className={`${pill.tone ?? ""} ${compact}`}>{pill.label}</span>
 			{pill.short ? (
-				<span className={`wide:hidden ${pill.tone ?? ""}`}>{pill.short}</span>
+				<span className={`min-[860px]:hidden ${pill.tone ?? ""}`}>{pill.short}</span>
 			) : null}
 		</span>
 	);

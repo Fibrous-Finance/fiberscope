@@ -1,7 +1,8 @@
 /**
  * Appearance: Auto follows the system; Light and Dark pin a theme. The choice is saved and applied
- * before first paint by `themeScript`, so the page never flashes the wrong theme. A change recolors
- * the whole page in one frame (see `applyAppearance`).
+ * before first paint by `themeScript`, so the page never flashes the wrong theme. The appearance
+ * button fades the whole page into the new theme; a change of the system's theme, or one made in
+ * another tab, recolors it in one frame.
  */
 
 export type Appearance = "auto" | "light" | "dark";
@@ -56,7 +57,11 @@ export function saveAppearance(appearance: Appearance): void {
 	} catch {
 		// Private mode or blocked storage: the choice lasts for this page only.
 	}
-	applyAppearance(appearance);
+	// The page fades into the new theme as one picture: globals.css sets how long, and drops the
+	// fade for reduced motion. Browsers without view transitions switch in one frame.
+	if (document.startViewTransition)
+		document.startViewTransition(() => applyAppearance(appearance));
+	else applyAppearance(appearance);
 	window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 

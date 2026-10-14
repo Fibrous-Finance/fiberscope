@@ -27,6 +27,15 @@
 	color-scheme: dark;
 }
 
+/*
+ * The appearance button fades the old page into the new one as a single picture (lib/theme.ts),
+ * so every color changes together. 300ms: long enough to soften a full-screen change from light to
+ * dark or back, short enough not to feel like a wait.
+ */
+::view-transition-group(root) {
+	animation-duration: 0.3s;
+}
+
 @theme inline {
 	--breakpoint-*: initial;
 	/* The single breakpoint: below it the page uses the compact layout. */
@@ -120,6 +129,12 @@
 			animation-duration: 0.01ms !important;
 			animation-iteration-count: 1 !important;
 			transition-duration: 0.01ms !important;
+		}
+
+		::view-transition-group(*),
+		::view-transition-old(*),
+		::view-transition-new(*) {
+			animation: none !important;
 		}
 	}
 }

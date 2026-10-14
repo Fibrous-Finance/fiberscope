@@ -206,3 +206,36 @@ export function trackPosition(gap: number): number {
 	const position = (Math.log10(Math.max(gap, TRACK_LOW)) - Math.log10(TRACK_LOW)) / 4;
 	return Math.min(1, position);
 }
+
+/** A mark on the solutions' track: where it sits (0–1, `trackPosition`) and its size in px. */
+export interface TrackMark {
+	position: number;
+	size: number;
+}
+
+/** The lanes a mark can take, in the order tried: the centre line, above it, below it. */
+const TRACK_LANES = [0, -1, 1] as const;
+
+/**
+ * Lanes for one row's marks on the solutions' track, so marks that would overlap at this width
+ * sit above and below each other instead of merging: two hollow rings a few px apart read as "∞".
+ * Each mark, in the order given (the row's best first), takes the first lane where it keeps 1px
+ * clear of the marks already there, and stays on the centre line when no lane has room. Before the
+ * track is measured (`width` 0), every mark is on the centre line.
+ */
+export function trackLanes(marks: readonly TrackMark[], width: number): number[] {
+	if (width <= 0) return marks.map(() => 0);
+	const placed: { x: number; radius: number; lane: number }[] = [];
+	return marks.map(({ position, size }) => {
+		const x = position * width;
+		const radius = size / 2;
+		const lane =
+			TRACK_LANES.find((lane) =>
+				placed.every(
+					(mark) => mark.lane !== lane || Math.abs(mark.x - x) >= mark.radius + radius + 1
+				)
+			) ?? 0;
+		placed.push({ x, radius, lane });
+		return lane;
+	});
+}

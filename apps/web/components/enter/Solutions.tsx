@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { useTranslations } from "next-intl";
 
 import {
@@ -8,6 +10,7 @@ import {
 	filteredOutcome,
 	NETWORKS,
 	solutionState,
+	trackLanes,
 	trackPosition,
 } from "@fiberscope/core";
 import type { AuctionSolutions, SolutionsRow } from "@fiberscope/core";
@@ -18,10 +21,11 @@ import { arrow } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
 
-/** Solver | track | Score | Below winner: the gaps to a single winner, on wide pages. */
-const TRACK_GRID = "grid grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_84px_104px] gap-4";
-/** Solver | Score | Below winner: several winners, or a lone solution, leave no gaps to plot. */
-const FLAT_GRID = "grid grid-cols-[clamp(96px,16vw,190px)_84px_104px] gap-4";
+/**
+ * Solver | track | Score | Below winner, on wide pages. Without a track (several winners, a lone
+ * solution) its column stays empty, so the figures keep their place from one auction to the next.
+ */
+const WIDE_GRID = "grid grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_84px_104px] gap-4";
 /** Solver | Score | Below: compact pages leave the track out. */
 const COMPACT_GRID = "grid grid-cols-[minmax(0,1fr)_70px_88px] gap-2";
 /**
@@ -29,6 +33,11 @@ const COMPACT_GRID = "grid grid-cols-[minmax(0,1fr)_70px_88px] gap-2";
  * marks at either end stay inside it.
  */
 const TRACK_INSET = "mx-[4.5px]";
+/**
+ * How far above or below the centre line a mark moves when it would overlap another
+ * (`trackLanes`): a 5px mark then clears a 9px one by 1px and stays inside the 31px row.
+ */
+const LANE_PX = 8;
 
 /**
  * The solutions of the auction selected on the tape: a sentence, then one row per solver, in the
@@ -195,7 +204,10 @@ function SolutionsTable({
 	// The track plots the gaps below a single winning score, on wide pages: a lone solution has
 	// none to plot.
 	const track = auction.single && auction.solutions > 1 && !compact;
-	const grid = compact ? COMPACT_GRID : track ? TRACK_GRID : FLAT_GRID;
+	const grid = compact ? COMPACT_GRID : WIDE_GRID;
+	// Without a track, the figures skip its empty column on wide pages.
+	const figures = !compact && !track ? "col-start-3" : "";
+	const [trackWidth, trackRef] = useWidth();
 
 	return (
 		<>
@@ -225,7 +237,7 @@ function SolutionsTable({
 					<div role="row" className={`${grid} items-end pb-2 label`}>
 						<span role="columnheader">{t("columns.solver")}</span>
 						{track ? <span role="columnheader">{t("columns.track")}</span> : null}
-						<span role="columnheader" className="text-right">
+						<span role="columnheader" className={`text-right ${figures}`}>
 							{t("columns.score")}
 						</span>
 						<span role="columnheader" className="text-right">
@@ -258,22 +270,21 @@ function SolutionsTable({
 										</span>
 									) : null}
 								</span>
-								{track ? <Track row={row} hot={hot} /> : null}
+								{track ? <Track row={row} hot={hot} width={trackWidth} /> : null}
 								<span
 									role="cell"
-									className={`text-right font-mono text-[12.5px] leading-[normal] font-medium ${best.filteredOut ? "text-mu" : ""}`}
+									className={`text-right font-mono text-[12.5px] leading-[normal] font-medium ${figures} ${best.filteredOut ? "text-mu" : ""}`}
 								>
 									{f.score(best.score)}
 								</span>
 								<span
 									role="cell"
-									className={`text-right font-mono leading-[normal] font-medium whitespace-nowrap ${compact ? "text-[11.5px]" : "text-[12.5px]"} ${best.filteredOut ? "text-mu" : ""}`}
+									className={`text-right font-mono leading-[normal] font-medium whitespace-nowrap ${compact ? "text-[11.5px]" : "text-[12.5px]"} ${best.filteredOut || state === "none" ? "text-mu" : ""}`}
 								>
-									{state === "gap"
+									{/* "—" where no gap is given: several winners, or no score. */}
+									{state === "gap" || state === "none"
 										? f.gap(best.gap)
-										: state === "none"
-											? null
-											: t(`value.${state}`)}
+										: t(`value.${state}`)}
 								</span>
 							</div>
 						);
@@ -286,7 +297,7 @@ function SolutionsTable({
 						className={`${grid} border-t border-ln2 pt-2 font-mono text-[11px] leading-[normal] font-medium text-fa`}
 					>
 						<span />
-						<span className={`relative h-3.5 ${TRACK_INSET}`}>
+						<span ref={trackRef} className={`relative h-3.5 ${TRACK_INSET}`}>
 							<span className="absolute left-0">{t("axis.a")}</span>
 							<span className="absolute left-1/4 -translate-x-1/2">
 								{t("axis.b")}
@@ -315,12 +326,21 @@ function SolutionsTable({
 
 /**
  * A solver's solutions on the log track below the winning score: the winning one an 8px square
- * at the left end, drawn over any of the winner's other solutions there; its best a 9px dot, its
- * others 5px dots at 50%; filtered-out ones hollow.
+ * at the left end, its best a 9px dot, its others 5px dots at 50%; filtered-out ones hollow. Marks
+ * that would overlap at the track's `width` move above or below the centre line (`trackLanes`).
  */
-function Track({ row, hot }: { row: SolutionsRow; hot: boolean }) {
+function Track({ row, hot, width }: { row: SolutionsRow; hot: boolean; width: number }) {
 	const t = useTranslations("Enter.solutions");
 	const f = useFormat();
+	// The solutions with a place on the track, the row's best first, and their size in px as drawn
+	// below. A solution without a score has no place.
+	const marks = row.solutions.flatMap((solution, index) => {
+		const best = index === 0;
+		if (solution.winner) return [{ solution, best, position: 0, size: 8 }];
+		if (solution.gap === null) return [];
+		return [{ solution, best, position: trackPosition(solution.gap), size: best ? 9 : 5 }];
+	});
+	const lanes = trackLanes(marks, width);
 
 	return (
 		<span role="cell" className="flex self-stretch">
@@ -340,18 +360,20 @@ function Track({ row, hot }: { row: SolutionsRow; hot: boolean }) {
 				})}
 				className={`relative flex-1 ${TRACK_INSET} bg-[repeating-linear-gradient(90deg,var(--ln)_0_1px,transparent_1px_25%)]`}
 			>
-				{row.solutions.map((solution, index) => {
+				{marks.map(({ solution, best, position }, index) => {
+					const place = {
+						left: `${position * 100}%`,
+						top: `calc(50% + ${(lanes[index] ?? 0) * LANE_PX}px)`,
+					};
 					if (solution.winner) {
 						return (
 							<span
 								key={index}
-								className={`absolute top-1/2 left-0 z-1 size-2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] transition-colors duration-200 ${hot ? "bg-teal" : "bg-fg"}`}
+								className={`absolute z-1 size-2 -translate-x-1/2 -translate-y-1/2 rounded-[2px] transition-colors duration-200 ${hot ? "bg-teal" : "bg-fg"}`}
+								style={place}
 							/>
 						);
 					}
-					// A solution without a score has no place on the track.
-					if (solution.gap === null) return null;
-					const best = index === 0;
 					const look = solution.filteredOut
 						? `bg-bg ${best ? "border-[1.5px]" : "border"} ${hot ? "border-teal" : "border-fg"}`
 						: best
@@ -362,12 +384,28 @@ function Track({ row, hot }: { row: SolutionsRow; hot: boolean }) {
 					return (
 						<span
 							key={index}
-							className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200 ${best ? "size-[9px]" : "size-[5px]"} ${look}`}
-							style={{ left: `${trackPosition(solution.gap) * 100}%` }}
+							className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-200 ${best ? "size-[9px]" : "size-[5px]"} ${look}`}
+							style={place}
 						/>
 					);
 				})}
 			</span>
 		</span>
 	);
+}
+
+/** The width of an element, followed through resizes: attach `ref` to it. 0 until measured. */
+function useWidth(): [number, (node: HTMLElement | null) => void] {
+	const [node, ref] = useState<HTMLElement | null>(null);
+	const [width, setWidth] = useState(0);
+
+	useEffect(() => {
+		if (!node) return;
+		// The observer also measures once when it starts.
+		const observer = new ResizeObserver(() => setWidth(node.clientWidth));
+		observer.observe(node);
+		return () => observer.disconnect();
+	}, [node]);
+
+	return [width, ref];
 }

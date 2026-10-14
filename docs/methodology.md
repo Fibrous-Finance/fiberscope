@@ -179,13 +179,14 @@ The value CoW's protocol computes from each solution's executed amounts to choos
 page converts it to USD at Chainlink's ETH/USD rate at the auction's start block, to 6 significant
 figures. **Below winner** is (winning score − score) ÷ winning score. It is given only for auctions
 with a single winning solution. Only a filtered-out solution can score above that winner, since one
-that passed the filter with a higher score would have won; the page then gives how much higher:
-(score − winning score) ÷ winning score. With several winners, a losing solution competed only
-with the winner whose orders it would also have settled; the scores do not identify that winner.
-Each solver's row shows its best solution, its first in CoW's ranking: the winners, then the other
-solutions by score, then the filtered-out ones. With several winners, the solvers that won come
-first, by the score of their winning solution, then the others by their best solution's; a
-winner's row also gives its best score when another of its solutions scored higher.
+that passed the filter with a higher score would have won; the page then shows how much higher:
+(score − winning score) ÷ winning score. With several winning solutions, a losing solution competed
+only with the winning solution whose orders it would also have settled; the scores do not identify
+that solution. Each solver's row shows its best solution, its first in CoW's ranking: the winners,
+then the other solutions by score, then the filtered-out ones. With several winning solutions,
+winning solvers come first and the others after them, each group sorted by the score its rows
+show. A winner's row also shows the highest score among its other solutions, filtered out or not,
+when that score is higher than the one the row shows.
 
 ### Filtered out
 

@@ -139,23 +139,25 @@ same options) also read `apps/indexer/.env` when it exists.
 ### What a sync does
 
 1. Refreshes CoW's solver registry; if the registry is unavailable, it uses the last copy.
-2. Catches up: settlements, receipts and calldata up to the network's safe block (on Base the
+2. Checks on the allow-list the senders and recipients of relay settlements stored before their
+   relay was listed, so attribution can read them.
+3. Catches up: settlements, receipts and calldata up to the network's safe block (on Base the
    newest block whose transactions Base has posted to Ethereum, on BNB Chain the newest justified
    block), then the auctions behind the new settlements.
-3. With `--prune`, deletes settlements older than N days (at least M, as for the backfill) with
+4. With `--prune`, deletes settlements older than N days (at least M, as for the backfill) with
    their auction data, and the auction data, orders and fees of settlements older than M days. A
    relay settlement (through the flash-loan router or an Atomic Bundle) keeps its auction while it
    is in the chain data, since its attribution may need the auction's winner.
-4. Fetches details for the new blocks: the orders traded and their trades' protocol fees,
+5. Fetches details for the new blocks: the orders traded and their trades' protocol fees,
    rechecking the last 10 minutes of trades whose fees the API did not list yet. If one of these
    lookups fails, or they take more than 2 minutes, the snapshot is written without the
    auction-detail figures, and the rest is caught up after it.
-5. Marks the data current and, with `--snapshot`, writes the snapshot.
-6. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
+6. Marks the data current and, with `--snapshot`, writes the snapshot.
+7. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
    settlements, followed by their auction lookups, followed by their details. Settlement history
    is kept at least as deep as auction history. Trades stored before the schema held order uids
    get theirs from their `Trade` events.
-7. Writes the snapshot again if the history grew.
+8. Writes the snapshot again if the history grew.
 
 On an empty database there is nothing to catch up: the backfill starts at the safe block and the
 snapshot is written once it ends. Every step commits as it goes, so an interrupted run loses

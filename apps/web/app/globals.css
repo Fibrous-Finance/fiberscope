@@ -15,6 +15,9 @@
 	--ln2: light-dark(#d2d7db, #363d51);
 	--hov: light-dark(#eef1f3, #232839);
 	--act: light-dark(#0a7a81, #3cc9cf);
+	/* The hovered solver's name: brand teal on dark; on light, where teal is 2.4:1, a darker teal
+	   that keeps 4.75:1 on a hovered row. */
+	--hvt: light-dark(#09767d, #11b2ba);
 	--warn: light-dark(#8a5a00, #f2b544);
 	--err: light-dark(#b42318, #ff8a7a);
 }
@@ -53,6 +56,7 @@
 	--color-ln2: var(--ln2);
 	--color-hov: var(--hov);
 	--color-act: var(--act);
+	--color-hvt: var(--hvt);
 	--color-warn: var(--warn);
 	--color-err: var(--err);
 	/* Brand teal: thumbs, buttons, hover highlight, logo, live dot. Text on teal is navy. */
@@ -150,10 +154,9 @@
 	padding-inline: clamp(20px, 5vw, 48px);
 }
 
+/* Sentence case, so names such as "CoW" keep their capitals. */
 @utility eyebrow {
 	font: 500 12px/1.5 var(--font-mono);
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
 	color: var(--mu);
 	text-wrap: balance;
 }

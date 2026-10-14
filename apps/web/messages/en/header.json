@@ -5,7 +5,8 @@
 		"overview": "Overview",
 		"solvers": "Solvers",
 		"auctions": "Auctions",
-		"methodology": "Methodology"
+		"methodology": "Methodology",
+		"efficiency": "Efficiency"
 	},
 	"network": {
 		"label": "Network: {name}",
@@ -16,8 +17,8 @@
 		"gnosis": "Gnosis Chain"
 	},
 	"status": {
-		"live": "Updated {time}\u00a0UTC",
-		"liveTitle": "Data to block {block} · updated every {minutes, plural, one {minute} other {#\u00a0minutes}}",
+		"live": "Updated {time} UTC",
+		"liveTitle": "Data to block {block} · updated every {minutes, plural, one {minute} other {# minutes}}",
 		"delayed": "Delayed",
 		"delayedTitle": "Last updated {age} ({asOf}){polling, select, yes { · the page checks for new data every minute} other {}}",
 		"loading": "Loading…",
@@ -25,7 +26,7 @@
 		"loadingTitle": "Loading the latest data",
 		"error": "Data unavailable",
 		"errorShort": "No data",
-		"errorTitle": "Fiberscope’s data service didn’t respond · last try {time}\u00a0UTC"
+		"errorTitle": "Fiberscope’s data service didn’t respond · last try {time} UTC"
 	},
 	"appearance": {
 		"title": "Switch to {theme, select, dark {dark} other {light}} theme"

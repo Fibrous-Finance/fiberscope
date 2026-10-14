@@ -45,7 +45,7 @@ export function Facts({ view, leader }: { view: View; leader: Row }) {
 		{
 			href: "#change",
 			label: t("since"),
-			value: run ? f.day(run.since) : DASH,
+			value: run ? f.dayNarrow(run.since) : DASH,
 			caption: runner ? t("runBy", { name: runner.label, run: days }) : days,
 			mono: runner?.unnamed,
 		},

@@ -329,26 +329,10 @@ describe("tapeCell", () => {
 			{ solver: "c", score: 0.5 },
 		],
 	};
-	it("opens the solver's own settlement when it won, else the first winner's", () => {
-		assert.deepEqual(tapeCell(auction, "b"), { state: "won", tx: "0xbb" });
-		assert.deepEqual(tapeCell(auction, "c"), { state: "entered", tx: "0xaa" });
-		assert.deepEqual(tapeCell(auction, "d"), { state: "absent", tx: "0xaa" });
-	});
-
-	it("opens the first settlement a winner made when the first winner never settled", () => {
-		const failed = {
-			...auction,
-			winners: [
-				{ solver: "a", tx: null },
-				{ solver: "b", tx: "0xbb" },
-			],
-		};
-		assert.deepEqual(tapeCell(failed, "a"), { state: "won", tx: "0xbb" });
-		assert.deepEqual(tapeCell(failed, "c"), { state: "entered", tx: "0xbb" });
-		assert.deepEqual(tapeCell({ ...auction, winners: [{ solver: "a", tx: null }] }, "c"), {
-			state: "entered",
-			tx: null,
-		});
+	it("marks a winner won, another entrant entered and the rest absent", () => {
+		assert.deepEqual(tapeCell(auction, "b"), { state: "won" });
+		assert.deepEqual(tapeCell(auction, "c"), { state: "entered" });
+		assert.deepEqual(tapeCell(auction, "d"), { state: "absent" });
 	});
 });
 

@@ -8,6 +8,11 @@ const f = createFormat("en");
 describe("format", () => {
 	it("abbreviates dollars with fewer decimals as amounts grow", () => {
 		assert.equal(f.usd(4_870_000), "$4.87M");
+		assert.equal(f.usd(37_412_000), "$37.4M");
+		assert.equal(f.usd(412_300_000), "$412M");
+		assert.equal(f.usd(1_951_000_000), "$1.95B");
+		assert.equal(f.usd(37_400_000_000), "$37.4B");
+		assert.equal(f.usd(412_000_000_000), "$412B");
 		assert.equal(f.usd(285_674), "$286K");
 		assert.equal(f.usd(52_998), "$53.0K");
 		assert.equal(f.usd(3_559), "$3.56K");
@@ -27,6 +32,14 @@ describe("format", () => {
 		assert.equal(f.usd(99_960), "$100K");
 		assert.equal(f.usd(999_499), "$999K");
 		assert.equal(f.usd(999_600), "$1.00M");
+		assert.equal(f.usd(9_994_000), "$9.99M");
+		assert.equal(f.usd(9_996_000), "$10.0M");
+		assert.equal(f.usd(99_949_000), "$99.9M");
+		assert.equal(f.usd(99_960_000), "$100M");
+		assert.equal(f.usd(999_499_000), "$999M");
+		assert.equal(f.usd(999_600_000), "$1.00B");
+		assert.equal(f.usd(9_996_000_000), "$10.0B");
+		assert.equal(f.usd(99_960_000_000), "$100B");
 	});
 
 	it("writes surplus with cents below $100 and never as $0.00 or $100.00", () => {
@@ -145,6 +158,7 @@ describe("format", () => {
 	it("writes English dates day first with three-letter months, in UTC, never split", () => {
 		const t = Date.UTC(2026, 8, 13, 22, 10, 5);
 		assert.equal(f.day(t), "13\u00a0Sep");
+		assert.equal(f.dayNarrow(t), "13\u202fSep");
 		assert.equal(f.dayTime(t), "13\u00a0Sep 22:10");
 		assert.equal(f.clock(t), "22:10:05");
 		assert.equal(f.date(t), "13\u00a0Sep\u00a02026");

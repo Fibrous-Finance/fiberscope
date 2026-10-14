@@ -84,8 +84,8 @@ export interface NetworkBars {
 	earlier: string;
 	/** Days inside the selected period. */
 	window: string;
-	/** The hovered day. */
-	hovered: string;
+	/** The picked day: under the mouse, or chosen with the keys or a tap. */
+	picked: string;
 }
 
 /**
@@ -94,17 +94,16 @@ export interface NetworkBars {
  */
 export function networkBars(
 	{ totals, window }: Pick<NetworkActivity, "totals" | "window">,
-	hovered: number | null
+	picked: number | null
 ): NetworkBars {
 	const max = Math.max(1, ...totals.filter((total) => total !== null));
-	const bars: NetworkBars = { earlier: "", window: "", hovered: "" };
+	const bars: NetworkBars = { earlier: "", window: "", picked: "" };
 	totals.forEach((total, k) => {
 		if (total === null) return;
 		const left = (k + 0.15).toFixed(2);
 		const top = (100 - (total / max) * 96).toFixed(2);
 		const bar = `M${left} ${top}H${(k + 0.85).toFixed(2)}V100H${left}Z`;
-		const group =
-			k === hovered ? "hovered" : k >= totals.length - window ? "window" : "earlier";
+		const group = k === picked ? "picked" : k >= totals.length - window ? "window" : "earlier";
 		bars[group] += bar;
 	});
 	return bars;

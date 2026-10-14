@@ -44,7 +44,8 @@ export function tapeAuctions(tape: View["tape"], compact: boolean): TapeAuction[
  * auction is selected: a click or tap selects a column and opens its solutions under the tape,
  * while hovering a column only previews it in the readout. The tape is a single tab stop, to
  * assistive tech a grid with one cell per auction: ← → Home End move the selection, Enter or Space
- * opens or closes the solutions, Escape closes them. Cells are plain marks.
+ * opens or closes the solutions, Escape closes them. Cells are plain marks. The block is `#tape`,
+ * where a solver detail's "Latest 24 auctions" links.
  */
 export function Tape({
 	ref,
@@ -130,7 +131,8 @@ export function Tape({
 	};
 
 	return (
-		<div className="mt-14">
+		// The detail's "Latest 24 auctions" lands here: the margin keeps the title clear of the header.
+		<div id="tape" className="mt-14 scroll-mt-6">
 			<div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1.5">
 				<h3 className="text-[15px] font-medium max-wide:basis-full">
 					{t("title", { count })}

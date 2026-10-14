@@ -74,12 +74,12 @@ every solver with a batch in the window by the selected measure. A solver with n
 window's days with auction data has no volume figure rather than $0, and no rank by volume. The
 overview's **Lead over #2** is the leader's share divided by the runner-up's.
 
-### Gas/trade
+### Gas per trade
 
 Gas units used by a solver's batches divided by the trades they filled: units of gas, not cost. A
 transaction that holds several batches splits its gas evenly between them.
 
-The overview's **Lowest gas/trade** considers only solvers with at least 100 batches per day of
+The overview's **Lowest gas per trade** considers only solvers with at least 100 batches per day of
 settlement data in the window, or every solver when none has that many.
 
 ### Transaction cost
@@ -178,10 +178,15 @@ The value CoW's protocol computes from each solution's executed amounts to choos
 (CIP-20): roughly the surplus the solution generates for traders. CoW's API gives it in ETH; the
 page converts it to USD at Chainlink's ETH/USD rate at the auction's start block, to 6 significant
 figures. **Below winner** is (winning score − score) ÷ winning score. It is given only for auctions
-with a single winning solution. With several winners, a losing solution competed only with the
-winner whose orders it would also have settled; the scores do not identify that winner. Each
-solver's row shows its best solution, its first in CoW's ranking: the winners, then the other
-solutions by score, then the filtered-out ones.
+with a single winning solution. Only a filtered-out solution can score above that winner, since one
+that passed the filter with a higher score would have won; the page then shows how much higher:
+(score − winning score) ÷ winning score. With several winning solutions, a losing solution competed
+only with the winning solution whose orders it would also have settled; the scores do not identify
+that solution. Each solver's row shows its best solution, its first in CoW's ranking: the winners,
+then the other solutions by score, then the filtered-out ones. With several winning solutions,
+winning solvers come first and the others after them, each group sorted by the score its rows
+show. A winner's row also shows the highest score among its other solutions, filtered out or not,
+when that score is higher than the one the row shows.
 
 ### Filtered out
 

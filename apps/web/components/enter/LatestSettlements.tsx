@@ -29,6 +29,15 @@ const GRID =
  * ring goes around the label instead and stays off the figures above.
  */
 const COMPACT_LINK = "flex min-h-11 items-center whitespace-nowrap quiet focus-label";
+/**
+ * Time stays in view while the table scrolls sideways: opaque, the full row tall, and its colour
+ * carried over the column gap so nothing shows between it and the next column. It stays below the
+ * fade on the right edge, and takes the row's colour as the row does when its solver is hovered.
+ */
+const STICKY_TIME =
+	"sticky left-0 z-1 flex items-center self-stretch transition-[background-color,box-shadow] duration-150";
+const STICKY_TIME_BG = "bg-bg shadow-[12px_0_0_var(--bg)]";
+const STICKY_TIME_HOT = "bg-hov shadow-[12px_0_0_var(--hov)]";
 
 /**
  * The newest settlements of every solver, under the window's fee totals: a table on wide pages
@@ -150,7 +159,12 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 							role="row"
 							className={`${GRID} box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] whitespace-nowrap text-fa uppercase`}
 						>
-							<span role="columnheader">{t("columns.time")}</span>
+							<span
+								role="columnheader"
+								className={`${STICKY_TIME} ${STICKY_TIME_BG}`}
+							>
+								{t("columns.time")}
+							</span>
 							<span role="columnheader">{t("columns.solver")}</span>
 							<span role="columnheader" className="text-right">
 								{t("columns.trades")}
@@ -188,11 +202,16 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 								onMouseLeave={() => setHovered(null)}
 								className={`${GRID} box-content h-[38px] border-b border-ln font-mono text-[12.5px] leading-[normal] font-medium transition-colors duration-150 ${row.hot ? "bg-hov" : ""}`}
 							>
-								<span role="cell">{row.time}</span>
+								<span
+									role="cell"
+									className={`${STICKY_TIME} ${row.hot ? STICKY_TIME_HOT : STICKY_TIME_BG}`}
+								>
+									{row.time}
+								</span>
 								<span
 									role="cell"
 									title={row.solver.label}
-									className={`truncate text-[13.5px] transition-colors duration-200 ${row.solver.unnamed ? "font-mono" : "font-sans"} ${row.hot ? "text-teal" : ""}`}
+									className={`truncate text-[13.5px] transition-colors duration-200 ${row.solver.unnamed ? "font-mono" : "font-sans"} ${row.hot ? "text-hvt" : ""}`}
 								>
 									{row.solver.label}
 								</span>
@@ -224,7 +243,7 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 								<span
 									role="cell"
 									title={row.quotedBy?.label}
-									className={`truncate pl-1.5 text-[13px] transition-colors duration-200 ${row.quotedBy?.unnamed ? "font-mono" : "font-sans"} ${row.quotedHot ? "text-teal" : ""}`}
+									className={`truncate pl-1.5 text-[13px] transition-colors duration-200 ${row.quotedBy?.unnamed ? "font-mono" : "font-sans"} ${row.quotedHot ? "text-hvt" : ""}`}
 								>
 									{row.quotedBy?.label ?? DASH}
 								</span>

@@ -1,7 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
-import type { KeyboardEvent } from "react";
+import { useId } from "react";
 
 import { useTranslations } from "next-intl";
 
@@ -41,6 +40,15 @@ const SHORT_ADDRESS_TABLE = 720;
 const MIN_SPAN = 0.04;
 /** The strip shows this many of the latest auctions, oldest first. */
 const LATEST_AUCTIONS = 24;
+/**
+ * The footnote under the stats that each mark points to. A source's mark can be another's ("†"
+ * after the surplus stats when surplus covers the auction data's days), and so can its line.
+ */
+const FOOTNOTE: Record<string, string> = {
+	"†": "fn-detail-a",
+	"‡": "fn-detail-s",
+	"§": "fn-detail-d",
+};
 /** Settlements this close to the end of the window show a clock time, older ones the day too. */
 const RECENT_MS = 12 * 3_600_000;
 /** "Copied ✓" stays this long after copying an address. */
@@ -60,6 +68,12 @@ const COMPACT_LINK = "flex min-h-11 items-center whitespace-nowrap quiet focus-l
  */
 const SETTLEMENT_GRID =
 	"grid grid-cols-[96px_46px_46px_minmax(0,1fr)_76px_72px_56px_56px_minmax(96px,.6fr)_200px] items-center gap-3";
+/**
+ * Time stays in view while the settlements scroll sideways: opaque, the full row tall, and its
+ * colour carried over the column gap so nothing shows between it and the next column.
+ */
+const STICKY_TIME =
+	"sticky left-0 z-1 flex items-center self-stretch bg-bg shadow-[12px_0_0_var(--bg)]";
 /** The compact settlement's figures, in order, as one wrapping list. */
 const SETTLEMENT_ITEMS = ["trades", "swaps", "volume", "surplus", "cost", "gas"] as const;
 
@@ -70,12 +84,17 @@ const DOT: Record<TapeCell["state"], string> = {
 	absent: "size-0.5 rounded-full bg-ln2",
 };
 
-interface AuctionCell {
-	id: number;
-	state: TapeCell["state"];
-	/** The settlement in CoW Explorer; null when the auction never settled. */
-	href: string | null;
-	title: string;
+/** The title over the strip links to the auction tape, where each auction can be opened. */
+const TAPE_LINK =
+	"text-inherit underline decoration-ln2 underline-offset-3 transition-colors duration-200 hover:text-fg";
+
+interface Stat {
+	key: string;
+	label: string;
+	/** The footnote that explains the label's mark; none without one. */
+	describedBy?: string;
+	value: string;
+	note: string;
 }
 
 /** Everything both layouts show, formatted. */
@@ -135,30 +154,175 @@ function useDetail(row: Row) {
 		{ mark: marks.detail, covered: details.coverage },
 	].map((source) => (source.covered > 0 ? source : { ...source, mark: "" }));
 	const [auctionMark, surplusMark, detailMark] = sources.map((source) => source.mark);
+	// A marked label points to its footnote, for screen readers that skip past the stats.
 	const marked = (label: string, mark: string) =>
-		mark === "" ? label : t("detail.labels.partial", { label, mark });
+		mark === ""
+			? { label }
+			: { label: t("detail.labels.partial", { label, mark }), describedBy: FOOTNOTE[mark] };
 	const quoter = solverRefs(snapshot!);
 
 	// Without auction data in the window the strip stays empty, as the auction stats do.
-	const cells: AuctionCell[] = (auctionData ? (snapshot?.latestAuctions ?? []) : [])
+	const cells = (auctionData ? (snapshot?.latestAuctions ?? []) : [])
 		.slice(-LATEST_AUCTIONS)
-		.map((auction) => {
-			const { state, tx } = tapeCell(auction, row.id);
-			return {
-				id: auction.id,
-				state,
-				href: tx === null ? null : COW_TX + tx,
-				title: t("detail.auction", {
-					id: f.int(auction.id),
-					time: tc("utc", { time: f.clock(auction.time) }),
-					state,
-					link: tx === null ? "no" : "yes",
-				}),
-			};
-		});
+		.map((auction) => ({ id: auction.id, state: tapeCell(auction, row.id).state }));
 	const rank = (value: number | null) =>
 		value === null ? DASH : t("detail.rank", { rank: value });
 	const registration = registrationOf(snapshot?.registry ?? [], row);
+
+	/**
+	 * Fourteen stats, two to a row: cost next to gas, typical surplus after the swaps, filtered
+	 * out under entered and close losses under win rate.
+	 */
+	const stats: Stat[] = [
+		{
+			key: "batches",
+			label: labels.batches,
+			value: cellText(row, "batches", f),
+			note: t("detail.stats.batches", { share: f.percent(row.shares.batches, 1) }),
+		},
+		{
+			key: "trades",
+			label: labels.trades,
+			value: cellText(row, "trades", f),
+			note:
+				row.tradesPerBatch === null
+					? DASH
+					: t("detail.stats.trades", { count: f.fixed(row.tradesPerBatch, 2) }),
+		},
+		{
+			key: "volume",
+			...marked(labels.volume, auctionMark),
+			value: cellText(row, "volume", f),
+			note:
+				row.averageTrade === null
+					? noData
+					: t("detail.stats.volume", { value: f.usd(row.averageTrade) }),
+		},
+		{
+			key: "batchValue",
+			...marked(t("detail.labels.batchValue"), auctionMark),
+			value: f.usd(row.batchValue),
+			note:
+				batchValue === null
+					? noData
+					: t("detail.stats.average", { value: f.usd(batchValue) }),
+		},
+		{
+			key: "gas",
+			label: labels.gas,
+			value: cellText(row, "gas", f),
+			note:
+				gasDiff === null
+					? DASH
+					: t("detail.stats.gas", {
+							percent: f.percent(Math.abs(gasDiff)),
+							// Within half a percent the difference would read "0%": the same.
+							direction:
+								Math.round(Math.abs(gasDiff) * 100) === 0
+									? "same"
+									: gasDiff < 0
+										? "below"
+										: "above",
+						}),
+		},
+		{
+			key: "cost",
+			label: t("detail.labels.cost"),
+			value: f.cost(own?.costPerTrade ?? null),
+			note:
+				network.costPerTrade === null
+					? DASH
+					: t("detail.stats.cost", { value: f.cost(network.costPerTrade) }),
+		},
+		{
+			key: "swaps",
+			label: t("detail.labels.swaps"),
+			value: row.swapsPerTrade === null ? DASH : f.fixed(row.swapsPerTrade, 2),
+			note: swaps === null ? DASH : t("detail.stats.average", { value: f.fixed(swaps, 2) }),
+		},
+		{
+			key: "surplus",
+			...marked(t("detail.labels.surplus"), surplusMark),
+			value:
+				typical === null ? DASH : t("detail.stats.surplusValue", { bps: f.bps(typical) }),
+			note: !auctionData
+				? noData
+				: typical === null
+					? t("detail.stats.noSurplusData")
+					: t("detail.stats.surplus", {
+							share: own?.unusualShare ? f.percent(own.unusualShare) : "none",
+						}),
+		},
+		{
+			key: "participation",
+			...marked(labels.participation, auctionMark),
+			value: cellText(row, "participation", f),
+			note: row.entered
+				? t("detail.stats.participation", { percent: f.percent(participation) })
+				: noData,
+		},
+		{
+			key: "winRate",
+			...marked(labels.winRate, auctionMark),
+			value: cellText(row, "winRate", f),
+			note:
+				row.entered && row.wonShare !== null
+					? t("detail.stats.winRate", { percent: f.percent(row.wonShare, 1) })
+					: noData,
+		},
+		{
+			key: "filteredOut",
+			...marked(t("detail.labels.filteredOut"), detailMark),
+			value: filteredText(detail?.filteredShare ?? null, f),
+			note:
+				detail === null
+					? noDetails
+					: detail.solutions === 0
+						? t("detail.stats.noSolutions")
+						: t("detail.stats.filteredOut", {
+								filtered: f.int(detail.filteredOut),
+								solutions: detail.solutions,
+							}),
+		},
+		{
+			key: "closeLosses",
+			...marked(t("detail.labels.closeLosses"), detailMark),
+			value: f.percent(detail?.closeLossShare ?? null),
+			note:
+				detail === null
+					? noDetails
+					: detail.losses === 0
+						? t("detail.stats.noLosses")
+						: t("detail.stats.closeLosses", { losses: detail.losses }),
+		},
+		{
+			key: "quotes",
+			...marked(t("detail.labels.quotes"), detailMark),
+			value: detail === null ? DASH : f.int(detail.quotes),
+			note:
+				detail === null
+					? noDetails
+					: detail.quotes === 0
+						? t("detail.stats.noQuotes")
+						: t("detail.stats.quotes", {
+								share: f.percent(detail.quoteShare, 1),
+								verified: f.percent(detail.verifiedShare),
+							}),
+		},
+		{
+			key: "settledItself",
+			...marked(t("detail.labels.settledItself"), detailMark),
+			value: f.percent(detail?.settledShare ?? null),
+			note:
+				detail === null
+					? noDetails
+					: detail.quotes === 0
+						? t("detail.stats.noQuotesShort")
+						: t("detail.stats.settledItself", {
+								percent: f.percent(details.network.settledShare),
+							}),
+		},
+	];
 
 	return {
 		// The big value is the window's share, so the label names the window (the chart's own
@@ -182,170 +346,17 @@ function useDetail(row: Row) {
 		}),
 		start,
 		end,
-		/**
-		 * Fourteen stats, two to a row: cost next to gas, typical surplus after the swaps, filtered
-		 * out under entered and close losses under win rate.
-		 */
-		stats: [
-			{
-				key: "batches",
-				label: labels.batches,
-				value: cellText(row, "batches", f),
-				note: t("detail.stats.batches", { share: f.percent(row.shares.batches, 1) }),
-			},
-			{
-				key: "trades",
-				label: labels.trades,
-				value: cellText(row, "trades", f),
-				note:
-					row.tradesPerBatch === null
-						? DASH
-						: t("detail.stats.trades", { count: f.fixed(row.tradesPerBatch, 2) }),
-			},
-			{
-				key: "volume",
-				label: marked(labels.volume, auctionMark),
-				value: cellText(row, "volume", f),
-				note:
-					row.averageTrade === null
-						? noData
-						: t("detail.stats.volume", { value: f.usd(row.averageTrade) }),
-			},
-			{
-				key: "batchValue",
-				label: marked(t("detail.labels.batchValue"), auctionMark),
-				value: f.usd(row.batchValue),
-				note:
-					batchValue === null
-						? noData
-						: t("detail.stats.average", { value: f.usd(batchValue) }),
-			},
-			{
-				key: "gas",
-				label: labels.gas,
-				value: cellText(row, "gas", f),
-				note:
-					gasDiff === null
-						? DASH
-						: t("detail.stats.gas", {
-								percent: f.percent(Math.abs(gasDiff)),
-								// Within half a percent the difference would read "0%": the same.
-								direction:
-									Math.round(Math.abs(gasDiff) * 100) === 0
-										? "same"
-										: gasDiff < 0
-											? "below"
-											: "above",
-							}),
-			},
-			{
-				key: "cost",
-				label: t("detail.labels.cost"),
-				value: f.cost(own?.costPerTrade ?? null),
-				note:
-					network.costPerTrade === null
-						? DASH
-						: t("detail.stats.cost", { value: f.cost(network.costPerTrade) }),
-			},
-			{
-				key: "swaps",
-				label: t("detail.labels.swaps"),
-				value: row.swapsPerTrade === null ? DASH : f.fixed(row.swapsPerTrade, 2),
-				note:
-					swaps === null ? DASH : t("detail.stats.average", { value: f.fixed(swaps, 2) }),
-			},
-			{
-				key: "surplus",
-				label: marked(t("detail.labels.surplus"), surplusMark),
-				value:
-					typical === null
-						? DASH
-						: t("detail.stats.surplusValue", { bps: f.bps(typical) }),
-				note: !auctionData
-					? noData
-					: typical === null
-						? t("detail.stats.noSurplusData")
-						: t("detail.stats.surplus", {
-								share: own?.unusualShare ? f.percent(own.unusualShare) : "none",
-							}),
-			},
-			{
-				key: "participation",
-				label: marked(labels.participation, auctionMark),
-				value: cellText(row, "participation", f),
-				note: row.entered
-					? t("detail.stats.participation", { percent: f.percent(participation) })
-					: noData,
-			},
-			{
-				key: "winRate",
-				label: marked(labels.winRate, auctionMark),
-				value: cellText(row, "winRate", f),
-				note:
-					row.entered && row.wonShare !== null
-						? t("detail.stats.winRate", { percent: f.percent(row.wonShare, 1) })
-						: noData,
-			},
-			{
-				key: "filteredOut",
-				label: marked(t("detail.labels.filteredOut"), detailMark),
-				value: filteredText(detail?.filteredShare ?? null, f),
-				note:
-					detail === null
-						? noDetails
-						: detail.solutions === 0
-							? t("detail.stats.noSolutions")
-							: t("detail.stats.filteredOut", {
-									filtered: f.int(detail.filteredOut),
-									solutions: detail.solutions,
-								}),
-			},
-			{
-				key: "closeLosses",
-				label: marked(t("detail.labels.closeLosses"), detailMark),
-				value: f.percent(detail?.closeLossShare ?? null),
-				note:
-					detail === null
-						? noDetails
-						: detail.losses === 0
-							? t("detail.stats.noLosses")
-							: t("detail.stats.closeLosses", { losses: detail.losses }),
-			},
-			{
-				key: "quotes",
-				label: marked(t("detail.labels.quotes"), detailMark),
-				value: detail === null ? DASH : f.int(detail.quotes),
-				note:
-					detail === null
-						? noDetails
-						: detail.quotes === 0
-							? t("detail.stats.noQuotes")
-							: t("detail.stats.quotes", {
-									share: f.percent(detail.quoteShare, 1),
-									verified: f.percent(detail.verifiedShare),
-								}),
-			},
-			{
-				key: "settledItself",
-				label: marked(t("detail.labels.settledItself"), detailMark),
-				value: f.percent(detail?.settledShare ?? null),
-				note:
-					detail === null
-						? noDetails
-						: detail.quotes === 0
-							? t("detail.stats.noQuotesShort")
-							: t("detail.stats.settledItself", {
-									percent: f.percent(details.network.settledShare),
-								}),
-			},
-		],
+		stats,
 		/**
 		 * Under the stats, one line per mark: "† Covers the last 90 of 180 days." None when every
 		 * source covers the window.
 		 */
 		coverage: sources
 			.filter(({ mark }, i) => mark !== "" && sources.findIndex((s) => s.mark === mark) === i)
-			.map(({ mark, covered }) => t("detail.coverage", { mark, covered, days: view.days })),
+			.map(({ mark, covered }) => ({
+				id: FOOTNOTE[mark],
+				text: t("detail.coverage", { mark, covered, days: view.days }),
+			})),
 		auctions: {
 			title: t("detail.auctions", { count: cells.length }),
 			note:
@@ -453,6 +464,8 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 	const t = useTranslations("Winning");
 	const tc = useTranslations("Common");
 	const [copied, copy] = useCopy(COPIED_MS);
+	// The compact list renders its own detail too, hidden here: only the one shown has the ids.
+	const { compact } = useDashboard().layout;
 	const { ref: settlementsScroller, more: moreColumns } = useScrollMore();
 	const settlementsTitle = useId();
 	const narrow = width > 0 && width < NARROW_TABLE;
@@ -469,7 +482,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 			>
 				<h3 className="sr-only">{row.label}</h3>
 				<div className="min-w-0">
-					<div className="label">{d.title}</div>
+					<h4 className="label">{d.title}</h4>
 					<div className="mt-2 flex items-baseline gap-2.5">
 						<span className="font-mono text-[28px] leading-none font-medium tracking-[-0.04em]">
 							{d.share}
@@ -545,7 +558,9 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 					<div className="grid grid-cols-2 content-start gap-x-5 gap-y-[18px]">
 						{d.stats.map((stat) => (
 							<div key={stat.key} className="min-w-0">
-								<div className="label">{stat.label}</div>
+								<div aria-describedby={stat.describedBy} className="label">
+									{stat.label}
+								</div>
 								<div className="mt-1 font-mono text-[18px] leading-[normal] font-medium tracking-[-0.03em]">
 									{stat.value}
 								</div>
@@ -557,10 +572,11 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 					</div>
 					{d.coverage.map((line, i) => (
 						<div
-							key={line}
+							key={line.text}
+							id={compact ? undefined : line.id}
 							className={`${i === 0 ? "mt-4" : "mt-1"} font-mono text-[11px] leading-[normal] font-medium text-fa`}
 						>
-							{line}
+							{line.text}
 						</div>
 					))}
 				</div>
@@ -572,12 +588,12 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 					className={`min-w-0 gap-x-9 gap-y-[18px] ${narrow ? "col-span-full grid grid-cols-[repeat(auto-fit,minmax(270px,1fr))]" : "flex flex-col"}`}
 				>
 					<div>
-						<h4 className="label">{d.auctions.title}</h4>
-						<AuctionStrip
-							cells={d.auctions.cells}
-							label={d.auctions.title}
-							className="mt-2.5"
-						/>
+						<h4 className="label">
+							<a href="#tape" className={TAPE_LINK}>
+								{d.auctions.title}
+							</a>
+						</h4>
+						<AuctionStrip cells={d.auctions.cells} className="mt-2.5" />
 						<div className="mt-1.5 text-[12.5px] text-mu">{d.auctions.note}</div>
 					</div>
 					<div>
@@ -635,7 +651,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 								role="row"
 								className={`${SETTLEMENT_GRID} box-content h-[34px] border-b border-ln2 font-mono text-[10.5px] leading-[normal] font-medium tracking-[.06em] text-fa uppercase`}
 							>
-								<span role="columnheader">
+								<span role="columnheader" className={STICKY_TIME}>
 									{t("detail.settlementColumns.time")}
 								</span>
 								<span role="columnheader" className="text-right">
@@ -672,7 +688,9 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 									role="row"
 									className={`${SETTLEMENT_GRID} box-content h-[38px] border-b border-ln font-mono text-[12.5px] leading-[normal] font-medium`}
 								>
-									<span role="cell">{s.time}</span>
+									<span role="cell" className={STICKY_TIME}>
+										{s.time}
+									</span>
 									<span role="cell" className="text-right">
 										{s.trades}
 									</span>
@@ -739,14 +757,16 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 }
 
 /**
- * The compact detail: one stack, the auction strip as a picture only, shortened addresses and
- * settlements whose figures wrap as one list. Every link and button is a 44px target.
+ * The compact detail: one stack, shortened addresses and settlements whose figures wrap as one
+ * list. Every link and button is a 44px target.
  */
 export function DetailCompact({ row }: { row: Row }) {
 	const d = useDetail(row);
 	const t = useTranslations("Winning");
 	const tc = useTranslations("Common");
 	const [copied, copy] = useCopy(COPIED_MS);
+	// The table renders its own detail too, hidden here: only the one shown has the ids.
+	const { compact } = useDashboard().layout;
 
 	return (
 		<div className="flex flex-col gap-[22px] border-b border-ln pt-4 pb-[22px] pl-[34px]">
@@ -766,7 +786,9 @@ export function DetailCompact({ row }: { row: Row }) {
 				<div className="grid grid-cols-2 gap-x-[18px] gap-y-4">
 					{d.stats.map((stat) => (
 						<div key={stat.key} className="min-w-0">
-							<div className={SMALL_LABEL}>{stat.label}</div>
+							<div aria-describedby={stat.describedBy} className={SMALL_LABEL}>
+								{stat.label}
+							</div>
 							<div className="mt-[3px] font-mono text-[16px] leading-[normal] font-medium">
 								{stat.value}
 							</div>
@@ -778,24 +800,27 @@ export function DetailCompact({ row }: { row: Row }) {
 				</div>
 				{d.coverage.map((line, i) => (
 					<div
-						key={line}
+						key={line.text}
+						id={compact ? line.id : undefined}
 						className={`${i === 0 ? "mt-3" : "mt-1"} font-mono text-[11px] leading-[normal] font-medium text-fa`}
 					>
-						{line}
+						{line.text}
 					</div>
 				))}
 			</div>
 			<div>
-				<h4 className={SMALL_LABEL}>{d.auctions.title}</h4>
-				<div aria-hidden="true" className="mt-2 flex h-4">
-					{d.auctions.cells.map((cell) => (
-						<span key={cell.id} className="grid h-full flex-1 place-items-center">
-							<span className={DOT[cell.state]} />
-						</span>
-					))}
-				</div>
+				{/* A 44px target from padding that does not space the title out. */}
+				<h4 className={SMALL_LABEL}>
+					<a
+						href="#tape"
+						className={`-my-3.5 inline-flex min-h-11 items-center ${TAPE_LINK}`}
+					>
+						{d.auctions.title}
+					</a>
+				</h4>
+				<AuctionStrip cells={d.auctions.cells} className="mt-2" />
 				<DotList
-					items={[d.auctions.note, d.ranks]}
+					items={[{ text: d.auctions.note }, { text: d.ranks }]}
 					className="mt-1.5 text-[12px] text-mu"
 				/>
 			</div>
@@ -938,78 +963,24 @@ function ShareChart({
 }
 
 /**
- * The latest auctions, oldest first; a click on a cell opens that auction's settlement. The strip
- * is one tab stop, as the auction tape is: it starts on the latest auction with a settlement, ← →
- * move between the cells, Home and End jump to the first and last, and Enter opens a cell's
- * settlement. Each cell is named in full; the line under the strip says what it shows.
+ * The latest auctions, oldest first, as a picture: its cells, touching and under 18px wide, are
+ * too small to be targets, so the title above links to the tape instead and the line under the
+ * strip says what it shows.
  */
 function AuctionStrip({
 	cells,
-	label,
 	className,
 }: {
-	cells: AuctionCell[];
-	label: string;
+	cells: { id: number; state: TapeCell["state"] }[];
 	className: string;
 }) {
-	// The cell that holds the tab stop, by auction id, so new data keeps it on its auction.
-	const [current, setCurrent] = useState<number | null>(null);
-	const picked = cells.findIndex((cell) => cell.id === current);
-	const latest = cells.findLastIndex((cell) => cell.href !== null);
-	const active = picked !== -1 ? picked : latest !== -1 ? latest : cells.length - 1;
-
-	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-		if (event.altKey || event.ctrlKey || event.metaKey) return;
-		const moves: Partial<Record<string, number>> = {
-			ArrowLeft: active - 1,
-			ArrowRight: active + 1,
-			Home: 0,
-			End: cells.length - 1,
-		};
-		const next = moves[event.key];
-		if (next === undefined) return;
-		event.preventDefault();
-		const index = Math.min(cells.length - 1, Math.max(0, next));
-		setCurrent(cells[index].id);
-		event.currentTarget.querySelectorAll<HTMLElement>("[data-cell]")[index]?.focus();
-	};
-
 	return (
-		<div
-			role="group"
-			aria-label={label}
-			onKeyDown={onKeyDown}
-			className={`flex h-4 ${className}`}
-		>
-			{cells.map((cell, index) =>
-				cell.href === null ? (
-					<span
-						key={cell.id}
-						data-cell=""
-						role="img"
-						aria-label={cell.title}
-						title={cell.title}
-						tabIndex={index === active ? 0 : -1}
-						className="grid h-full flex-1 place-items-center rounded-[3px]"
-					>
-						<span className={DOT[cell.state]} />
-					</span>
-				) : (
-					<a
-						key={cell.id}
-						data-cell=""
-						href={cell.href}
-						target="_blank"
-						rel="noopener"
-						aria-label={cell.title}
-						title={cell.title}
-						tabIndex={index === active ? 0 : -1}
-						className="grid h-full flex-1 place-items-center rounded-[3px] hover:bg-[color-mix(in_oklab,var(--fg)_14%,transparent)]"
-					>
-						<span className={DOT[cell.state]} />
-					</a>
-				)
-			)}
+		<div aria-hidden="true" className={`flex h-4 ${className}`}>
+			{cells.map((cell) => (
+				<span key={cell.id} className="grid h-full flex-1 place-items-center">
+					<span className={DOT[cell.state]} />
+				</span>
+			))}
 		</div>
 	);
 }

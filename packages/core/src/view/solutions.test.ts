@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import type { AuctionSolution, Snapshot, SnapshotSolver } from "../snapshot.ts";
 import {
+	aboveWinner,
 	auctionOutcome,
 	auctionSolutions,
 	filteredOutcome,
@@ -10,7 +11,7 @@ import {
 	trackLanes,
 	trackPosition,
 } from "./solutions.ts";
-import type { SolutionPoint } from "./solutions.ts";
+import type { SolutionPoint, TrackMark } from "./solutions.ts";
 
 const END = Date.UTC(2026, 9, 13, 20, 12);
 
@@ -149,6 +150,91 @@ describe("auctionSolutions", () => {
 		assert.equal(auctionSolutions(alone, 2)!.rival, null);
 	});
 
+	it("puts several winners first and each group in score order, under sub-heads", () => {
+		// #29,521,628, trimmed, and a filtered-out solution that CoW ranks last but that scored
+		// above two others: with several winners nothing is measured against one, so it sorts by score.
+		const s = snapshot(29_521_628, [
+			{ solver: "nexroute", score: 0.0174203, winner: true },
+			{ solver: "kaiser", score: 0.00130546, winner: true },
+			{ solver: "helixbox", score: 0.0166384 },
+			{ solver: "rosato", score: 0.0149391 },
+			{ solver: "kaiser", score: 0.0134651 },
+			{ solver: "kaiser", score: 0.0126354 },
+			{ solver: "horadrim", score: 0.00875004 },
+			{ solver: "baseline", score: 0.0155, filteredOut: true },
+		]);
+		const a = auctionSolutions(s, 29_521_628)!;
+		assert.deepEqual(
+			a.rows.map((r) => r.id),
+			["nexroute", "kaiser", "helixbox", "baseline", "rosato", "horadrim"]
+		);
+		assert.equal(a.wonRows, 2);
+		// Kaisersolver won with $0.00131 and scored $0.0135 with another solution: "best $0.0135".
+		assert.deepEqual(
+			a.rows.map((r) => r.bestScore),
+			[null, 0.0134651, null, null, null, null]
+		);
+	});
+
+	it("gives sub-heads only when some solver did not win", () => {
+		// #29,521,720: Rizzolver won with two solutions, so Won holds its one row.
+		const twice = auctionSolutions(
+			snapshot(29_521_720, [
+				{ solver: "rizzolver", score: 53.0278, winner: true },
+				{ solver: "rizzolver", score: 0.615998, winner: true },
+				{ solver: "sector", score: 51.2529 },
+				{ solver: "kaiser", score: 50.7856 },
+				{ solver: "kaiser", score: 35.0416 },
+			]),
+			29_521_720
+		)!;
+		assert.equal(twice.wonRows, 1);
+		assert.deepEqual(
+			twice.rows.map((r) => [r.id, r.solutions.length, r.bestScore]),
+			[
+				["rizzolver", 2, null],
+				["sector", 1, null],
+				["kaiser", 2, null],
+			]
+		);
+		// #29,521,615: every solution won.
+		const all = snapshot(29_521_615, [
+			{ solver: "sector", score: 0.116631, winner: true },
+			{ solver: "nexroute", score: 0.00748751, winner: true },
+		]);
+		assert.equal(auctionSolutions(all, 29_521_615)!.wonRows, null);
+		// Every solver won, though one also scored higher with a solution that did not.
+		const both = auctionSolutions(
+			snapshot(4, [
+				{ solver: "a", score: 2, winner: true },
+				{ solver: "b", score: 1, winner: true },
+				{ solver: "a", score: 3 },
+			]),
+			4
+		)!;
+		assert.equal(both.wonRows, null);
+		assert.deepEqual(
+			both.rows.map((r) => r.bestScore),
+			[3, null]
+		);
+	});
+
+	it("gives one winner's rows no sub-heads and no best", () => {
+		const a = auctionSolutions(
+			snapshot(5, [
+				{ solver: "a", score: 2, winner: true },
+				{ solver: "b", score: 1.5 },
+				{ solver: "a", score: 2.5, filteredOut: true },
+			]),
+			5
+		)!;
+		assert.equal(a.wonRows, null);
+		assert.deepEqual(
+			a.rows.map((r) => r.bestScore),
+			[null, null]
+		);
+	});
+
 	it("links the settlement of the first winner that settled", () => {
 		const s = snapshot(3, [
 			{ solver: "a", score: 2, winner: true },
@@ -262,22 +348,23 @@ describe("filteredOutcome", () => {
 
 	it("names one solver's filtered-out solutions against all of its own", () => {
 		assert.equal(filtered({ solver: "b", score: 4 }), null);
-		assert.deepEqual(filtered({ solver: "b", score: 6, filteredOut: true }), {
+		assert.deepEqual(filtered({ solver: "b", score: 4, filteredOut: true }), {
 			kind: "filteredOne",
 			solvers: [ref("b")],
 			count: 1,
 			total: 1,
+			above: null,
 		});
 		assert.deepEqual(
-			filtered({ solver: "b", score: 4 }, { solver: "b", score: 6, filteredOut: true }),
-			{ kind: "filteredSome", solvers: [ref("b")], count: 1, total: 2 }
+			filtered({ solver: "b", score: 4.5 }, { solver: "b", score: 4, filteredOut: true }),
+			{ kind: "filteredSome", solvers: [ref("b")], count: 1, total: 2, above: null }
 		);
 		assert.deepEqual(
 			filtered(
 				{ solver: "b", score: 6, filteredOut: true },
 				{ solver: "b", score: 5.5, filteredOut: true }
 			),
-			{ kind: "filteredBoth", solvers: [ref("b")], count: 2, total: 2 }
+			{ kind: "filteredBoth", solvers: [ref("b")], count: 2, total: 2, above: null }
 		);
 		assert.deepEqual(
 			filtered(
@@ -285,7 +372,33 @@ describe("filteredOutcome", () => {
 				{ solver: "b", score: 5.5, filteredOut: true },
 				{ solver: "b", score: 5.2, filteredOut: true }
 			),
-			{ kind: "filteredAll", solvers: [ref("b")], count: 3, total: 3 }
+			{ kind: "filteredAll", solvers: [ref("b")], count: 3, total: 3, above: null }
+		);
+	});
+
+	it("says how far above the winner one removed solution scored", () => {
+		// #29,521,759, trimmed: Arc won with $10.0613; Nexroute's $10.0722 is 0.11% above it.
+		const s = snapshot(29_521_759, [
+			{ solver: "arc", score: 10.0613, winner: true },
+			{ solver: "rosato", score: 10.0601 },
+			{ solver: "nexroute", score: 10.0722, filteredOut: true },
+		]);
+		const above = filteredOutcome(auctionSolutions(s, 29_521_759)!)!;
+		assert.equal(above.kind, "filteredAbove");
+		assert.deepEqual([above.solvers, above.count, above.total], [[ref("nexroute")], 1, 1]);
+		assert.ok(Math.abs(above.above! - (10.0722 - 10.0613) / 10.0613) < 1e-12);
+		// One of the solver's several solutions: "1 of B's 2 solutions scored 20% higher …".
+		assert.deepEqual(
+			filtered({ solver: "b", score: 4 }, { solver: "b", score: 6, filteredOut: true }),
+			{ kind: "filteredAbove", solvers: [ref("b")], count: 1, total: 2, above: 0.2 }
+		);
+		// Two removed solutions keep the sentences that count them, above the winner or not.
+		assert.equal(
+			filtered(
+				{ solver: "b", score: 6, filteredOut: true },
+				{ solver: "b", score: 4, filteredOut: true }
+			)?.kind,
+			"filteredBoth"
 		);
 	});
 
@@ -297,7 +410,7 @@ describe("filteredOutcome", () => {
 				{ solver: "c", score: 5.5, filteredOut: true },
 				{ solver: "b", score: 3, filteredOut: true }
 			),
-			{ kind: "filteredMany", solvers: [ref("c"), ref("b")], count: 3, total: 4 }
+			{ kind: "filteredMany", solvers: [ref("c"), ref("b")], count: 3, total: 4, above: null }
 		);
 	});
 });
@@ -313,12 +426,20 @@ describe("solutionState", () => {
 
 	it("says what a solution's Below winner shows", () => {
 		assert.equal(solutionState(point({ winner: true })), "won");
-		// A filtered-out solution can score above the winner; it still reads "Filtered out".
-		assert.equal(solutionState(point({ filteredOut: true, gap: -0.2 })), "filtered");
+		assert.equal(solutionState(point({ filteredOut: true, gap: 0.1 })), "filtered");
+		// Only a filtered-out solution can score above the winner: "Filtered out · 20% above".
+		assert.equal(solutionState(point({ filteredOut: true, gap: -0.2 })), "above");
 		assert.equal(solutionState(point({ gap: 0 })), "same");
 		assert.equal(solutionState(point({ gap: 0.0012 })), "gap");
 		// Several winners: no gap to give.
 		assert.equal(solutionState(point({})), "none");
+		assert.equal(solutionState(point({ filteredOut: true })), "filtered");
+	});
+
+	it("measures how far above the winner a filtered-out solution scored", () => {
+		assert.equal(aboveWinner(point({ filteredOut: true, gap: -0.2 })), 0.2);
+		assert.equal(aboveWinner(point({ filteredOut: true, gap: 0.1 })), null);
+		assert.equal(aboveWinner(point({ gap: -0.2 })), null);
 	});
 });
 
@@ -327,54 +448,69 @@ describe("trackPosition", () => {
 		assert.equal(trackPosition(0.0001), 0);
 		assert.equal(trackPosition(0.01), 0.5);
 		assert.equal(trackPosition(1), 1);
-		// Ties, gaps under 0.01% and scores above the winner sit at the left end.
-		assert.equal(trackPosition(0), 0);
-		assert.equal(trackPosition(-0.2), 0);
-		assert.ok(Math.abs(trackPosition(0.001) - 0.25) < 1e-12);
+		assert.ok(Math.abs(trackPosition(0.001)! - 0.25) < 1e-12);
+		// Gaps under 0.01% sit on its gridline.
+		assert.equal(trackPosition(0.00002), 0);
+	});
+
+	it("puts ties and scores above the winner on the anchor, with the winning solution", () => {
+		assert.equal(trackPosition(0), null);
+		assert.equal(trackPosition(-0.2), null);
 	});
 });
 
 describe("trackLanes", () => {
+	const mark = (position: number | null, size = 5, fixed = false): TrackMark => ({
+		position,
+		size,
+		fixed,
+	});
+
 	it("keeps marks that don't touch on the centre line", () => {
-		const marks = [
-			{ position: 0.1, size: 9 },
-			{ position: 0.5, size: 5 },
-			{ position: 0.52, size: 5 },
-		];
+		const marks = [mark(0.1, 9, true), mark(0.5), mark(0.52)];
 		assert.deepEqual(trackLanes(marks, 400), [0, 0, 0]);
 	});
 
-	it("moves a mark that would overlap above, then below, the row's best staying put", () => {
+	it("moves a mark that would overlap above, then below, the fixed ones staying put", () => {
 		// Two hollow rings 4px apart (Kaisersolver's 61% and 64% in #29,521,541) drew an "∞".
 		assert.deepEqual(
-			trackLanes(
-				[
-					{ position: 0.2, size: 9 },
-					{ position: 0.94, size: 5 },
-					{ position: 0.945, size: 5 },
-				],
-				800
-			),
+			trackLanes([mark(0.2, 9, true), mark(0.94), mark(0.945)], 800),
 			[0, 0, -1]
 		);
-		// Next to a 9px best, a 5px mark needs 8px; a third goes below; a fourth has no room left.
-		const crowded = [0.5, 0.505, 0.51, 0.5].map((position, index) => ({
-			position,
-			size: index === 0 ? 9 : 5,
-		}));
-		assert.deepEqual(trackLanes(crowded, 400), [0, -1, 1, 0]);
+		// Next to a 9px best, a 5px mark needs 8px; a third goes below; a fourth has no room left
+		// and is not drawn.
+		const crowded = [mark(0.5, 9, true), mark(0.505), mark(0.51), mark(0.5)];
+		assert.deepEqual(trackLanes(crowded, 400), [0, -1, 1, null]);
+		// The fixed marks are placed first, wherever they come.
+		assert.deepEqual(trackLanes([mark(0.5), mark(0.5, 9, true)], 400), [-1, 0]);
+	});
+
+	it("keeps the anchor apart from the log scale's start", () => {
+		// The winning square on the anchor; a tie with it moves up; the 0.01% gridline is 15.5px
+		// away, clear of the square.
+		assert.deepEqual(trackLanes([mark(null, 8, true), mark(null), mark(0)], 400), [0, -1, 0]);
+	});
+
+	it("leaves out the marks no lane has room for", () => {
+		// #29,521,619, trimmed: four of Kaisersolver's six solutions less than 1px apart. The
+		// fourth has no lane left, so the row reads "+1".
+		const s = snapshot(29_521_619, [
+			{ solver: "kipseli", score: 24.8886, winner: true },
+			{ solver: "kaiser", score: 16.7572 },
+			{ solver: "kaiser", score: 16.7522 },
+			{ solver: "kaiser", score: 16.7221 },
+			{ solver: "kaiser", score: 16.7021 },
+			{ solver: "kaiser", score: 7.05637 },
+			{ solver: "kaiser", score: 6.96783 },
+		]);
+		const row = auctionSolutions(s, 29_521_619)!.rows[1]!;
+		const marks = row.solutions.map((solution, index) =>
+			mark(trackPosition(solution.gap!), index === 0 ? 9 : 5, index === 0)
+		);
+		assert.deepEqual(trackLanes(marks, 758), [0, -1, 1, null, 0, -1]);
 	});
 
 	it("keeps every mark on the centre line until the track is measured", () => {
-		assert.deepEqual(
-			trackLanes(
-				[
-					{ position: 0.5, size: 9 },
-					{ position: 0.5, size: 5 },
-				],
-				0
-			),
-			[0, 0]
-		);
+		assert.deepEqual(trackLanes([mark(0.5, 9, true), mark(0.5)], 0), [0, 0]);
 	});
 });

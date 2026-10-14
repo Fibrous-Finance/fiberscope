@@ -10,7 +10,7 @@ auctions, by how much, whether that is changing, and how efficiently each solver
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.webp">
 <source media="(prefers-color-scheme: light)" srcset="docs/images/hero-light.webp">
-<img src="docs/images/hero-light.webp" alt="Fiberscope's overview shows the headline “Two in five of all Base batches went to one solver in the last 24 hours.” It also shows the day's totals, period and measure controls, a mosaic of batches by solver, and four facts: the leader's share, its lead over the runner-up, the day its run began and the lowest gas per trade.">
+<img src="docs/images/hero-light.webp" alt="Fiberscope's overview shows the headline “Over a quarter of all Base batches went to one solver in the last 24 hours.” It also shows the day's totals, period and measure controls, a mosaic of batches by solver, and four facts: the leader's share, its lead over the runner-up, the day its run began and the lowest gas per trade.">
 </picture>
 </a>
 

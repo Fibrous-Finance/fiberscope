@@ -28,6 +28,6 @@
 		"errorTitle": "Fiberscope’s data service didn’t respond · last try {time}\u00a0UTC"
 	},
 	"appearance": {
-		"title": "Appearance: {mode, select, light {Light} dark {Dark} other {Auto ({theme, select, dark {dark} other {light}})}} · click to change"
+		"title": "Switch to {theme, select, dark {dark} other {light}} theme"
 	}
 }

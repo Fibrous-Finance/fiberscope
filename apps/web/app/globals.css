@@ -27,6 +27,9 @@
 	color-scheme: dark;
 }
 
+/* `dark:` follows the theme on screen (data-theme), not the system's preference. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /*
  * A theme change fades the old page into the new one as a single picture (lib/theme.ts), so every
  * color changes together. 300ms: long enough to soften a full-screen change from light to dark or

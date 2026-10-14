@@ -9,13 +9,7 @@ import { Logo } from "@/components/frame/Logo";
 import { Caret } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
-import {
-	APPEARANCES,
-	readAppearance,
-	saveAppearance,
-	subscribeAppearance,
-	systemTheme,
-} from "@/lib/theme";
+import { shownTheme, subscribeTheme, toggleAppearance } from "@/lib/theme";
 
 /** The data status the header shows on every page; the overview adds what its sections need. */
 export type HeaderStatus = Omit<Status, "delayed" | "asOf" | "retry">;
@@ -268,63 +262,38 @@ function StatusPill({ status, away }: { status: HeaderStatus; away?: boolean }) 
 
 function ThemeButton() {
 	const t = useTranslations("Header.appearance");
-	const appearance = useSyncExternalStore(
-		subscribeAppearance,
-		readAppearance,
-		() => "auto" as const
-	);
-	const system = useSyncExternalStore(subscribeAppearance, systemTheme, () => "light" as const);
-	const title = t("title", { mode: appearance, theme: system });
-	const next = APPEARANCES[(APPEARANCES.indexOf(appearance) + 1) % APPEARANCES.length]!;
+	// The label follows once React runs; the icon is right from the first paint, as CSS picks it
+	// from data-theme.
+	const theme = useSyncExternalStore(subscribeTheme, shownTheme, () => "light" as const);
+	const title = t("title", { theme: theme === "dark" ? "light" : "dark" });
 
 	return (
 		<button
 			type="button"
 			title={title}
 			aria-label={title}
-			onClick={() => saveAppearance(next)}
+			onClick={toggleAppearance}
 			className="-mr-3 grid size-11 place-items-center rounded-full border-0 bg-transparent text-fg transition-colors duration-200 hover:bg-hov wide:mr-0 wide:size-[34px]"
 		>
-			<svg viewBox="0 0 18 18" aria-hidden="true" className="block size-[18px]">
-				{appearance === "light" ? (
-					<>
-						<circle
-							cx="9"
-							cy="9"
-							r="3.4"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth={1.5}
-						/>
-						<path
-							d="M9 1.5v1.8M9 14.7v1.8M1.5 9h1.8M14.7 9h1.8M3.7 3.7l1.3 1.3M13 13l1.3 1.3M3.7 14.3 5 13M13 5l1.3-1.3"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth={1.5}
-							strokeLinecap="round"
-						/>
-					</>
-				) : appearance === "dark" ? (
-					<path
-						d="M15 11.3A6.4 6.4 0 0 1 6.7 3a6.4 6.4 0 1 0 8.3 8.3z"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth={1.5}
-						strokeLinejoin="round"
-					/>
-				) : (
-					<>
-						<circle
-							cx="9"
-							cy="9"
-							r="6.5"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth={1.5}
-						/>
-						<path d="M9 2.5a6.5 6.5 0 0 1 0 13z" fill="currentColor" />
-					</>
-				)}
+			{/* The theme on screen: a sun for light, a moon for dark. */}
+			<svg viewBox="0 0 18 18" aria-hidden="true" className="block size-[18px] dark:hidden">
+				<circle cx="9" cy="9" r="3.4" fill="none" stroke="currentColor" strokeWidth={1.5} />
+				<path
+					d="M9 1.5v1.8M9 14.7v1.8M1.5 9h1.8M14.7 9h1.8M3.7 3.7l1.3 1.3M13 13l1.3 1.3M3.7 14.3 5 13M13 5l1.3-1.3"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth={1.5}
+					strokeLinecap="round"
+				/>
+			</svg>
+			<svg viewBox="0 0 18 18" aria-hidden="true" className="hidden size-[18px] dark:block">
+				<path
+					d="M15 11.3A6.4 6.4 0 0 1 6.7 3a6.4 6.4 0 1 0 8.3 8.3z"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth={1.5}
+					strokeLinejoin="round"
+				/>
 			</svg>
 		</button>
 	);

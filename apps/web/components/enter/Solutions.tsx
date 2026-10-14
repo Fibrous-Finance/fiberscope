@@ -147,6 +147,10 @@ function useSentence(auction: AuctionSolutions | null): string | null {
 	if (!auction) return null;
 
 	const [winner] = auction.winners;
+	// A solver can win with more than one solution; the sentence names it once.
+	const winning = [
+		...new Map(auction.winners.map((w) => [w.solver.id, w.solver.label])).values(),
+	];
 	const removed = filteredOutcome(auction);
 	// Prose words a bound: the best rival scored "less than 0.01%" lower, not "<0.01%".
 	const gap = f.gap(auction.rival?.gap ?? null);
@@ -168,7 +172,11 @@ function useSentence(auction: AuctionSolutions | null): string | null {
 			gap: bound === "none" ? gap : gap.slice(1),
 			ties: auction.ties.length,
 			rivals: f.list(auction.ties.map((solver) => t("possessive", { solver: solver.label }))),
-			winners: f.list(auction.winners.map((w) => w.solver.label)),
+			winners: f.list(winning),
+			winningSolvers: winning.length,
+			wins: auction.winners.length,
+			// With every solution a winner, no losing solution needs explaining.
+			losers: auction.solutions > auction.winners.length ? "yes" : "no",
 			scores: f.list(auction.winners.map((w) => f.score(w.score))),
 		}),
 		removed

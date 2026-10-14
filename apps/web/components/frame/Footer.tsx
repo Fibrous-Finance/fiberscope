@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import { useTranslations } from "next-intl";
 
+import type { Network } from "@fiberscope/core";
+
 import { Logo } from "@/components/frame/Logo";
 import { arrow } from "@/components/ui/Section";
 
@@ -22,10 +24,13 @@ const SENTENCE = "max-wide:block max-wide:leading-11";
  * commits behind the page and its data, so anyone can check them against the source.
  */
 export function Footer({
+	network,
 	away,
 	dataCommit,
 }: {
-	/** On pages other than the overview. */
+	/** The page's network, whose data sources it names. */
+	network: Network;
+	/** On pages other than a network's overview. */
 	away?: boolean;
 	/** The commit of the code that prepared the data (the snapshot's `commit`), if known. */
 	dataCommit?: string;
@@ -62,7 +67,7 @@ export function Footer({
 			</div>
 			<div className="mt-3 flex flex-wrap items-end justify-between gap-x-7 gap-y-2 text-[12.5px] leading-[1.55] wide:mt-5">
 				<p className="flex max-w-[640px] flex-col gap-0.5 text-fa">
-					<span>{t("dataSources")}</span>
+					<span>{t("dataSources", { network: network.name })}</span>
 					<span>{t("independent")}</span>
 					{SITE_COMMIT && (
 						<span>

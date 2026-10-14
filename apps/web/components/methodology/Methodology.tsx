@@ -46,10 +46,18 @@ type Term = (typeof MEASURES)[number] | (typeof SOURCES)[number];
 export function Methodology() {
 	const t = useTranslations("Methodology");
 	const f = useFormat();
-	const { snapshot, status } = useDashboard();
+	const { network, snapshot, status } = useDashboard();
 	// Without figures on the page (error, or reloading after one), the definitions leave out the
 	// numbers that describe the data.
 	const data = status.state === "error" || status.state === "loading" ? null : snapshot;
+	// The network's facts, which the definitions name.
+	const facts = {
+		network: network.name,
+		native: network.native.symbol,
+		wrapped: network.native.wrappedSymbol,
+		duneTable: network.duneTable,
+		l1: network.l1DataFee ? "yes" : "no",
+	};
 
 	const text = (key: Term) => {
 		if (key === "freshness") {
@@ -77,7 +85,9 @@ export function Methodology() {
 				: t("terms.coverage.noData");
 		}
 		if (key === "gas") return t("terms.gas.text", { minBatches: MIN_BATCHES_PER_DAY });
-		return t(`terms.${key}.text`);
+		// The addresses the registry leaves out differ from one network to the next.
+		if (key === "registry") return t(`terms.registry.text.${network.id}`);
+		return t(`terms.${key}.text`, facts);
 	};
 	// Compact: one column, 14px above each term.
 	const list = (keys: readonly Term[]) => (

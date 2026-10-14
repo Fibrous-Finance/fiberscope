@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { useTranslations } from "next-intl";
 
-import { BASE, buildRegistry, DASH, shortAddress } from "@fiberscope/core";
+import { buildRegistry, DASH, shortAddress } from "@fiberscope/core";
 import type { RegisteredAddress, RegisteredSolver } from "@fiberscope/core";
 
 import { useDashboard } from "@/components/dashboard/context";
@@ -24,9 +24,8 @@ const RETIRED = "text-[10.5px] tracking-[.06em] text-fa uppercase";
  * one since it starts sit behind a second toggle.
  */
 export function Registry() {
-	const { snapshot, layout } = useDashboard();
+	const { network, snapshot, layout } = useDashboard();
 	const t = useTranslations("Winning.registry");
-	const tc = useTranslations("Common");
 	const f = useFormat();
 	const [open, setOpen] = useState(false);
 	const [all, setAll] = useState(false);
@@ -47,7 +46,7 @@ export function Registry() {
 			>
 				<span className="text-[16px] font-medium tracking-[-0.01em]">{t("title")}</span>
 				<span className="text-[14px] text-pretty text-mu">
-					{t("summary", { total: registry.total, network: tc("network") })}
+					{t("summary", { total: registry.total, network: network.name })}
 				</span>
 				<Caret
 					open={open}
@@ -101,7 +100,7 @@ export function Registry() {
 					</div>
 					<div className="mt-3.5 flex flex-wrap justify-between gap-x-5 gap-y-1.5 foot-line">
 						<span>{t("note")}</span>
-						<span>{t("source", { network: tc("network") })}</span>
+						<span>{t("source", { network: network.name })}</span>
 					</div>
 				</>
 			) : null}
@@ -131,16 +130,17 @@ function RegistryRow({ solver, since }: { solver: RegisteredSolver; since: strin
 	);
 }
 
-/** A role's addresses, current first, each linked to Basescan; "—" when it has none. */
+/** A role's addresses, current first, each linked to the explorer; "—" when it has none. */
 function Addresses({ addresses }: { addresses: RegisteredAddress[] }) {
 	const t = useTranslations("Winning");
+	const { network } = useDashboard();
 	if (addresses.length === 0) return <span className="text-fa">{DASH}</span>;
 	return (
 		<span className="flex min-w-0 flex-col gap-0.5">
 			{addresses.map((a, index) => (
 				<span key={a.address} className="flex items-baseline gap-2 whitespace-nowrap">
 					<a
-						href={`${BASE.scan}/address/${a.address}`}
+						href={`${network.scan}/address/${a.address}`}
 						target="_blank"
 						rel="noopener"
 						title={a.address}

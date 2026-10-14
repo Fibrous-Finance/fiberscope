@@ -4,6 +4,9 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 
 import { useTranslations } from "next-intl";
 
+import { NETWORKS } from "@fiberscope/core";
+import type { Network, NetworkId } from "@fiberscope/core";
+
 import type { Status } from "@/components/dashboard/context";
 import { Logo } from "@/components/frame/Logo";
 import { Caret } from "@/components/ui/Section";
@@ -23,13 +26,32 @@ const SECTIONS = [
 ] as const;
 /** A section is "in view" once its top is this close to the viewport top. */
 const SPY_OFFSET = 140;
+/** Each network's mark, the square by its name: a colour token (globals.css). */
+const MARK: Record<NetworkId, string> = { base: "bg-base", bnb: "bg-bnb" };
+/**
+ * Below these widths a network's name does not fit next to a status word such as Delayed, so it
+ * hides and the button keeps it. Next to a live status, a dot alone, every name fits to 360px.
+ */
+const NAME_HIDES: Record<NetworkId, string> = {
+	base: "max-[360px]:hidden",
+	bnb: "max-[400px]:hidden",
+};
+/** The live networks, in the menu's order, then the ones still to come (Header.network messages). */
+const LIVE = Object.values(NETWORKS);
+const UPCOMING = ["ethereum", "arbitrum", "gnosis"] as const;
 
 export function Header({
+	network,
 	status,
+	query = "",
 	away,
 }: {
+	/** The page's network, whose data the status describes. */
+	network: Network;
 	status: HeaderStatus;
-	/** On pages other than the overview. */ away?: boolean;
+	/** The query string another network's page opens with. */
+	query?: string;
+	/** On pages other than a network's overview. */ away?: boolean;
 }) {
 	const t = useTranslations("Header");
 	return (
@@ -44,7 +66,13 @@ export function Header({
 				</a>
 				<Nav away={away} />
 				<div className="ml-auto flex items-center gap-2 wide:gap-[clamp(12px,2vw,24px)]">
-					<NetworkMenu />
+					<NetworkMenu
+						network={network}
+						query={query}
+						away={away}
+						// Below 980px a live status is a dot alone, which leaves room for a long name.
+						roomy={status.state === "live"}
+					/>
 					<StatusPill status={status} away={away} />
 					<ThemeButton />
 				</div>
@@ -111,10 +139,20 @@ function Nav({ away }: { away?: boolean }) {
 /**
  * The network picker, a disclosure: Escape, a click outside or focus moving out closes it. Closing
  * from inside the popup puts focus back on the button, which would otherwise be lost with the popup.
+ * Each live network is a link to its page; the page's own only closes the popup.
  */
-function NetworkMenu() {
+function NetworkMenu({
+	network,
+	query,
+	away,
+	roomy,
+}: {
+	network: Network;
+	query: string;
+	away?: boolean;
+	roomy: boolean;
+}) {
 	const t = useTranslations("Header.network");
-	const tc = useTranslations("Common");
 	const [open, setOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 	const button = useRef<HTMLButtonElement>(null);
@@ -153,13 +191,14 @@ function NetworkMenu() {
 				type="button"
 				aria-expanded={open}
 				aria-controls={open ? popup : undefined}
-				aria-label={t("label", { name: tc("network") })}
+				aria-label={t("label", { name: network.name })}
 				onClick={() => setOpen(!open)}
 				className="-mx-1.5 flex h-11 items-center gap-[7px] border-0 bg-transparent px-1.5 text-[14px] font-medium text-fg wide:mx-0 wide:h-auto wide:px-0 wide:py-2.5"
 			>
-				<span className="size-2 rounded-[2px] bg-base" />
-				{/* Below 360px the name does not fit next to the Delayed label; the button keeps it. */}
-				<span className="max-[360px]:hidden">{tc("network")}</span>
+				<span className={`size-2 rounded-[2px] ${MARK[network.id]}`} />
+				<span className={roomy ? "max-[360px]:hidden" : NAME_HIDES[network.id]}>
+					{network.name}
+				</span>
 				<Caret open={open} className="text-mu" />
 			</button>
 			{open ? (
@@ -167,23 +206,35 @@ function NetworkMenu() {
 					id={popup}
 					className="absolute top-[50px] -right-3 z-30 w-[220px] rounded-[12px] border border-ln2 bg-bg p-1.5 text-[14px] wide:top-11"
 				>
-					<li>
-						<button
-							type="button"
-							aria-current="true"
-							onClick={() => {
-								button.current?.focus();
-								setOpen(false);
-							}}
-							className="flex w-full items-baseline justify-between rounded-[8px] border-0 bg-hov px-2.5 py-[9px] text-left text-fg"
-						>
-							<span>{tc("network")}</span>
-							<span className="font-mono text-[11px] font-medium text-act">
-								{t("live")}
-							</span>
-						</button>
-					</li>
-					{(["ethereum", "arbitrum", "gnosis"] as const).map((key) => (
+					{LIVE.map((item) => {
+						const current = item.id === network.id;
+						// Away from the network pages, the header's network is not this page.
+						const here = current && !away;
+						return (
+							<li key={item.id}>
+								<a
+									href={`${item.path}${query}`}
+									aria-current={here ? "page" : undefined}
+									onClick={
+										here
+											? (event) => {
+													event.preventDefault();
+													button.current?.focus();
+													setOpen(false);
+												}
+											: undefined
+									}
+									className={`flex items-baseline justify-between rounded-[8px] px-2.5 py-[9px] text-fg hover:no-underline ${current ? "bg-hov" : "transition-colors duration-200 hover:bg-hov"}`}
+								>
+									<span>{item.name}</span>
+									<span className="font-mono text-[11px] font-medium text-act">
+										{t("live")}
+									</span>
+								</a>
+							</li>
+						);
+					})}
+					{UPCOMING.map((key) => (
 						<li
 							key={key}
 							className="flex items-baseline justify-between px-2.5 py-[9px] text-mu"

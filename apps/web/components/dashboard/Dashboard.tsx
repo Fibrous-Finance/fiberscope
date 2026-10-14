@@ -12,8 +12,8 @@ import {
 
 import { useRouter } from "next/navigation";
 
-import { buildView } from "@fiberscope/core";
-import type { Measure, Period, Snapshot, Sort } from "@fiberscope/core";
+import { buildView, NETWORKS } from "@fiberscope/core";
+import type { Measure, NetworkId, Period, Snapshot, Sort } from "@fiberscope/core";
 
 import { Change } from "@/components/change/Change";
 import { DashboardContext, HoverContext } from "@/components/dashboard/context";
@@ -54,15 +54,19 @@ function knownSolver(snapshot: Snapshot | null, id: string | null): string | nul
 }
 
 export function Dashboard({
+	network: networkId,
 	result,
 	selection,
 	phone,
 }: {
+	/** The route's network: the page shows its data and names it, even when none loaded. */
+	network: NetworkId;
 	result: SnapshotResult;
 	selection: Selection;
 	/** The request most likely comes from a phone: render the compact layout before measuring. */
 	phone: boolean;
 }) {
+	const network = NETWORKS[networkId];
 	const router = useRouter();
 	const f = useFormat();
 	const snapshot = result.ok ? result.snapshot : null;
@@ -190,6 +194,7 @@ export function Dashboard({
 	return (
 		<DashboardContext
 			value={{
+				network,
 				snapshot,
 				view,
 				period,
@@ -211,7 +216,12 @@ export function Dashboard({
 			}}
 		>
 			<HoverContext value={{ hovered, setHovered }}>
-				<Header status={status} />
+				<Header
+					network={network}
+					status={status}
+					// Another network's page opens with this period and measure; solver ids differ.
+					query={selectionQuery({ period, measure, solver: null })}
+				/>
 				<div className="page">
 					<main ref={mainRef}>
 						<Hero />
@@ -229,7 +239,7 @@ export function Dashboard({
 						) : null}
 						<Methodology />
 					</main>
-					<Footer dataCommit={snapshot?.commit} />
+					<Footer network={network} dataCommit={snapshot?.commit} />
 				</div>
 			</HoverContext>
 		</DashboardContext>

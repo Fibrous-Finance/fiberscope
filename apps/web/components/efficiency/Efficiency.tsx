@@ -53,7 +53,7 @@ export function Efficiency() {
 	const t = useTranslations("Efficiency");
 	const f = useFormat();
 	const view = useView();
-	const { snapshot } = useDashboard();
+	const { network, snapshot } = useDashboard();
 	const { hovered, setHovered } = useHover();
 	const { average, lowest, minBatches } = view.gas;
 	const swaps = view.swaps;
@@ -84,7 +84,12 @@ export function Efficiency() {
 					swaps.average !== null
 						? t("sentenceSwaps", { swaps: f.fixed(swaps.average, 2) })
 						: null,
-					cost !== null ? t("sentenceCost", { cost: f.cost(cost) }) : null,
+					cost !== null
+						? t("sentenceCost", {
+								cost: f.cost(cost),
+								l1: network.l1DataFee ? "yes" : "no",
+							})
+						: null,
 				]
 					.filter(Boolean)
 					.join(" ")
@@ -224,7 +229,9 @@ export function Efficiency() {
 					<span />
 				</div>
 			</div>
-			<FootLine source={t("source")}>
+			<FootLine
+				source={t("source", { network: network.name, native: network.native.symbol })}
+			>
 				<span className="max-wide:hidden">{t("note")}</span>
 				<span className="wide:hidden">{t("noteCompact")}</span>
 			</FootLine>

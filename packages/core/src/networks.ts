@@ -1,14 +1,16 @@
 /**
- * Networks Fiberscope indexes. The page shows Base and its header lists the upcoming networks; the
- * indexer also covers BNB Chain. When another network goes live on the page, also update the copy
- * that names Base (`grep -rn Base apps/web/messages/en`), the README and the social image,
- * apps/web/public/og-image.png.
+ * Networks Fiberscope indexes, each shown on a page of its own (`path`). The page's network menu
+ * lists them in `NETWORKS`'s order, then the upcoming networks. A new network also needs its route
+ * (apps/web/app), its registry term in the methodology (`Methodology.terms.registry.text`) and its
+ * mark in the menu (a colour token in apps/web/app/globals.css).
  */
 export type NetworkId = "base" | "bnb";
 
 export interface Network {
 	id: NetworkId;
 	name: string;
+	/** The site's page for this network. */
+	path: string;
 	chainId: number;
 	/** CoW Protocol API root for this network. */
 	cowApi: string;
@@ -16,6 +18,15 @@ export interface Network {
 	explorerSlug: string;
 	/** Block explorer root. */
 	scan: string;
+	/** The block explorer's name, as the page's links name it. */
+	scanName: string;
+	/**
+	 * Whether a transaction also pays an L1 data fee, an L2's charge for posting its data to
+	 * Ethereum: a settlement's cost includes it, and the page's copy says so.
+	 */
+	l1DataFee: boolean;
+	/** Dune Spellbook's table of CoW Protocol trades on this network, as the methodology cites it. */
+	duneTable: string;
 	/**
 	 * Average seconds between blocks, only to turn seconds into block counts: block times come
 	 * from the blocks' own timestamps (the indexer's clock).
@@ -35,6 +46,8 @@ export interface Network {
 		symbol: string;
 		/** The wrapped native token. CoW prices both alike, so a native buy is priced as it. */
 		wrapped: string;
+		/** The wrapped native token's symbol. */
+		wrappedSymbol: string;
 		/** Chainlink's proxy for the native token's USD price (8 decimals). */
 		usdFeed: string;
 	};
@@ -49,10 +62,14 @@ export interface Network {
 export const BASE: Network = {
 	id: "base",
 	name: "Base",
+	path: "/",
 	chainId: 8453,
 	cowApi: "https://api.cow.fi/base",
 	explorerSlug: "base",
 	scan: "https://basescan.org",
+	scanName: "Basescan",
+	l1DataFee: true,
+	duneTable: "cow_protocol_base.trades",
 	// Exactly: Base makes a block every 2 seconds.
 	blockTime: 2,
 	// Base's docs recommend ranges under 2,000 blocks.
@@ -62,6 +79,7 @@ export const BASE: Network = {
 	native: {
 		symbol: "ETH",
 		wrapped: "0x4200000000000000000000000000000000000006",
+		wrappedSymbol: "WETH",
 		usdFeed: "0x71041dddad3595f9ced3dccfbe3d1f4b0a16bb70",
 	},
 	contracts: {
@@ -74,10 +92,14 @@ export const BASE: Network = {
 export const BNB: Network = {
 	id: "bnb",
 	name: "BNB Chain",
+	path: "/bnb",
 	chainId: 56,
 	cowApi: "https://api.cow.fi/bnb",
 	explorerSlug: "bnb",
 	scan: "https://bscscan.com",
+	scanName: "BscScan",
+	l1DataFee: false,
+	duneTable: "cow_protocol_bnb.trades",
 	// On average since January 2026 (0.4502 s measured); it was 3, 1.5 and then 0.75 seconds before.
 	blockTime: 0.45,
 	// The widest range every BNB node we use serves (one caps ranges at 5,000 blocks): about 37
@@ -88,6 +110,7 @@ export const BNB: Network = {
 	native: {
 		symbol: "BNB",
 		wrapped: "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
+		wrappedSymbol: "WBNB",
 		usdFeed: "0x0567f2323251f0aab15c8dfb1967e4e8a7d42aee",
 	},
 	contracts: {

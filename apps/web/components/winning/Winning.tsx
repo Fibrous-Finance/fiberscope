@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 
 import {
 	auctionDetails,
-	BASE,
 	DASH,
 	exportCoverage,
 	exportedSurplus,
@@ -42,7 +41,7 @@ const SKELETON_NAMES = [62, 48, 55, 40, 51, 44, 58, 37];
 /** "Who is winning": the leaderboard, with an expandable detail per solver, then the registry. */
 export function Winning() {
 	const view = useView();
-	const { snapshot, sort, status } = useDashboard();
+	const { network, snapshot, sort, status } = useDashboard();
 	const t = useTranslations("Winning");
 	const tc = useTranslations("Common");
 	const ts = useTranslations("Surplus.header");
@@ -146,7 +145,7 @@ export function Winning() {
 		const align = `|--:|---|${"--:|".repeat(columns.length)}`;
 		// Pasted elsewhere, "Share" needs its measure.
 		const source = t("markdownSource", {
-			network: tc("network"),
+			network: network.name,
 			measure: tc(`measure.${view.measure}`),
 			window: span,
 		});
@@ -171,7 +170,7 @@ export function Winning() {
 				details,
 				exportCoverage(view, figures, details)
 			),
-			`fiberscope-${BASE.id}-${view.period}-${view.measure}.csv`
+			`fiberscope-${network.id}-${view.period}-${view.measure}.csv`
 		);
 	};
 
@@ -211,7 +210,7 @@ export function Winning() {
 			</div>
 			<Table rows={rows} />
 			<List rows={rows} />
-			<FootLine source={t("source", { network: tc("network") })}>
+			<FootLine source={t("source", { network: network.name })}>
 				{t.rich("note", {
 					earlier: view.hasEarlierWindow ? "yes" : "no",
 					previous: tc(`previousPeriod.${view.period}`),
@@ -292,7 +291,7 @@ export function WinningSkeleton() {
 	);
 }
 
-/** Saves the CSV under `file`: `fiberscope-base-{period}-{measure}.csv`. */
+/** Saves the CSV under `file`: `fiberscope-{network}-{period}-{measure}.csv`. */
 function downloadCsv(csv: string, file: string) {
 	const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
 	const link = document.createElement("a");

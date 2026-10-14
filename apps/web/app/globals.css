@@ -62,7 +62,9 @@
 	/* Brand teal: thumbs, buttons, hover highlight, logo, live dot. Text on teal is navy. */
 	--color-teal: #11b2ba;
 	--color-navy: #1b1f2c;
+	/* Each network's mark: the square by its name in the header. */
 	--color-base: #0052ff;
+	--color-bnb: #f0b90b;
 	--color-transparent: transparent;
 
 	--font-sans: var(--font-geist-sans), system-ui, sans-serif;

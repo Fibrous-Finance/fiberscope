@@ -2,7 +2,7 @@
 
 import { createContext, use } from "react";
 
-import type { Measure, Period, Snapshot, Sort, View } from "@fiberscope/core";
+import type { Measure, Network, Period, Snapshot, Sort, View } from "@fiberscope/core";
 
 /**
  * Page state shared by every section. Hover lives in its own context because it changes on every
@@ -53,6 +53,8 @@ interface Layout {
 }
 
 export interface Dashboard {
+	/** The page's network, from its route: what the page names and links, data or not. */
+	network: Network;
 	snapshot: Snapshot | null;
 	/** The view for the selected period and measure; null when no data loaded. */
 	view: View | null;

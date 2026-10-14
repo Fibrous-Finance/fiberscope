@@ -1,7 +1,39 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { costAxis, swapsAxis } from "./efficiency.ts";
+import { costAxis, gasAxis, swapsAxis } from "./efficiency.ts";
+
+describe("gasAxis", () => {
+	const gas = (trades: number, gasPerTrade: number | null) => ({ trades, gasPerTrade });
+
+	it("leaves a low-sample outlier beyond the axis", () => {
+		// 7D on 14 Oct: the network at 664K, the heaviest large solver at 1.41M, and 4.78M from
+		// a solver with 2 trades.
+		const axis = gasAxis(
+			[gas(9_000, 285_000), gas(400, 1_410_000), gas(2, 4_780_000)],
+			664_000
+		);
+		assert.equal(axis.max, 2_000_000);
+		assert.deepEqual(axis.ticks, [0, 500_000, 1_000_000, 1_500_000, 2_000_000]);
+	});
+
+	it("counts a solver with exactly 30 trades, and an end equal to the value holds it", () => {
+		assert.equal(gasAxis([gas(30, 2_600_000)], 664_000).max, 3_000_000);
+		assert.equal(gasAxis([gas(29, 2_600_000)], 664_000).max, 2_000_000);
+		assert.equal(gasAxis([gas(30, 2_500_000)], 664_000).max, 2_500_000);
+		assert.equal(gasAxis([gas(30, 2_500_001)], 664_000).ticks.at(-1), 3_000_000);
+	});
+
+	it("holds the network average, and ends at 2M or more", () => {
+		assert.equal(gasAxis([gas(100, 300_000)], 2_100_000).max, 2_500_000);
+		assert.equal(gasAxis([gas(100, 300_000)], 300_000).max, 2_000_000);
+		assert.equal(gasAxis([], null).max, 2_000_000);
+	});
+
+	it("ignores solvers without trades", () => {
+		assert.equal(gasAxis([gas(0, null), gas(50, 900_000)], 900_000).max, 2_000_000);
+	});
+});
 
 const row = (trades: number, swapsPerTrade: number | null) => ({ trades, swapsPerTrade });
 
@@ -24,11 +56,21 @@ describe("swapsAxis", () => {
 		assert.equal(swapsAxis([], null).max, 2);
 	});
 
-	it("ticks every 2 above 6, and stops at 20", () => {
+	it("ticks every 2 up to 12, then every 5, and stops at 20", () => {
 		assert.deepEqual(swapsAxis([row(100, 7.5)], 1.8).ticks, [0, 2, 4, 6, 8]);
+		assert.deepEqual(swapsAxis([row(100, 11)], 1.8).ticks, [0, 2, 4, 6, 8, 10, 12]);
+		// 7D on 14 Oct: Elfomo at 14.50 over 34 trades.
+		assert.deepEqual(swapsAxis([row(34, 14.5)], 2.49).ticks, [0, 5, 10, 15]);
 		const capped = swapsAxis([row(100, 31)], 1.8);
 		assert.equal(capped.max, 20);
-		assert.equal(capped.ticks.at(-1), 20);
+		assert.deepEqual(capped.ticks, [0, 5, 10, 15, 20]);
+	});
+
+	it("labels its end, whatever it is", () => {
+		for (let swaps = 0; swaps <= 25; swaps += 0.25) {
+			const axis = swapsAxis([row(100, swaps)], null);
+			assert.equal(axis.ticks.at(-1), axis.max, `swaps ${swaps}`);
+		}
 	});
 
 	it("ignores solvers without trades", () => {
@@ -71,5 +113,12 @@ describe("costAxis", () => {
 
 	it("ignores solvers without trades", () => {
 		assert.equal(costAxis([cost(0, null), cost(50, 0.009)], 0.009).max, 1);
+	});
+
+	it("labels its end, whatever it is", () => {
+		for (let cents = 0; cents <= 60; cents += 0.25) {
+			const axis = costAxis([cost(100, cents / 100)], null);
+			assert.equal(axis.ticks.at(-1), axis.max, `${cents}¢`);
+		}
 	});
 });

@@ -3,18 +3,26 @@
 import { useTranslations } from "next-intl";
 
 import {
+	auctionDetails,
 	BASE,
+	DASH,
 	exportCoverage,
 	exportedSurplus,
 	leaderboardCsv,
 	sortRows,
 	surplusAndCost,
 } from "@fiberscope/core";
-import type { Row, SurplusCostFigures } from "@fiberscope/core";
+import type { DetailFigures, Row, SurplusCostFigures } from "@fiberscope/core";
 
 import { useDashboard, useView } from "@/components/dashboard/context";
 import { arrow, FootLine, Section } from "@/components/ui/Section";
-import { cellText, useColumnLabels } from "@/components/winning/columns";
+import {
+	cellText,
+	filteredText,
+	rankText,
+	shareText,
+	useColumnLabels,
+} from "@/components/winning/columns";
 import { List, Table } from "@/components/winning/Leaderboard";
 import { Registry } from "@/components/winning/Registry";
 import { useCopy } from "@/components/winning/useCopy";
@@ -57,19 +65,23 @@ export function Winning() {
 		view.coverage.chain < view.days
 			? tc("coverage.chain", { covered: view.coverage.chain, days: view.days })
 			: null;
-	// The coverage notes under the table.
-	const notes = [
-		chainNote,
-		partial ? t("auctionCoverage", { covered: view.coverage.auction, days: view.days }) : null,
-	].filter((note) => note !== null);
 
 	const copyMarkdown = () => {
 		const figures = surplusAndCost(snapshot!, view);
-		const { marks, footnotes } = exportCoverage(view, figures);
-		// The table's columns, cost after gas and surplus last. A mark after a column says its
-		// source does not cover the whole window; a footnote below says how much it covers.
-		const columns: [string, (row: Row, own: SurplusCostFigures | undefined) => string][] = [
-			[labels.share, (row) => cellText(row, "share", f)],
+		const details = auctionDetails(snapshot!, view);
+		const { marks, footnotes } = exportCoverage(view, figures, details);
+		// The table's columns, cost after gas, then surplus, then the auction details. A mark
+		// after a column says its source does not cover the whole window; a footnote below says
+		// how much it covers.
+		const columns: [
+			string,
+			(
+				row: Row,
+				own: SurplusCostFigures | undefined,
+				detail: DetailFigures | undefined
+			) => string,
+		][] = [
+			[labels.share, (row) => shareText(row, view.measure, f)],
 			[labels.batches, (row) => cellText(row, "batches", f)],
 			[labels.trades, (row) => cellText(row, "trades", f)],
 			[labels.volume + marks.auction, (row) => cellText(row, "volume", f)],
@@ -91,15 +103,41 @@ export function Winning() {
 				(_, own) => f.bps(own?.typicalSurplusRate ?? null),
 			],
 			[ts("unusual") + marks.surplus, (_, own) => f.percent(own?.unusualShare ?? null)],
+			[
+				t("columns.filteredOut") + marks.detail,
+				(_, __, detail) => filteredText(detail?.filteredShare ?? null, f),
+			],
+			[
+				t("columns.closeLosses") + marks.detail,
+				(_, __, detail) => f.percent(detail?.closeLossShare ?? null),
+			],
+			[
+				t("columns.quotes") + marks.detail,
+				(_, __, detail) => (detail ? f.int(detail.quotes) : DASH),
+			],
+			[
+				t("columns.settledItself") + marks.detail,
+				(_, __, detail) => f.percent(detail?.settledShare ?? null),
+			],
+			[
+				t("columns.protocolFees") + marks.detail,
+				(_, __, detail) => f.usdCents(detail?.protocolFees ?? null),
+			],
+			[
+				t("columns.partnerFees") + marks.detail,
+				(_, __, detail) => f.usdCents(detail?.partnerFees ?? null),
+			],
 		];
 		const [head, ...body] = [
 			[t("columns.rank"), t("columns.solver"), ...columns.map(([label]) => label)],
 			...rows.map((row) => {
 				const own = figures.rows.get(row.id);
+				// Without auction details in the window, none of their figures exists.
+				const detail = details.coverage > 0 ? details.solvers.get(row.id) : undefined;
 				return [
-					row.rank,
+					rankText(row, view.measure),
 					row.label.replaceAll("|", "\\|"),
-					...columns.map(([, cell]) => cell(row, own)),
+					...columns.map(([, cell]) => cell(row, own, detail)),
 				];
 			}),
 		].map((cells) => `| ${cells.join(" | ")} |`);
@@ -123,8 +161,15 @@ export function Winning() {
 
 	const saveCsv = () => {
 		const figures = surplusAndCost(snapshot!, view);
+		const details = auctionDetails(snapshot!, view);
 		downloadCsv(
-			leaderboardCsv(rows, figures, exportCoverage(view, figures)),
+			leaderboardCsv(
+				rows,
+				view.measure,
+				figures,
+				details,
+				exportCoverage(view, figures, details)
+			),
 			`fiberscope-${BASE.id}-${view.period}-${view.measure}.csv`
 		);
 	};
@@ -169,11 +214,15 @@ export function Winning() {
 					arrow,
 				})}
 			</FootLine>
-			{notes.map((note) => (
-				<div key={note} className="mt-1.5 foot-line">
-					{note}
+			{chainNote === null ? null : <div className="mt-1.5 foot-line">{chainNote}</div>}
+			{partial ? (
+				// Without any auction data, the compact rows say so and carry no mark to explain.
+				<div
+					className={`mt-1.5 foot-line ${view.coverage.auction === 0 ? "max-wide:hidden" : ""}`}
+				>
+					{t("auctionCoverage", { covered: view.coverage.auction, days: view.days })}
 				</div>
-			))}
+			) : null}
 			<Registry />
 		</Section>
 	);

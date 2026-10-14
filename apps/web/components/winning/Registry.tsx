@@ -38,7 +38,7 @@ export function Registry() {
 	const Entry = compact ? RegistryBlock : RegistryRow;
 
 	return (
-		<div id="registry" className="mt-11 scroll-mt-[60px] border-t border-ln2">
+		<div id="registry" className="mt-11 border-t border-ln2">
 			<button
 				type="button"
 				aria-expanded={open}

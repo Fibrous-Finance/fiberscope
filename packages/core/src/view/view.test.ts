@@ -248,6 +248,39 @@ describe("buildView", () => {
 		assert.deepEqual([c?.participation, c?.winRate, c?.wonShare], [null, null, null]);
 	});
 
+	it("gives a solver without a trade on the auction days no volume and no rank by it", () => {
+		// b's batches all fall on the day before the auction data.
+		const s = snapshot(2, 1, [
+			solver("a", "A", { batches: [5, 1], trades: [6, 1], volume: [300] }),
+			solver("b", "B", { batches: [0, 9], trades: [0, 9], volume: [0] }),
+		]);
+		for (const measure of MEASURES) {
+			const b = buildView(s, "7d", measure).rows.find((r) => r.id === "b");
+			assert.deepEqual(
+				[b?.volume, b?.averageTrade, b?.batchValue, b?.shares.volume, b?.ranks.volume],
+				[null, null, null, null, null]
+			);
+		}
+		const byBatches = buildView(s, "7d", "batches");
+		assert.deepEqual(
+			byBatches.rows.map((r) => [r.id, r.rank, r.ranks.batches]),
+			[
+				["b", 1, 1],
+				["a", 2, 2],
+			]
+		);
+		// By volume b comes last, unranked.
+		const byVolume = buildView(s, "7d", "volume");
+		assert.deepEqual(
+			byVolume.rows.map((r) => [r.id, r.rank, r.ranks.volume]),
+			[
+				["a", 1, 1],
+				["b", 2, null],
+			]
+		);
+		assert.equal(byVolume.totals.volume, 300);
+	});
+
 	it("picks the lowest gas per trade among busy solvers, else among all", () => {
 		const busy = Array.from({ length: 1 }, () => 150);
 		const s = snapshot(1, 0, [
@@ -300,6 +333,22 @@ describe("tapeCell", () => {
 		assert.deepEqual(tapeCell(auction, "b"), { state: "won", tx: "0xbb" });
 		assert.deepEqual(tapeCell(auction, "c"), { state: "entered", tx: "0xaa" });
 		assert.deepEqual(tapeCell(auction, "d"), { state: "absent", tx: "0xaa" });
+	});
+
+	it("opens the first settlement a winner made when the first winner never settled", () => {
+		const failed = {
+			...auction,
+			winners: [
+				{ solver: "a", tx: null },
+				{ solver: "b", tx: "0xbb" },
+			],
+		};
+		assert.deepEqual(tapeCell(failed, "a"), { state: "won", tx: "0xbb" });
+		assert.deepEqual(tapeCell(failed, "c"), { state: "entered", tx: "0xbb" });
+		assert.deepEqual(tapeCell({ ...auction, winners: [{ solver: "a", tx: null }] }, "c"), {
+			state: "entered",
+			tx: null,
+		});
 	});
 });
 

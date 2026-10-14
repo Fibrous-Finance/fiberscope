@@ -26,14 +26,25 @@ export interface Format {
 	cost(value: number | null): string;
 	/** A 0–1 ratio in basis points, whole and separated: 65 · 4,201 */
 	bps(ratio: number | null): string;
+	/** A 0–1 ratio in basis points with one decimal, for fees: 3.7 · <0.1 */
+	bps1(ratio: number | null): string;
+	/**
+	 * A solution's score in USD: $0.00413 under $0.10 (three significant digits), $4.5783 under
+	 * $100, $165.47 under $10,000, then $12,345; <$0.0001 below $0.0001
+	 */
+	score(value: number | null): string;
+	/** How far below the winning score, from a 0–1 ratio: 0.12% · 5.4% · 18% · <0.01% · >99% */
+	gap(ratio: number | null): string;
 	/** Gas units: 644K · 1.37M */
 	gas(units: number | null): string;
 	/** A 0–1 ratio as a percentage: 46.9%. Only 0 and 1 show as 0% and 100%: <1%, >99%. */
 	percent(ratio: number | null, digits?: number): string;
 	/** Signed percentage points without the unit: +6.5 · −0.3 · ±0.0 */
 	points(value: number): string;
-	/** A multiple: 3.6× */
+	/** A multiple: 3.6×; under 1.1× with two decimals, 1.02×, so a lead never reads 1.0× */
 	times(value: number): string;
+	/** Names joined as the sentences list them: "Nexroute, Sector Finance and Rosato" */
+	list(items: readonly string[]): string;
 	/** 10:35 */
 	time(ms: number): string;
 	/** 10:34:52 */
@@ -72,6 +83,17 @@ const EN_MONTHS = [
 	"Dec",
 ];
 
+/**
+ * A positive `value` rounded to `digits` decimals the way `Intl.NumberFormat` rounds it: half up,
+ * on the shortest decimal that reads back as `value`. `toFixed` rounds the binary value instead,
+ * which takes 9.95 (9.9499… in binary) down where Intl takes it up. The tiers below decide with
+ * this, so each starts exactly where the one below would round up into it.
+ */
+function rounded(value: number, digits: number): number {
+	const [mantissa, exponent = "0"] = String(value).split("e");
+	return Math.round(Number(`${mantissa}e${Number(exponent) + digits}`)) / 10 ** digits;
+}
+
 export function createFormat(locale: string): Format {
 	const english = locale === "en" || locale.startsWith("en-");
 	const number = (options: Intl.NumberFormatOptions) => new Intl.NumberFormat(locale, options);
@@ -99,6 +121,18 @@ export function createFormat(locale: string): Format {
 		minimumFractionDigits: 2,
 		maximumFractionDigits: 2,
 	});
+	const scoreUsd = number({
+		style: "currency",
+		currency: "USD",
+		minimumFractionDigits: 4,
+		maximumFractionDigits: 4,
+	});
+	const smallScoreUsd = number({
+		style: "currency",
+		currency: "USD",
+		minimumSignificantDigits: 3,
+		maximumSignificantDigits: 3,
+	});
 	const gasK = number({ notation: "compact", maximumFractionDigits: 0 });
 	const gasM = number({
 		notation: "compact",
@@ -110,6 +144,8 @@ export function createFormat(locale: string): Format {
 	const dayMonth = dates({ day: "numeric", month: "short" });
 	const dayMonthYear = dates({ day: "numeric", month: "short", year: "numeric" });
 	const relative = new Intl.RelativeTimeFormat(locale, { numeric: "always" });
+	// The page's English lists have no comma before "and", as British English writes them.
+	const conjunction = new Intl.ListFormat(english ? "en-GB" : locale, { type: "conjunction" });
 
 	const fixed = (value: number, digits: number) => {
 		let f = decimals.get(digits);
@@ -118,6 +154,18 @@ export function createFormat(locale: string): Format {
 			decimals.set(digits, f);
 		}
 		return f.format(value);
+	};
+	const percentFormat = (digits: number) => {
+		let f = percents.get(digits);
+		if (!f) {
+			f = number({
+				style: "percent",
+				minimumFractionDigits: digits,
+				maximumFractionDigits: digits,
+			});
+			percents.set(digits, f);
+		}
+		return f;
 	};
 	// "13 Sep" never splits across lines: a no-break space joins the day and the month.
 	const day = (ms: number) => {
@@ -144,13 +192,14 @@ export function createFormat(locale: string): Format {
 		// Under half a cent, two decimals would print "$0.00".
 		if (value < 0.005) return `<${centsUsd.format(0.01)}`;
 		// Where cents would round up to "$100.00", whole dollars take over.
-		return Number(value.toFixed(2)) < 100 ? centsUsd.format(value) : usd(value);
+		return rounded(value, 2) < 100 ? centsUsd.format(value) : usd(value);
 	};
 
 	return {
 		locale,
 		int: (value) => integer.format(value),
 		fixed,
+		list: (items) => conjunction.format(items),
 		usd,
 		usdCents,
 		usdWhole: (value) => (value === null ? DASH : wholeUsd.format(value)),
@@ -159,12 +208,41 @@ export function createFormat(locale: string): Format {
 			if (value <= 0) return "0¢";
 			const cents = Math.round(value * 1e6) / 1e4;
 			if (cents < 0.05) return `<${fixed(0.1, 1)}¢`;
-			// Each step starts where the one below would round up into it: 9.96¢ reads "10¢".
-			if (Number(cents.toFixed(1)) < 10) return `${fixed(cents, 1)}¢`;
+			// Each step starts where the one below would round up into it: 9.95¢ reads "10¢".
+			if (rounded(cents, 1) < 10) return `${fixed(cents, 1)}¢`;
 			if (Math.round(cents) < 100) return `${integer.format(Math.round(cents))}¢`;
 			return usdCents(value);
 		},
 		bps: (ratio) => (ratio === null ? DASH : integer.format(Math.round(ratio * 10_000))),
+		bps1(ratio) {
+			if (ratio === null) return DASH;
+			const bps = ratio * 10_000;
+			// A fee of a few hundredths of a basis point is not "0.0".
+			return bps > 0 && bps < 0.05 ? `<${fixed(0.1, 1)}` : fixed(bps, 1);
+		},
+		score(value) {
+			if (value === null) return DASH;
+			if (value <= 0) return wholeUsd.format(0);
+			if (value < 0.0001) return `<${scoreUsd.format(0.0001)}`;
+			// Solutions are told apart by how far below the winning score they came, so a score
+			// keeps the digits that separate scores 1% apart: three significant ones under $0.10
+			// ($0.00413 and $0.00408, which four decimals would both write $0.0041), then four
+			// decimals, then cents. Each tier starts where the one below would round up into it.
+			if (rounded(value, 4) < 0.1) return smallScoreUsd.format(value);
+			if (rounded(value, 4) < 100) return scoreUsd.format(value);
+			if (rounded(value, 2) < 10_000) return centsUsd.format(value);
+			return wholeUsd.format(value);
+		},
+		gap(ratio) {
+			if (ratio === null) return DASH;
+			if (ratio <= 0) return percentFormat(0).format(0);
+			if (ratio < 0.00005) return `<${percentFormat(2).format(0.0001)}`;
+			if (rounded(ratio, 4) < 0.01) return percentFormat(2).format(ratio);
+			if (rounded(ratio, 3) < 0.1) return percentFormat(1).format(ratio);
+			// A solution that scored a little above zero is not "100%" below the winner.
+			if (ratio < 1 && ratio >= 0.995) return `>${percentFormat(0).format(0.99)}`;
+			return percentFormat(0).format(ratio);
+		},
 		gas(units) {
 			if (units === null) return DASH;
 			// From 999.5K on, rounding to whole thousands would print "1000K".
@@ -172,15 +250,7 @@ export function createFormat(locale: string): Format {
 		},
 		percent(ratio, digits = 0) {
 			if (ratio === null) return DASH;
-			let f = percents.get(digits);
-			if (!f) {
-				f = number({
-					style: "percent",
-					minimumFractionDigits: digits,
-					maximumFractionDigits: digits,
-				});
-				percents.set(digits, f);
-			}
+			const f = percentFormat(digits);
 			// A solver that won a few auctions did not win "0%" of them, and one that missed a
 			// few did not enter "100%".
 			const step = 10 ** -(digits + 2);
@@ -192,7 +262,8 @@ export function createFormat(locale: string): Format {
 			const sign = value >= 0.05 ? "+" : value <= -0.05 ? "−" : "±";
 			return sign + fixed(Math.abs(value), 1);
 		},
-		times: (value) => `${fixed(value, 1)}×`,
+		// One decimal would show a lead of a few percent as "1.0×", next to the word "leads".
+		times: (value) => `${fixed(value, rounded(value, 2) < 1.1 ? 2 : 1)}×`,
 		time: (ms) => hm.format(ms),
 		clock: (ms) => hms.format(ms),
 		day,

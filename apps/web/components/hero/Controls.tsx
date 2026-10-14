@@ -65,7 +65,8 @@ function Segmented<T extends string>({
 						type="button"
 						aria-pressed={on}
 						onClick={() => onChange(option.value)}
-						className={`relative z-1 border-0 bg-transparent px-3.5 font-mono text-[11.5px] leading-[normal] font-medium tracking-[.06em] whitespace-nowrap uppercase transition-colors duration-200 ${on ? "text-navy" : "text-mu"}`}
+						// On phones the hit area reaches over the group's border and padding: 44px tall.
+						className={`relative z-1 border-0 bg-transparent px-3.5 font-mono text-[11.5px] leading-[normal] font-medium tracking-[.06em] whitespace-nowrap uppercase transition-colors duration-200 max-wide:-my-[3px] ${on ? "text-navy" : "text-mu"}`}
 					>
 						{option.label}
 					</button>

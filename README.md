@@ -21,8 +21,8 @@ auctions, by how much, whether that is changing, and how efficiently each solver
 <table>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/images/who-is-winning.webp" alt="Who is winning over 7 days: the solver table ranked by share of batches, with the leader's detail open: its daily share, its figures against the network average, its latest auctions, its submission addresses and its latest settlements.">
-<p><b>Who is winning.</b> Each solver's share of batches, trades or volume over 24 hours or 7, 30, 90 or 180 days, with rank changes, the share of auctions entered, and win rates. A row opens the solver's detail view.</p>
+<img src="docs/images/who-is-winning.webp" alt="Who is winning over 24 hours: the solver table ranked by share of batches, with the leader's detail open: its daily share, its figures against the network average, its latest auctions, its submission addresses and its latest settlements.">
+<p><b>Who is winning.</b> Each solver's share of batches, trades or volume over 24 hours or 7, 30, 90 or 180 days, with rank changes, the share of auctions entered, and win rates. A row opens the solver's detail view.</p>
 </td>
 <td width="50%" valign="top">
 <img src="docs/images/is-it-changing.webp" alt="Is it changing: daily batches across all solvers over 30 days, the last 7 days in bolder bars, and small charts of the top eight solvers' daily share.">
@@ -31,8 +31,8 @@ auctions, by how much, whether that is changing, and how efficiently each solver
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/images/who-enters.webp" alt="Who enters, who wins: a bar per solver for the share of auctions it entered and the share it won, and a tape of the latest 48 auctions marking who entered and who won each.">
-<p><b>Who enters, who wins.</b> How often each solver enters an auction and how often it wins, and a tape of the latest 48 auctions: who entered each and who won it.</p>
+<img src="docs/images/who-enters.webp" alt="Who enters, who wins: a bar per solver for the share of auctions it entered, the share it won and the share of its solutions filtered out; a tape of the latest 48 auctions; and the solutions of the selected auction, each solver's best score against the winning one.">
+<p><b>Who enters, who wins.</b> How often each solver enters an auction, how often it wins and how many of its solutions CoW's fairness filter removed, and a tape of the latest 48 auctions: select one to see all its solutions and their scores. Then whose quotes orders were placed with, and the latest settlements with their protocol and partner fees.</p>
 </td>
 <td width="50%" valign="top">
 <img src="docs/images/how-efficiently.webp" alt="How efficiently: gas, transaction cost and DEX swaps per trade for each solver, as dots against a dashed network average.">
@@ -45,7 +45,7 @@ auctions, by how much, whether that is changing, and how efficiently each solver
 <p><b>Trader surplus.</b> How far trades beat the limit prices their users signed, in basis points of volume, with surplus from limits far from the market set apart.</p>
 </td>
 <td width="50%" valign="top">
-<img src="docs/images/mobile.webp" alt="Fiberscope on a phone: the overview, the solver list over 7 days, and the leader's detail.">
+<img src="docs/images/mobile.webp" alt="Fiberscope on a phone: the overview, the solver list over 24 hours, and the leader's detail.">
 <p><b>On a phone.</b> The same page in a compact layout.</p>
 </td>
 </tr>
@@ -68,11 +68,12 @@ flowchart LR
     worker --> browser["Browser"]
 ```
 
-The indexer reads settlements, receipts, calldata and Chainlink's ETH/USD rate from Base, the
-auction behind each settlement from CoW's API, and solver names from CoW's registry, into SQLite.
-Every 10 minutes it catches up with the chain, writes a snapshot with every figure the page shows,
-and uploads it to R2; then it backfills history until the next run is due. The site, Next.js on a
-Cloudflare Worker, reads the snapshot from R2 and derives every window, share and rank from it.
+The indexer reads settlements, receipts, calldata and Chainlink's ETH/USD rate from Base; the
+auction behind each settlement, with every solution's score, and each traded order's quote and
+protocol fees from CoW's API; and solver names from CoW's registry, into SQLite. Every 10 minutes
+it catches up with the chain, writes a snapshot with every figure the page shows and uploads it to
+R2; then it backfills history until the next run is due. The site, Next.js on a Cloudflare
+Worker, reads the snapshot from R2 and derives every window, share and rank from it.
 
 ## Accuracy
 

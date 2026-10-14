@@ -120,7 +120,35 @@ describe("latestSettlements", () => {
 				[95_000, 827.23],
 			]
 		);
-		// Everything but the solver passes through unchanged.
-		assert.deepEqual({ ...rows[2], solver: "arc" }, settled("arc", 95, 827.23));
+		// Everything but the two solvers passes through unchanged.
+		assert.deepEqual(
+			{ ...rows[2], solver: "arc", quotedBy: undefined },
+			{ ...settled("arc", 95, 827.23), quotedBy: undefined }
+		);
+	});
+
+	it("names the quoting solver, or none when the order had no solver's quote or was not looked up", () => {
+		const s = snapshot(
+			[solver("arc", "Arc", []), solver("nexroute", "Nexroute", [])],
+			[
+				{ ...settled("arc", 10, 5), quotedBy: "nexroute" },
+				// The quoting solver may be the settling one.
+				{ ...settled("arc", 11, 5), quotedBy: "arc" },
+				{ ...settled("arc", 12, 5), quotedBy: UNLISTED },
+				{ ...settled("arc", 13, 5), quotedBy: null },
+				// Not looked up in the order book: no quotedBy at all.
+				settled("arc", 14, 5),
+			]
+		);
+		assert.deepEqual(
+			latestSettlements(s).map((x) => x.quotedBy),
+			[
+				{ id: "nexroute", label: "Nexroute", unnamed: false },
+				{ id: "arc", label: "Arc", unnamed: false },
+				{ id: UNLISTED, label: "0x09e5…04ef", unnamed: true },
+				null,
+				null,
+			]
+		);
 	});
 });

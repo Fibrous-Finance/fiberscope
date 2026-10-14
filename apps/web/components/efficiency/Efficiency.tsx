@@ -2,29 +2,35 @@
 
 import { useTranslations } from "next-intl";
 
-import { costAxis, DASH, FEW_TRADES, sortRows, surplusAndCost, swapsAxis } from "@fiberscope/core";
+import {
+	costAxis,
+	DASH,
+	FEW_TRADES,
+	gasAxis,
+	sortRows,
+	surplusAndCost,
+	swapsAxis,
+} from "@fiberscope/core";
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
-import { isHot } from "@/components/dashboard/tones";
+import { hoverIndex, isHot } from "@/components/dashboard/tones";
 import { Surplus } from "@/components/surplus/Surplus";
-import { compactTickClass } from "@/components/ui/axis";
+import { Ticks } from "@/components/ui/axis";
 import { FootLine, Section } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
 
-/** The gas axis runs to at least 2M, in 500K ticks. */
-const AXIS_MIN = 2_000_000;
-const AXIS_STEP = 500_000;
 /** Dot diameters in px, by √trades. */
 const DOT_MIN = 7;
 const DOT_MAX = 18;
 
 /**
  * Desktop: name | gas track | gas value | cost track | cost value | swaps track | swaps value.
- * Compact: the cost and swaps tracks are hidden, and their values take the last two columns.
+ * Compact: the cost and swaps tracks are hidden, and their values take the last two columns,
+ * each wide enough for five characters ("14.50", "<0.1¢").
  */
 const GRID =
-	"grid grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_44px_36px_36px] gap-2 wide:grid-cols-[clamp(96px,16vw,190px)_minmax(0,1.25fr)_56px_minmax(0,1fr)_48px_minmax(0,1fr)_44px] wide:gap-4";
+	"grid grid-cols-[clamp(96px,16vw,190px)_minmax(0,1fr)_44px_38px_38px] gap-2 wide:grid-cols-[clamp(96px,16vw,190px)_minmax(0,1.25fr)_56px_minmax(0,1fr)_48px_minmax(0,1fr)_44px] wide:gap-4";
 
 const VALUE = "text-right font-mono text-[12.5px] leading-[normal] font-medium";
 
@@ -48,7 +54,7 @@ export function Efficiency() {
 	const view = useView();
 	const { snapshot } = useDashboard();
 	const { hovered, setHovered } = useHover();
-	const { average, max, lowest, minBatches } = view.gas;
+	const { average, lowest, minBatches } = view.gas;
 	const swaps = view.swaps;
 	const costs = surplusAndCost(snapshot!, view);
 	// Costs come in USD per trade; the cost track runs in cents.
@@ -58,8 +64,7 @@ export function Efficiency() {
 	const rows = sortRows(view.rows, { key: "gas", direction: 1 })
 		.filter((row) => row.gasPerTrade !== null)
 		.map((row) => ({ ...row, costPerTrade: costs.rows.get(row.id)?.costPerTrade ?? null }));
-	const axisMax = Math.max(AXIS_MIN, Math.ceil((max ?? 0) / AXIS_STEP) * AXIS_STEP);
-	const ticks = Array.from({ length: axisMax / AXIS_STEP + 1 }, (_, i) => i * AXIS_STEP);
+	const gasScale = gasAxis(rows, average);
 	const costScale = costAxis(rows, cost);
 	const swapsScale = swapsAxis(rows, swaps.average);
 	// Tick labels drop the trailing zeros Format.gas keeps: 1M, 1.5M.
@@ -78,10 +83,7 @@ export function Efficiency() {
 					swaps.average !== null
 						? t("sentenceSwaps", { swaps: f.fixed(swaps.average, 2) })
 						: null,
-					// "Settling one" continues the swaps sentence's "a trade".
-					swaps.average !== null && cost !== null
-						? t("sentenceCost", { cost: f.cost(cost) })
-						: null,
+					cost !== null ? t("sentenceCost", { cost: f.cost(cost) }) : null,
 				]
 					.filter(Boolean)
 					.join(" ")
@@ -137,7 +139,7 @@ export function Efficiency() {
 					const dot: Dot = {
 						size: DOT_MIN + (DOT_MAX - DOT_MIN) * Math.sqrt(row.trades / maxTrades),
 						hollow: row.trades < FEW_TRADES,
-						hot: isHot(hovered, row.id, row.rank - 1),
+						hot: isHot(hovered, row.id, hoverIndex(row, view.measure)),
 					};
 					return (
 						<div
@@ -154,7 +156,7 @@ export function Efficiency() {
 							<Track
 								value={gas}
 								average={average}
-								max={axisMax}
+								max={gasScale.max}
 								dot={dot}
 								label={t("dot", { gas: f.gas(gas), trades: row.trades })}
 							/>
@@ -197,17 +199,15 @@ export function Efficiency() {
 				>
 					<span />
 					<Ticks
-						ticks={ticks.map((value) => ({
-							value,
+						ticks={gasScale.ticks.map((value) => ({
 							label: tick.format(value),
-							x: value / axisMax,
+							x: value / gasScale.max,
 						}))}
 					/>
 					<span />
 					<Ticks
 						className="max-wide:hidden"
 						ticks={costScale.ticks.map((value) => ({
-							value,
 							label: value === 0 ? "0" : `${f.int(value)}¢`,
 							x: value / costScale.max,
 						}))}
@@ -216,7 +216,6 @@ export function Efficiency() {
 					<Ticks
 						className="max-wide:hidden"
 						ticks={swapsScale.ticks.map((value) => ({
-							value,
 							label: f.int(value),
 							x: value / swapsScale.max,
 						}))}
@@ -235,7 +234,8 @@ export function Efficiency() {
 
 /**
  * A solver's dot on one track, against the dashed network average. A value beyond the axis sits
- * at its end, with "›" just after the track.
+ * at its end, with "›" just after the track; nearer it on compact pages, whose narrower gap would
+ * otherwise put it against the value ("›4.78M").
  */
 function Track({
 	value,
@@ -281,34 +281,11 @@ function Track({
 			{value !== null && value > max ? (
 				<span
 					aria-hidden="true"
-					className="absolute top-1/2 left-full translate-x-2 -translate-y-[52%] font-mono text-[13px] leading-[normal] font-medium text-fa"
+					className="absolute top-1/2 left-full translate-x-1 -translate-y-[52%] font-mono text-[13px] leading-[normal] font-medium text-fa wide:translate-x-2"
 				>
 					›
 				</span>
 			) : null}
-		</span>
-	);
-}
-
-/** An axis under a track: the first label starts at 0, the last ends at the track's end. */
-function Ticks({
-	ticks,
-	className = "",
-}: {
-	ticks: { value: number; label: string; x: number }[];
-	className?: string;
-}) {
-	return (
-		<span className={`relative h-3.5 ${className}`}>
-			{ticks.map(({ value, label, x }, index) => (
-				<span
-					key={value}
-					className={`absolute ${x === 0 ? "" : x === 1 ? "-translate-x-full" : "-translate-x-1/2"} ${compactTickClass(index, ticks.length)}`}
-					style={{ left: `${x * 100}%` }}
-				>
-					{label}
-				</span>
-			))}
 		</span>
 	);
 }

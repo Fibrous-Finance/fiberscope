@@ -9,3 +9,5 @@ export * from "./view/settlements.ts";
 export * from "./view/registry.ts";
 export * from "./view/surplus.ts";
 export * from "./view/exports.ts";
+export * from "./view/details.ts";
+export * from "./view/solutions.ts";

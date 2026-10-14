@@ -227,6 +227,24 @@ describe("auctionOutcome", () => {
 			]),
 			"multi"
 		);
+		// A solver that won with two solutions, alone or next to another winner (Rizzolver twice in
+		// #29,521,720 read "Rizzolver and Rizzolver won together").
+		assert.equal(
+			outcome([
+				{ solver: "a", score: 53.0278, winner: true },
+				{ solver: "a", score: 0.616, winner: true },
+				{ solver: "b", score: 51.2529 },
+			]),
+			"multiSolutions"
+		);
+		assert.equal(
+			outcome([
+				{ solver: "a", score: 2, winner: true },
+				{ solver: "b", score: 1, winner: true },
+				{ solver: "a", score: 0.5, winner: true },
+			]),
+			"multiSolutions"
+		);
 		assert.equal(
 			outcome([
 				{ solver: "a", score: 1 },

@@ -125,15 +125,26 @@ export function auctionSolutions(snapshot: Snapshot, id: number): AuctionSolutio
  * Which of the solutions' sentences (`enter.solutions.<outcome>`) tells how the auction went: no
  * winner; a single solution, which won; one winner and how far below it the best rival scored,
  * or a tie; one winner whose rivals the filter all removed; one winner with no rival to measure
- * (only its own solutions, or no score to measure against); several winners.
+ * (only its own solutions, or no score to measure against); several winners, one solution each;
+ * several winning solutions where a solver won with more than one, so the sentence names it once.
  */
 export type AuctionOutcome =
-	"none" | "oneSolution" | "single" | "singleTie" | "singleNoRival" | "singleOnly" | "multi";
+	| "none"
+	| "oneSolution"
+	| "single"
+	| "singleTie"
+	| "singleNoRival"
+	| "singleOnly"
+	| "multi"
+	| "multiSolutions";
 
 export function auctionOutcome(auction: AuctionSolutions): AuctionOutcome {
 	const { winners, rival } = auction;
 	if (winners.length === 0) return "none";
-	if (winners.length > 1) return "multi";
+	if (winners.length > 1) {
+		const solvers = new Set(winners.map((w) => w.solver.id)).size;
+		return solvers < winners.length ? "multiSolutions" : "multi";
+	}
 	if (auction.solutions === 1) return "oneSolution";
 	if (rival) return rival.gap <= 0 ? "singleTie" : "single";
 	// No rival: either the filter removed every other solver's solutions, or there is nothing to

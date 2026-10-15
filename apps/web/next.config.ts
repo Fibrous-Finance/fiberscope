@@ -2,7 +2,22 @@ import type { NextConfig } from "next";
 
 import createNextIntlPlugin from "next-intl/plugin";
 
-const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
+const withNextIntl = createNextIntlPlugin({
+	requestConfig: "./i18n/request.ts",
+	experimental: {
+		// Each messages/en/*.json is compiled to its ICU syntax tree at build time, and the page
+		// formats from that tree. Without it, every t() call with values builds its formats and
+		// compiles the message again on every request: about a sixth of a render's CPU on the
+		// Worker. Experimental in next-intl 4.14; the rendered text is the same.
+		messages: {
+			path: "./messages",
+			format: "json",
+			locales: "infer",
+			sourceLocale: "en",
+			precompile: true,
+		},
+	},
+});
 
 const nextConfig: NextConfig = {
 	// `next dev` would otherwise write AGENTS.md and CLAUDE.md for AI coding agents.

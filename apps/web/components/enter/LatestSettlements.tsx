@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { flushSync } from "react-dom";
 
-import { auctionDetails, DASH, latestSettlements, NETWORKS } from "@fiberscope/core";
+import { auctionDetails, DASH, latestSettlements } from "@fiberscope/core";
 
 import { useDashboard, useHover, useView } from "@/components/dashboard/context";
 import { isHot } from "@/components/dashboard/tones";
@@ -50,7 +50,7 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 	const th = useTranslations("Hero");
 	const f = useFormat();
 	const view = useView();
-	const { snapshot, status } = useDashboard();
+	const { network, networkName, snapshot, status } = useDashboard();
 	const { hovered, setHovered } = useHover();
 	const [expanded, setExpanded] = useState(false);
 	const { ref: scroller, more: moreColumns } = useScrollMore();
@@ -77,8 +77,7 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 					auctions: view.coverage.auction > 0 ? "some" : "none",
 				});
 
-	const { end, network: networkId } = snapshot!;
-	const network = NETWORKS[networkId];
+	const { end } = snapshot!;
 	const settlements = latestSettlements(snapshot!);
 	const more = settlements.length - SHOWN;
 	const rows = (expanded ? settlements : settlements.slice(0, SHOWN)).map((s) => {
@@ -131,7 +130,11 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 			scan: `${network.scan}/tx/${s.tx}`,
 			// Every row has the same two links: their names say which settlement they open.
 			cowLabel: tc("cowExplorerLabel", { time, pair: pairText }),
-			scanLabel: tc("basescanLabel", { time, pair: pairText }),
+			scanLabel: tc("chainExplorerLabel", {
+				explorer: network.scanName,
+				time,
+				pair: pairText,
+			}),
 		};
 	});
 
@@ -264,7 +267,10 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 										aria-label={row.scanLabel}
 										className="whitespace-nowrap quiet"
 									>
-										{tc.rich("basescan", { arrow })}
+										{tc.rich("chainExplorer", {
+											explorer: network.scanName,
+											arrow,
+										})}
 									</a>
 								</span>
 							</div>
@@ -328,7 +334,12 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 										aria-label={row.scanLabel}
 										className={COMPACT_LINK}
 									>
-										<span>{tc.rich("basescan", { arrow })}</span>
+										<span>
+											{tc.rich("chainExplorer", {
+												explorer: network.scanName,
+												arrow,
+											})}
+										</span>
 									</a>
 								</span>
 							</div>
@@ -358,7 +369,9 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 					<Caret open={expanded} />
 				</button>
 			) : null}
-			<FootLine source={t("source", { network: tc("network") })}>{t("note")}</FootLine>
+			<FootLine source={t("source", { network: networkName })}>
+				{t("note", { network: networkName, l1: network.l1DataFee ? "yes" : "no" })}
+			</FootLine>
 		</div>
 	);
 }

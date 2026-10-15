@@ -3,7 +3,7 @@
 	"terms": {
 		"batches": {
 			"term": "Batches",
-			"text": "Settlements a solver executed on Base in the window that filled at least one order. One auction can settle as several batches."
+			"text": "Settlements a solver executed on {network} in the window that filled at least one order. One auction can settle as several batches."
 		},
 		"trades": {
 			"term": "Trades",
@@ -11,7 +11,7 @@
 		},
 		"volume": {
 			"term": "Volume",
-			"text": "USD value of filled orders. Each trade counts at the lower of its sell and buy value, priced with the token prices CoW used in that auction and Chainlink’s ETH/USD rate at settlement. With only one side priced, that side counts; with neither, the trade adds nothing."
+			"text": "USD value of filled orders. Each trade counts at the lower of its sell and buy value, priced with the token prices CoW used in that auction and Chainlink’s {native}/USD rate at settlement. With only one side priced, that side counts; with neither, the trade adds nothing."
 		},
 		"share": {
 			"term": "Share",
@@ -23,11 +23,11 @@
 		},
 		"cost": {
 			"term": "Transaction cost",
-			"text": "What a settlement transaction paid on Base: gas used × gas price, plus the L1 data fee, in USD at Chainlink’s ETH/USD rate in its block. A transaction that holds several batches splits its cost evenly between them, as it splits gas. Per trade: a solver’s cost divided by the trades it filled."
+			"text": "What a settlement transaction paid on {network}: gas used × gas price{l1, select, yes {, plus the L1 data fee,} other {,}} in USD at Chainlink’s {native}/USD rate in its block. A transaction that holds several batches splits its cost evenly between them, as it splits gas. Per trade: a solver’s cost divided by the trades it filled."
 		},
 		"swaps": {
 			"term": "DEX swaps",
-			"text": "Interactions in a settlement other than token approvals and WETH unwraps. Per trade: a solver’s swaps divided by the trades it filled."
+			"text": "Interactions in a settlement other than token approvals and {wrapped} unwraps. Per trade: a solver’s swaps divided by the trades it filled."
 		},
 		"batchValue": {
 			"term": "Batch value",
@@ -51,7 +51,7 @@
 		},
 		"networkAverage": {
 			"term": "Network average",
-			"text": "Gas, transaction cost and DEX swaps per trade across all solvers, weighted by trades. Typical surplus across all solvers, weighted by volume."
+			"text": "Gas, transaction cost and DEX swaps per trade across all solvers on {network}, weighted by trades. Typical surplus across all solvers on {network}, weighted by volume."
 		},
 		"entered": {
 			"term": "Entered",
@@ -63,7 +63,7 @@
 		},
 		"score": {
 			"term": "Score",
-			"text": "The value CoW’s protocol computes from each solution’s executed amounts to choose winners: roughly the surplus the solution generates for traders. It is in ETH; the page shows it in USD at Chainlink’s ETH/USD rate when the auction started. Below winner: how much lower a solution scored than the winning one, given only for auctions with a single winner, since in the others a solution competes with only one of the winners."
+			"text": "The value CoW’s protocol computes from each solution’s executed amounts to choose winners: roughly the surplus the solution generates for traders. It is in {native}; the page shows it in USD at Chainlink’s {native}/USD rate when the auction started. Below winner: how much lower a solution scored than the winning one, given only for auctions with a single winner, since in the others a solution competes with only one of the winners."
 		},
 		"filteredOut": {
 			"term": "Filtered out",
@@ -79,19 +79,19 @@
 		},
 		"sources": {
 			"term": "Sources",
-			"text": "Settlement events, calldata, receipts and token symbols on Base, the settlement contract’s on-chain solver allow-list, CoW Protocol’s solver-competition API, order book and trades API, CoW’s solver registry and Chainlink’s ETH/USD feed."
+			"text": "Settlement events, calldata, receipts and token symbols on {network}, the settlement contract’s on-chain solver allow-list, CoW Protocol’s solver-competition API, order book and trades API, CoW’s solver registry and Chainlink’s {native}/USD feed."
 		},
 		"dune": {
 			"term": "Dune",
-			"text": "Surplus follows Dune’s definition (Spellbook’s cow_protocol_base.trades) with one difference: trades are valued at the lower of their two sides, as Volume is, where Dune takes the higher. Buy-order surplus follows Dune’s formula, which comes out slightly below CoW Explorer’s figure."
+			"text": "Surplus follows Dune’s definition (Spellbook’s {duneTable}) with one difference: trades are valued at the lower of their two sides, as Volume is, where Dune takes the higher. Buy-order surplus follows Dune’s formula, which comes out slightly below CoW Explorer’s figure."
 		},
 		"attribution": {
 			"term": "Attribution",
-			"text": "Settlements sent through CoW’s flash-loan router go to the transaction’s recipient when it is a registered or allow-listed solver, else to its sender when that is one, else to the auction’s winner; as a last resort, to the sender."
+			"text": "Settlements through CoW’s flash-loan router{bundles, select, yes { or Euler’s contracts for CoW’s Atomic Bundles follow the same rule. Both call the settlement contract on a solver’s behalf. Credit goes} other { are credited}} to the transaction’s recipient if it is a registered or allow-listed solver other than {bundles, select, yes {these contracts} other {the router}}, else to its sender if it is registered or allow-listed, else to the winner CoW’s solver-competition API names for the transaction; failing that, to the sender."
 		},
 		"registry": {
 			"term": "Registry",
-			"text": "Status and submission addresses from CoW’s solver registry for Base, plus addresses that settle on Base and are on the settlement contract’s on-chain solver allow-list but are not listed as active. These additional addresses are shown as active; today there is one, Rizzolver’s 0x8f58…5cb7. A retired address is one the registry marks inactive."
+			"text": "Status and submission addresses from CoW’s solver registry for {network}, plus addresses that settle on {network} and are on the settlement contract’s on-chain solver allow-list but are not listed as active for that network. These additional addresses are shown as active; today there {count, plural, =0 {are none} one {is one, {overrides}} =2 {are two, {overrides}} other {are #, {overrides}}}. A retired address is one the registry marks inactive."
 		},
 		"freshness": {
 			"term": "Freshness",

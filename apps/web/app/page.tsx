@@ -1,14 +1,13 @@
-import { headers } from "next/headers";
+import { networkMetadata, NetworkPage } from "@/components/dashboard/NetworkPage";
 
-import { Dashboard } from "@/components/dashboard/Dashboard";
-
-import { looksLikePhone } from "@/lib/device";
-import { parseSelection } from "@/lib/selection";
 import { siteUrl } from "@/lib/site";
-import { loadSnapshot } from "@/lib/snapshot";
 
-export default async function OverviewPage({ searchParams }: PageProps<"/">) {
-	const [result, params, request] = await Promise.all([loadSnapshot(), searchParams, headers()]);
+export function generateMetadata() {
+	return networkMetadata("base");
+}
+
+/** The home page: Base. */
+export default function BasePage({ searchParams }: PageProps<"/">) {
 	// The site's name in search results: Google reads it from WebSite data on the home page.
 	const website = {
 		"@context": "https://schema.org",
@@ -25,11 +24,7 @@ export default async function OverviewPage({ searchParams }: PageProps<"/">) {
 					__html: JSON.stringify(website).replace(/</g, "\\u003c"),
 				}}
 			/>
-			<Dashboard
-				result={result}
-				selection={parseSelection(params)}
-				phone={looksLikePhone(request)}
-			/>
+			<NetworkPage network="base" searchParams={searchParams} />
 		</>
 	);
 }

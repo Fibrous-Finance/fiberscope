@@ -1,5 +1,4 @@
 {
-	"network": "Base",
 	"measure": {
 		"batches": "batches",
 		"trades": "trades",
@@ -36,9 +35,9 @@
 	"window": "{start} – {end} UTC",
 	"cowExplorer": "CoW Explorer <arrow>↗</arrow>",
 	"explorer": "Explorer <arrow>↗</arrow>",
-	"basescan": "Basescan <arrow>↗</arrow>",
+	"chainExplorer": "{explorer} <arrow>↗</arrow>",
 	"cowExplorerLabel": "CoW Explorer, {time}, {pair}",
-	"basescanLabel": "Basescan, {time}, {pair}",
+	"chainExplorerLabel": "{explorer}, {time}, {pair}",
 	"copy": "Copy",
 	"copied": "Copied ✓",
 	"coverage": {

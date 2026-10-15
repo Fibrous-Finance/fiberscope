@@ -4,6 +4,8 @@ import { createContext, use } from "react";
 
 import type { Measure, Period, Snapshot, Sort, View } from "@fiberscope/core";
 
+import type { SiteNetwork } from "@/lib/networks";
+
 /**
  * Page state shared by every section. Hover lives in its own context because it changes on every
  * pointer move; components that do not highlight anything should not re-render with it.
@@ -53,6 +55,13 @@ interface Layout {
 }
 
 export interface Dashboard {
+	/** The page's network, from its route: what the page names and links, data or not. */
+	network: SiteNetwork;
+	/**
+	 * The network's name as the copy writes it, from `Header.network.{id}`: "BNB Chain" with its
+	 * no-break space, so no sentence splits it.
+	 */
+	networkName: string;
 	snapshot: Snapshot | null;
 	/** The view for the selected period and measure; null when no data loaded. */
 	view: View | null;

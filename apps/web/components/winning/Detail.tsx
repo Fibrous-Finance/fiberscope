@@ -7,7 +7,6 @@ import { useTranslations } from "next-intl";
 import {
 	auctionDetails,
 	autoRange,
-	BASE,
 	DASH,
 	exportCoverage,
 	gasAxis,
@@ -53,7 +52,6 @@ const FOOTNOTE: Record<string, string> = {
 const RECENT_MS = 12 * 3_600_000;
 /** "Copied ✓" stays this long after copying an address. */
 const COPIED_MS = 1500;
-const COW_TX = `https://explorer.cow.fi/${BASE.explorerSlug}/tx/`;
 
 /** Compact labels: Geist Mono 10.5px, uppercase. */
 const SMALL_LABEL =
@@ -100,7 +98,8 @@ interface Stat {
 /** Everything both layouts show, formatted. */
 function useDetail(row: Row) {
 	const view = useView();
-	const { snapshot } = useDashboard();
+	// The page's network; `network` below holds the figures of all its solvers.
+	const { network: chain, snapshot } = useDashboard();
 	const t = useTranslations("Winning");
 	const tc = useTranslations("Common");
 	const f = useFormat();
@@ -391,6 +390,8 @@ function useDetail(row: Row) {
 			registration.active === null
 				? null
 				: t("registry.status", { status: registration.active ? "active" : "inactive" }),
+		/** The network's block explorer, which the address and settlement links open. */
+		explorer: chain.scanName,
 		addresses: registration.addresses.map((a) => ({
 			key: `${a.env}:${a.address}`,
 			label: t(`detail.env.${a.env}`),
@@ -399,7 +400,7 @@ function useDetail(row: Row) {
 			short: shortAddress(a.address),
 			copyLabel: t("detail.copyAddress", { env: a.env }),
 			retired: !a.active,
-			href: `${BASE.scan}/address/${a.address}`,
+			href: `${chain.scan}/address/${a.address}`,
 		})),
 		settlements: row.latestSettlements.map((s) => {
 			const volume = f.usd(s.volume);
@@ -446,10 +447,10 @@ function useDetail(row: Row) {
 								},
 							]),
 				],
-				cow: COW_TX + s.tx,
+				cow: `https://explorer.cow.fi/${chain.explorerSlug}/tx/${s.tx}`,
 				cowLabel: tc("cowExplorerLabel", link),
-				scan: `${BASE.scan}/tx/${s.tx}`,
-				scanLabel: tc("basescanLabel", link),
+				scan: `${chain.scan}/tx/${s.tx}`,
+				scanLabel: tc("chainExplorerLabel", { explorer: chain.scanName, ...link }),
 			};
 		}),
 	};
@@ -518,7 +519,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 									>
 										{tight ? a.short : a.medium}
 									</span>
-									{/* Copy and Basescan: 24px targets that do not space the row out. */}
+									{/* Copy and the explorer: 24px targets that do not space the row out. */}
 									<span className="flex gap-3.5 font-mono text-[12px] leading-[normal] font-medium">
 										{a.retired ? (
 											<span className={RETIRED}>{t("retired")}</span>
@@ -544,7 +545,10 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 													rel="noopener"
 													className="-my-1 py-1 whitespace-nowrap quiet"
 												>
-													{tc.rich("basescan", { arrow })}
+													{tc.rich("chainExplorer", {
+														explorer: d.explorer,
+														arrow,
+													})}
 												</a>
 											</>
 										)}
@@ -742,7 +746,10 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 											aria-label={s.scanLabel}
 											className="whitespace-nowrap quiet"
 										>
-											{tc.rich("basescan", { arrow })}
+											{tc.rich("chainExplorer", {
+												explorer: d.explorer,
+												arrow,
+											})}
 										</a>
 									</span>
 								</div>
@@ -865,7 +872,7 @@ export function DetailCompact({ row }: { row: Row }) {
 										rel="noopener"
 										className="-my-[15px] py-[15px] whitespace-nowrap quiet"
 									>
-										{tc.rich("basescan", { arrow })}
+										{tc.rich("chainExplorer", { explorer: d.explorer, arrow })}
 									</a>
 								</>
 							)}
@@ -915,7 +922,12 @@ export function DetailCompact({ row }: { row: Row }) {
 										aria-label={s.scanLabel}
 										className={COMPACT_LINK}
 									>
-										<span>{tc.rich("basescan", { arrow })}</span>
+										<span>
+											{tc.rich("chainExplorer", {
+												explorer: d.explorer,
+												arrow,
+											})}
+										</span>
 									</a>
 								</span>
 							</div>

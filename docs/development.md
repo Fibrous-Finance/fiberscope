@@ -13,12 +13,13 @@ pnpm install
 
 ## Run the site
 
-The site reads a snapshot: one JSON file, written by the indexer, that holds every figure the page
-shows. Index a day of Base to get one:
+The site has a page for each network: Base at `/` and BNB Chain at `/bnb`. Each page reads its
+network's snapshot: one JSON file, written by the indexer, that holds every figure the page shows.
+Index a day of Base to create its snapshot:
 
 ```sh
 cd apps/indexer
-node src/cli.ts sync --chain-days 1 --auction-days 1 --snapshot ../web/data/snapshot.json
+node src/cli.ts sync --chain-days 1 --auction-days 1 --snapshot ../web/data/base/snapshot.json
 cd ../..
 pnpm dev   # http://localhost:3000
 ```
@@ -28,18 +29,69 @@ it spent looking up the day's auctions in CoW's API. More history takes longer: 
 settlements and 7 days of auctions take hours. A run can be stopped and started again; it resumes
 where it stopped, and later runs fetch only what is new.
 
-`pnpm dev` reads `apps/web/data/snapshot.json`. To use a snapshot file from elsewhere, give its
-absolute path:
+`pnpm dev` reads each network's snapshot from `apps/web/data/<network>/snapshot.json`:
+`base/snapshot.json` for `/` and `bnb/snapshot.json` for `/bnb` (see
+[Choosing the network](#choosing-the-network) to index BNB Chain). To read them from another
+directory laid out the same way, give its absolute path:
 
 ```sh
-SNAPSHOT_PATH=/path/to/snapshot.json pnpm dev
+SNAPSHOT_DIR=/path/to/snapshots pnpm dev   # /path/to/snapshots/base/snapshot.json, …
 ```
 
-Without a snapshot the page shows its error state. The page's view is in its query string:
+A page without its network's snapshot shows its error state, as it does when the file holds
+another network's data. The page's view is in its query string:
 `?period=7d&measure=volume&solver=<id>` opens a solver's detail for 7 days of volume.
 
 `pnpm build` builds the site for production, and `pnpm --filter @fiberscope/web start` serves that
 build.
+
+## Networks on the site
+
+Every network's page is the same page component with that network's data and facts: Base at `/`,
+BNB Chain at `/bnb`. Two modules describe a network:
+
+- `packages/core/src/networks.ts` holds each network's facts, used by the indexer and the page: its
+  page's path, its block explorer (`scan`, `scanName`), its native and wrapped tokens, whether a
+  transaction pays an L1 data fee (`l1DataFee`), Dune's table of its trades (`duneTable`), its
+  Atomic Bundles (`contracts.bundles`) and its registry overrides (`overrides`), with supporting
+  evidence for each override.
+- `apps/web/lib/networks.ts` holds how the site shows it, in the order of the header's network menu:
+  the minimum widths at which the header shows the network's name (`nameFrom`) and the Live label
+  (`liveFrom`), its link preview (`image`) and whether it is listed (`listed`). The networks still
+  to come, which the menu shows as SOON, are there too (`UPCOMING`).
+
+The copy takes the network's name from `Header.network.<id>` in
+`apps/web/messages/en/header.json`. A name of two words carries a no-break space, as "BNB Chain"
+does, so no sentence, title or source line splits it.
+
+### Adding a network
+
+1. Its facts: an entry in `NETWORKS` in `packages/core/src/networks.ts`, and its id in `NetworkId`.
+2. Its presentation: an entry in `SITE_NETWORKS` in `apps/web/lib/networks.ts`, after the live
+   networks, with `listed: false` until its launch. Measure the header widths with the network's
+   name in every data state so the header stays inside the content edge at every width. `nameFrom`
+   and `liveFrom` set the minimum widths at which the name and the Live label appear next to the
+   Live dot (Base 760 and 980px, BNB Chain 820 and 1,020px, with at least 4px to spare).
+   `compactWordNameFrom`, `wordNameFrom` and `wordFrom` control when the network name and status
+   word appear in the Delayed, Loading and No data states. If it was a SOON network, take it out of
+   `UPCOMING`.
+3. Its mark: the network's logo in one color, `fill="currentColor"`, its viewBox cropped to the
+   mark and any metadata the file carries removed, in `MARKS` in
+   `apps/web/components/frame/NetworkMark.tsx`, with its size in a 14px box (11–14px, for optical
+   weight: solid shapes smaller).
+4. Its route: `apps/web/app/<path>/page.tsx`, as `apps/web/app/bnb/page.tsx`.
+5. Its link preview: `apps/web/public/og-image-<id>.png`, 1200 × 630, with a one-day cache entry in
+   `apps/web/public/_headers`.
+6. Its name: `Header.network.<id>`.
+
+### Launching a network
+
+An unlisted network's page and data work as a listed one's, but only its own page's menu shows it,
+`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain is
+unlisted until its history is complete and its batches, trades, DEX swaps and gas have been checked
+against Dune's Spellbook, as Base's were (see [Validation](methodology.md#validation)). To launch a
+network, set its `listed` to `true` in `apps/web/lib/networks.ts`: every page's menu then shows its
+row, the sitemap lists its page, and its page may be indexed as the others are.
 
 ## The indexer
 
@@ -76,15 +128,17 @@ One indexer process covers one network, which `NETWORK` names: `base` (the defau
 BNB Chain. The network sets CoW's API root, the contracts, the native token and its Chainlink
 feed, and the defaults that are named after it: the RPC variables (`BASE_RPC_URL` and
 `BASE_RPC_RPS`, or `BNB_RPC_URL` and `BNB_RPC_RPS`), the database
-(`apps/indexer/.data/<network>.db`) and the R2 key (`<network>/snapshot.json`). Base's RPC
-defaults to its public endpoint. BNB Chain's public endpoints refuse old logs and archive calls,
-or rate-limit them far below a backfill's pace, so `BNB_RPC_URL` has no default: it must name an
-archive node that takes `eth_getLogs` ranges of 5,000 blocks.
+(`apps/indexer/.data/<network>.db`), the `snapshot` command's output
+(`apps/web/data/<network>/snapshot.json`, where the site reads it) and the R2 key
+(`<network>/snapshot.json`). Base's RPC defaults to its public endpoint. BNB Chain's public
+endpoints refuse old logs and archive calls, or rate-limit them far below a backfill's pace, so
+`BNB_RPC_URL` has no default: it must name an archive node that takes `eth_getLogs` ranges of
+5,000 blocks.
 
 ```sh
 cd apps/indexer
 export BNB_RPC_URL=https://…   # an archive node
-NETWORK=bnb node src/cli.ts sync --chain-days 1 --auction-days 1 --snapshot /tmp/bnb-snapshot.json
+NETWORK=bnb node src/cli.ts sync --chain-days 1 --auction-days 1 --snapshot ../web/data/bnb/snapshot.json
 ```
 
 A database holds one network: it records the network's chain id, and the indexer refuses to open
@@ -92,7 +146,8 @@ another network's database. To run a second network beside Base, run a second in
 own `NETWORK`, RPC variables, database and snapshot path: another `loop.sh`, or another container
 from the same image with its own volume (see [The indexer](#the-indexer-1)). The default R2 keys
 already differ. Each indexer paces its own requests, so on one host their CoW API request rates
-add up. The page shows Base.
+add up. The site shows each network on its own page: Base at `/`, BNB Chain at `/bnb` (see
+[Networks on the site](#networks-on-the-site)).
 
 ### Block times
 
@@ -128,7 +183,7 @@ the same summary.
 | Command                                                                                                       | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune] [--snapshot <path>]` | Catches up with the network's safe block, then backfills at least N days of settlements and M days of auctions. With `--snapshot`, writes the snapshot once caught up, and again if the backfill added history. With `--budget-minutes`, the backfill stops B minutes after the start, and the next run resumes it. With `--prune`, deletes the data older than those depths once caught up (see below); with both at 0 it deletes nothing.                                                              |
-| `node src/cli.ts snapshot [--out <path>]`                                                                     | Writes the snapshot from the database (default `apps/web/data/snapshot.json`).                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `node src/cli.ts snapshot [--out <path>]`                                                                     | Writes the snapshot from the database (default `apps/web/data/<network>/snapshot.json`).                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `node src/cli.ts window --from <block> --to <block>`                                                          | Prints totals (batches, trades, DEX swaps, volume, surplus, gas and cost; scores and filtered-out solutions; quotes; protocol and partner fees) and the per-solver table for a block range, from the database.                                                                                                                                                                                                                                                                                           |
 | `node src/cli.ts attribution --from <block> --to <block>`                                                     | Uses the database to compare each batch's credited solver address in a block range with the solver address of the winning solution for its transaction in CoW's competition data. Breaks down relay batches (through the flash-loan router or an Atomic Bundle) by how the credited address was chosen. See [Attribution](methodology.md#attribution) and [Validation](methodology.md#validation).                                                                                                       |
 | `node src/cli.ts terms --from <block> --to <block> [--sample N]`                                              | Counts trades with order terms decoded from `settle()` calldata, grouped by how the calldata reached the settlement contract. It then samples trades across the block range and routes, targeting N trades (default: 90). For each sampled trade, it rereads and decodes the transaction from the RPC, compares the executed fee with the fee in its `Trade` event, and compares the signed-order fields with the corresponding fields in CoW's order book. See [Validation](methodology.md#validation). |
@@ -179,7 +234,7 @@ is idle.
 
 ```sh
 REFRESH_MINUTES=10 sh apps/indexer/loop.sh --chain-days 30 --auction-days 7 --budget-minutes 10 \
-  --snapshot ../web/data/snapshot.json
+  --snapshot ../web/data/base/snapshot.json
 ```
 
 `loop.sh` runs from `apps/indexer`, so relative paths start there. It reads `REFRESH_MINUTES`,
@@ -189,22 +244,23 @@ at the network's default), it first downloads the database with `seed`.
 
 ## Configuration
 
-| Variable                                                            | Used by | Purpose                                                                                                                                                                                                                                             |
-| ------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NETWORK`                                                           | indexer | The network to index: `base` (default) or `bnb` for BNB Chain; see [Choosing the network](#choosing-the-network)                                                                                                                                    |
-| `BASE_RPC_URL`, `BNB_RPC_URL`                                       | indexer | The network's RPC endpoint: Base's defaults to `https://mainnet.base.org`; BNB Chain's has no default and must be an archive node                                                                                                                   |
-| `DB_PATH`                                                           | indexer | The SQLite database (default `apps/indexer/.data/<network>.db`); `--db` overrides it                                                                                                                                                                |
-| `BASE_RPC_RPS` or `BNB_RPC_RPS`, `COW_API_RPS`                      | indexer | Request rates per second for the network's RPC and CoW's API (defaults 15 and 3)                                                                                                                                                                    |
-| `REFRESH_MINUTES`                                                   | indexer | `loop.sh`'s interval (default 10). Through the snapshot, an open page also learns when the next run is due and fetches a minute after it. At any interval, the page shows Delayed once its data is more than 30 minutes old                         |
-| `SEED_DB_URL`                                                       | indexer | With `loop.sh`, download the database from this URL when there is none yet                                                                                                                                                                          |
-| `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                                                                                                                                                        |
-| `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | indexer | The account, and the S3 credentials of an R2 API token with Object Read & Write on that bucket only                                                                                                                                                 |
-| `GIT_COMMIT`                                                        | indexer | The full commit hash for the indexer's code, recorded in every snapshot. The page's footer links to it when `SITE_COMMIT` is also set. The Docker image sets this variable from its `GIT_COMMIT` build argument                                     |
-| `SNAPSHOT_R2_KEY`                                                   | both    | The snapshot's object key: where the indexer uploads it (default `<network>/snapshot.json`, so `base/snapshot.json` for Base) and what the site reads through its `SNAPSHOTS` binding. If `SNAPSHOT_R2_KEY` is unset, the site reads the local file |
-| `SNAPSHOT_PATH`                                                     | web     | The local snapshot file when `SNAPSHOT_R2_KEY` is unset (default `apps/web/data/snapshot.json`)                                                                                                                                                     |
-| `SITE_URL`                                                          | web     | The site's origin (default `http://localhost:3000`): absolute link-preview URLs, the canonical link, the sitemap, and the one host search engines may index                                                                                         |
-| `ALLOW_INDEXING`                                                    | web     | `true` lets search engines index requests to `SITE_URL`'s host; other hosts, pull-request previews included, stay `noindex`. Without it, every page is `noindex`                                                                                    |
-| `SITE_COMMIT`                                                       | web     | The site's commit hash, supplied at build time and linked in the footer. `deploy.yml` sets it to the commit being deployed. If unset, the footer shows no commit links                                                                              |
+| Variable                                                            | Used by | Purpose                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NETWORK`                                                           | indexer | The network to index: `base` (default) or `bnb` for BNB Chain; see [Choosing the network](#choosing-the-network)                                                                                                            |
+| `BASE_RPC_URL`, `BNB_RPC_URL`                                       | indexer | The network's RPC endpoint: Base's defaults to `https://mainnet.base.org`; BNB Chain's has no default and must be an archive node                                                                                           |
+| `DB_PATH`                                                           | indexer | The SQLite database (default `apps/indexer/.data/<network>.db`); `--db` overrides it                                                                                                                                        |
+| `BASE_RPC_RPS` or `BNB_RPC_RPS`, `COW_API_RPS`                      | indexer | Request rates per second for the network's RPC and CoW's API (defaults 15 and 3)                                                                                                                                            |
+| `REFRESH_MINUTES`                                                   | indexer | `loop.sh`'s interval (default 10). Through the snapshot, an open page also learns when the next run is due and fetches a minute after it. At any interval, the page shows Delayed once its data is more than 30 minutes old |
+| `SEED_DB_URL`                                                       | indexer | With `loop.sh`, download the database from this URL when there is none yet                                                                                                                                                  |
+| `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                                                                                                                                |
+| `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | indexer | The account, and the S3 credentials of an R2 API token with Object Read & Write on that bucket only                                                                                                                         |
+| `GIT_COMMIT`                                                        | indexer | The full commit hash for the indexer's code, recorded in every snapshot. The page's footer links to it when `SITE_COMMIT` is also set. The Docker image sets this variable from its `GIT_COMMIT` build argument             |
+| `SNAPSHOT_R2_KEY`                                                   | indexer | The object key every snapshot is uploaded to (default `<network>/snapshot.json`, so `base/snapshot.json` for Base). The site reads only the default key, so a snapshot uploaded under another key does not reach the page   |
+| `SNAPSHOT_SOURCE`                                                   | web     | `r2` (as in `wrangler.jsonc`): each network's page reads `<network>/snapshot.json` through the `SNAPSHOTS` binding. Any other value, or none, reads local files from `SNAPSHOT_DIR`                                         |
+| `SNAPSHOT_DIR`                                                      | web     | The directory of the local snapshots, one `<network>/snapshot.json` each (default `apps/web/data`)                                                                                                                          |
+| `SITE_URL`                                                          | web     | The site's origin (default `http://localhost:3000`): absolute link-preview URLs, the canonical link, the sitemap, and the one host search engines may index                                                                 |
+| `ALLOW_INDEXING`                                                    | web     | `true` lets search engines index requests to `SITE_URL`'s host; other hosts, pull-request previews included, stay `noindex`. Without it, every page is `noindex`                                                            |
+| `SITE_COMMIT`                                                       | web     | The site's commit hash, supplied at build time and linked in the footer. `deploy.yml` sets it to the commit being deployed. If unset, the footer shows no commit links                                                      |
 
 On Cloudflare, the site's variables come from `vars` in `apps/web/wrangler.jsonc`.
 
@@ -217,7 +273,7 @@ site; the indexer writes it and the site derives every view from it with the vie
 - Time is divided into rolling days of 24 hours based on block time (see
   [Block times](#block-times)), working backward from the newest block (`end`). Daily series are
   newest first and zero-filled, so index `d` is always the day `d` days back. `network` names the
-  network the snapshot covers.
+  network the snapshot covers; the site refuses a snapshot for a network other than the page's.
 - `coverage` says how many days hold complete data: `chainDays` for batches, trades, DEX swaps,
   gas and transaction cost; `auctionDays` for volume, entries and wins; `surplusDays` for surplus;
   `detailDays` for solutions, filtered-out solutions, losses, quotes and protocol fees.
@@ -237,16 +293,16 @@ pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build
 ```
 
 `pnpm format` fixes formatting. Tests use `node:test` and sit next to the code they test
-(`*.test.ts` in `packages/core` and `apps/indexer`). CI runs the same checks on every pull request
-and every push to `main` (`.github/workflows/ci.yml`).
+(`*.test.ts` in `packages/core`, `apps/indexer` and `apps/web/lib`). CI runs the same checks on
+every pull request and every push to `main` (`.github/workflows/ci.yml`).
 
 ## Deployment
 
 ### The site
 
 The site runs on Cloudflare Workers through [OpenNext](https://opennext.js.org/cloudflare).
-`apps/web/wrangler.jsonc` binds the R2 bucket `fiberscope-data` as `SNAPSHOTS` and sets the
-Worker's variables. From the repository root:
+`apps/web/wrangler.jsonc` binds the R2 bucket `fiberscope-data` as `SNAPSHOTS`, from which each
+network's page reads its snapshot, and sets the Worker's variables. From the repository root:
 
 ```sh
 pnpm --filter @fiberscope/web run deploy    # build and deploy
@@ -267,10 +323,10 @@ which `preview_urls: true` keeps on independently of that address.
 copy, create an R2 bucket and set `bucket_name` and `SITE_URL` in `wrangler.jsonc`, and set
 `ALLOW_INDEXING` to `"false"` unless the copy should appear in search results.
 `apps/web/public/_headers` sets the cache policy of static files: one year, immutable, for the
-fingerprinted files under `/_next/static/`, and one day for the icons and the social image
-(`favicon.svg`, `favicon.ico`, `apple-touch-icon.png` and `og-image.png`), which keep their names
-when they change. `favicon.ico` is there for clients that ask for it by name; without the file,
-each such request would render the not-found page.
+fingerprinted files under `/_next/static/`, and one day for the icons and the social images
+(`favicon.svg`, `favicon.ico`, `apple-touch-icon.png`, `og-image.png` and `og-image-bnb.png`),
+which keep their names when they change. `favicon.ico` is there for clients that ask for it by
+name; without the file, each such request would render the not-found page.
 
 ### Search engines
 
@@ -283,10 +339,12 @@ search results.
 - `/robots.txt` lets every crawler in on every host, so crawlers can read those `noindex` tags: a
   page that robots.txt blocks keeps its `noindex` unread and can still be listed. It names the
   sitemap only on the indexed host.
-- `/sitemap.xml` lists one URL, the site's root, last modified at the snapshot's newest block. It is
-  rendered per request, because `SITE_URL` is a Worker variable that `next build` does not see.
-- Every page has a canonical link to the site's root: query strings such as `?period=7d` are views
-  of the same page.
+- `/sitemap.xml` lists each listed network's page, last modified at the newest block of its
+  snapshot: `/`, and `/bnb` once BNB Chain is launched (see
+  [Launching a network](#launching-a-network)). It is rendered per request, because `SITE_URL` is
+  a Worker variable that `next build` does not see.
+- Each network's page has a canonical link to itself, `/` or `/bnb`: query strings such as
+  `?period=7d` are views of the same page. An unlisted network's page is `noindex` on every host.
 - The home page carries WebSite structured data (JSON-LD), which gives search results the site's
   name.
 
@@ -381,6 +439,8 @@ Measured on the live deployment on 3–5 Oct 2026.
 | `apps/indexer/src/rules.ts`     | The counting rules as pure functions: days, attribution, volume, surplus, cost |
 | `apps/indexer/src/snapshot.ts`  | Builds the snapshot from the database                                          |
 | `packages/core/src/snapshot.ts` | The snapshot contract                                                          |
+| `packages/core/src/networks.ts` | Each network's facts                                                           |
 | `packages/core/src/view`        | The view model: windows, shares, ranks, averages and the charts' scales        |
 | `apps/web/components`           | The page's sections                                                            |
+| `apps/web/lib/networks.ts`      | How the site shows each network                                                |
 | `apps/web/messages/en`          | Every reader-facing string, through next-intl                                  |

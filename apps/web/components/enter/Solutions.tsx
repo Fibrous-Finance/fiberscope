@@ -9,7 +9,6 @@ import {
 	auctionOutcome,
 	auctionSolutions,
 	filteredOutcome,
-	NETWORKS,
 	solutionState,
 	TRACK_ANCHOR,
 	TRACK_START,
@@ -76,7 +75,7 @@ export function Solutions({
 	const t = useTranslations("Enter.solutions");
 	const tc = useTranslations("Common");
 	const f = useFormat();
-	const { snapshot } = useDashboard();
+	const { network, snapshot } = useDashboard();
 
 	const auction = id === null ? null : auctionSolutions(snapshot!, id);
 	const sentence = useSentence(auction);
@@ -85,7 +84,7 @@ export function Solutions({
 	const hit = compact ? "min-h-11 min-w-11 justify-center" : "-my-1 py-1";
 	// CoW Explorer opens the settlement of the first winner that settled.
 	const href = auction?.tx
-		? `https://explorer.cow.fi/${NETWORKS[snapshot!.network].explorerSlug}/tx/${auction.tx}`
+		? `https://explorer.cow.fi/${network.explorerSlug}/tx/${auction.tx}`
 		: null;
 
 	return (
@@ -228,6 +227,7 @@ function SolutionsTable({
 }) {
 	const t = useTranslations("Enter.solutions");
 	const f = useFormat();
+	const { network } = useDashboard();
 	const { hovered, setHovered } = useHover();
 
 	// The track plots the gaps below a single winning score, on wide pages: a lone solution has
@@ -404,7 +404,9 @@ function SolutionsTable({
 				)}
 			</div>
 			<p className="mt-3 foot-line">
-				{compact ? t("noteCompact") : t("note", { track: track ? "yes" : "no" })}
+				{compact
+					? t("noteCompact")
+					: t("note", { native: network.native.symbol, track: track ? "yes" : "no" })}
 			</p>
 		</>
 	);

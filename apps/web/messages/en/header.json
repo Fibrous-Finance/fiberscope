@@ -10,8 +10,10 @@
 	},
 	"network": {
 		"label": "Network: {name}",
-		"live": "LIVE",
+		"menu": "Networks",
 		"soon": "SOON",
+		"base": "Base",
+		"bnb": "BNB Chain",
 		"ethereum": "Ethereum",
 		"arbitrum": "Arbitrum One",
 		"gnosis": "Gnosis Chain"

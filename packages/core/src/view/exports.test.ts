@@ -76,7 +76,7 @@ function exported(s: Snapshot, period: Period, measure: Measure = "batches") {
 	const coverage = exportCoverage(view, figures, details);
 	return {
 		coverage,
-		csv: leaderboardCsv(view.rows, measure, figures, details, coverage).split("\n"),
+		csv: leaderboardCsv(view.rows, measure, figures, details, coverage, s.network).split("\n"),
 	};
 }
 
@@ -223,11 +223,11 @@ describe("leaderboardCsv", () => {
 		}),
 	]);
 
-	it("writes money with cents, rates as fractions and the coverage on every row", () => {
+	it("writes money with cents, rates as fractions, the coverage and the network on every row", () => {
 		const [header, b, a] = exported(s, "24h").csv;
 		assert.equal(
 			header,
-			"rank,solver,share_pct,batches,trades,volume_usd,gas_per_trade,cost_usd,cost_per_trade_usd,dex_swaps_per_trade,avg_batch_value_usd,trades_per_batch,entered_pct,win_rate_pct,surplus_usd,surplus_per_trade_usd,surplus_bps,typical_surplus_per_trade_usd,typical_surplus_bps,unusual_surplus_share,solutions,filtered_out_share,close_loss_share,quotes,quotes_share,quotes_verified_share,quotes_settled_share,protocol_fees_usd,partner_fees_usd,window_start_utc,window_end_utc,auction_data_from_utc,surplus_data_from_utc,detail_data_from_utc"
+			"rank,solver,share_pct,batches,trades,volume_usd,gas_per_trade,cost_usd,cost_per_trade_usd,dex_swaps_per_trade,avg_batch_value_usd,trades_per_batch,entered_pct,win_rate_pct,surplus_usd,surplus_per_trade_usd,surplus_bps,typical_surplus_per_trade_usd,typical_surplus_bps,unusual_surplus_share,solutions,filtered_out_share,close_loss_share,quotes,quotes_share,quotes_verified_share,quotes_settled_share,protocol_fees_usd,partner_fees_usd,window_start_utc,window_end_utc,auction_data_from_utc,surplus_data_from_utc,detail_data_from_utc,network"
 		);
 		const window =
 			"2026-10-02T15:21:51Z,2026-10-03T15:21:51Z,2026-10-02T15:21:51Z,2026-10-02T15:21:51Z,2026-10-02T15:21:51Z";
@@ -235,11 +235,11 @@ describe("leaderboardCsv", () => {
 		// quoted trades were A's quotes.
 		assert.equal(
 			a,
-			`2,"A",40.00,4,8,10000,500000,0.12,0.0154,1.50,2500,2.00,50.0,40.0,12.40,1.55,12.4,1.06,7.8,0.403,40,0.0250,0.300,6,0.7500,0.833,0.333,1.23,0.50,${window}`
+			`2,"A",40.00,4,8,10000,500000,0.12,0.0154,1.50,2500,2.00,50.0,40.0,12.40,1.55,12.4,1.06,7.8,0.403,40,0.0250,0.300,6,0.7500,0.833,0.333,1.23,0.50,${window},base`
 		);
 		assert.equal(
 			b,
-			`1,"B ""Best""",60.00,6,6,0,200000,0.06,0.0100,1.00,0,1.00,,,,,,,,,0,,,2,0.2500,1.000,0.000,0.00,0.00,${window}`
+			`1,"B ""Best""",60.00,6,6,0,200000,0.06,0.0100,1.00,0,1.00,,,,,,,,,0,,,2,0.2500,1.000,0.000,0.00,0.00,${window},base`
 		);
 	});
 
@@ -258,7 +258,7 @@ describe("leaderboardCsv", () => {
 		).csv;
 		assert.equal(
 			a,
-			`1,"A",100.00,4,8,,500000,0.12,0.0154,1.50,,2.00${",".repeat(18)}2026-10-02T15:21:51Z,2026-10-03T15:21:51Z,,,`
+			`1,"A",100.00,4,8,,500000,0.12,0.0154,1.50,,2.00${",".repeat(18)}2026-10-02T15:21:51Z,2026-10-03T15:21:51Z,,,,base`
 		);
 
 		// Auction data and surplus, but no auction details: only their columns are empty.
@@ -268,7 +268,7 @@ describe("leaderboardCsv", () => {
 		).csv;
 		assert.ok(
 			detailless.endsWith(
-				`,0.403${",".repeat(10)}2026-10-02T15:21:51Z,2026-10-03T15:21:51Z,2026-10-02T15:21:51Z,2026-10-02T15:21:51Z,`
+				`,0.403${",".repeat(10)}2026-10-02T15:21:51Z,2026-10-03T15:21:51Z,2026-10-02T15:21:51Z,2026-10-02T15:21:51Z,,base`
 			)
 		);
 	});

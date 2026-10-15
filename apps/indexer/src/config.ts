@@ -14,8 +14,9 @@ export const NATIVE_TOKEN = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
 /** The network's database in apps/indexer/.data, which the Docker image links to its volume. */
 export const DEFAULT_DB_PATH = fileURLToPath(new URL(`../.data/${NETWORK.id}.db`, import.meta.url));
+/** The network's snapshot where the site reads it locally: apps/web/data/<network>/snapshot.json. */
 export const DEFAULT_SNAPSHOT_PATH = fileURLToPath(
-	new URL("../../web/data/snapshot.json", import.meta.url)
+	new URL(`../../web/data/${NETWORK.id}/snapshot.json`, import.meta.url)
 );
 
 /** The R2 object every snapshot is uploaded to, through R2's S3 API. */

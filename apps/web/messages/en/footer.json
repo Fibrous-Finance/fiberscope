@@ -3,7 +3,7 @@
 	"nav": "Footer",
 	"methodology": "Methodology",
 	"source": "Source code <arrow>↗</arrow>",
-	"dataSources": "Data from the CoW Protocol API, Base settlement events, CoW’s solver registry and Chainlink.",
+	"dataSources": "Data from the CoW Protocol API, settlement events on each network, CoW’s solver registry and Chainlink.",
 	"independent": "Independent project, not affiliated with CoW DAO.",
 	"commit": "This page was built from code version <siteLink>{site}</siteLink>.",
 	"dataCommit": "Its data was prepared with code version <dataLink>{data}</dataLink>.",

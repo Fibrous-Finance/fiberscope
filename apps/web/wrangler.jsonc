@@ -8,10 +8,11 @@
 		"directory": ".open-next/assets",
 		"binding": "ASSETS",
 	},
-	// The indexer uploads the snapshot here; the site reads it through the binding.
+	// The indexers upload each network's snapshot here; the site reads them through the binding.
 	"r2_buckets": [{ "binding": "SNAPSHOTS", "bucket_name": "fiberscope-data" }],
 	"vars": {
-		"SNAPSHOT_R2_KEY": "base/snapshot.json",
+		// Each network's page reads <network>/snapshot.json from SNAPSHOTS, not a local file.
+		"SNAPSHOT_SOURCE": "r2",
 		// The site's origin, for absolute link-preview URLs.
 		"SITE_URL": "https://fiberscope.org",
 		// "true" lets search engines index SITE_URL's host, and only that host; any other value

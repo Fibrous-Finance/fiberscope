@@ -43,7 +43,7 @@
 		"pair": "<swap>{sell} → {buy}</swap>{more, plural, =0 {} other {<extra> +#</extra>}}",
 		"more": "Show {count} more",
 		"fewer": "Show fewer",
-		"note": "Transaction cost: what the transaction paid on Base, including the L1 data fee. Fees: charged on the settlement’s trades by CoW’s protocol and by partners. Quoted by: the solver whose quote the first trade’s order was placed with.",
+		"note": "Transaction cost: {l1, select, yes {what the transaction paid on {network}, including the L1 data fee.} other {what the transaction paid for gas on {network}.}} Fees: charged on the settlement’s trades by CoW’s protocol and by partners. Quoted by: the solver whose quote the first trade’s order was placed with.",
 		"source": "Source: CoW Protocol API · {network} settlement events",
 		"items": {
 			"trades": "{trades, plural, one {# trade} other {# trades}}",
@@ -104,7 +104,7 @@
 		"filteredMany": "{count} solutions from {solvers} were filtered out.",
 		"dot": "{solver}: {solutions}",
 		"dotItem": "{score}{state, select, won {, won} filtered {, filtered out} above {, filtered out, {gap} above the winner} same {, same score as the winner} gap {, {gap} below the winner} other {}}",
-		"note": "Score: roughly the surplus a solution generates for traders, in USD at the auction’s ETH/USD rate. One row per solver, with its best solution: ×2 means it submitted two{track, select, yes {, and its other solutions are the small dots} other {}}.",
+		"note": "Score: roughly the surplus a solution generates for traders, in USD at the auction’s {native}/USD rate. One row per solver, with its best solution: ×2 means it submitted two{track, select, yes {, and its other solutions are the small dots} other {}}.",
 		"noteCompact": "Score: roughly the surplus a solution generates for traders, in USD. One row per solver, with its best solution: ×2 means it submitted two.",
 		"axis": {
 			"a": "0.01%",

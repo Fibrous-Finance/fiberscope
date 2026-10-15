@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { connection } from "next/server";
 
 import { getTranslations } from "next-intl/server";
 
 import { Footer } from "@/components/frame/Footer";
 import { Header } from "@/components/frame/Header";
 import { arrow } from "@/components/ui/Section";
-
-import { loadSnapshot } from "@/lib/snapshot";
-import { dataStatus } from "@/lib/status";
 
 export async function generateMetadata(): Promise<Metadata> {
 	const t = await getTranslations("Meta");
@@ -18,15 +14,16 @@ export async function generateMetadata(): Promise<Metadata> {
 	return { title: t("notFoundTitle"), robots: null };
 }
 
+/**
+ * The page of no network: it loads no data, so its header has no data status and a "Networks"
+ * menu with no current row, and its footer names the page's code version alone.
+ */
 export default async function NotFound() {
-	// Per request, not prerendered: the header shows how fresh the data is right now.
-	await connection();
 	const t = await getTranslations("NotFound");
-	const result = await loadSnapshot();
 
 	return (
 		<>
-			<Header status={dataStatus(result, result.at)} away />
+			<Header />
 			{/* A block-level child, not a flex item: auto margins would shrink it; `page` is content-box. */}
 			<div className="page flex min-h-[calc(100dvh-61px)] flex-col">
 				<main className="pt-[clamp(72px,12vw,168px)] pb-[clamp(72px,10vw,128px)]">
@@ -37,7 +34,7 @@ export default async function NotFound() {
 						{t.rich("back", { arrow })}
 					</Link>
 				</main>
-				<Footer away dataCommit={result.ok ? result.snapshot.commit : undefined} />
+				<Footer away />
 			</div>
 		</>
 	);

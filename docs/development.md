@@ -133,8 +133,9 @@ feed, and the defaults that are named after it: the RPC variables (`BASE_RPC_URL
 (`<network>/snapshot.json`). Base's RPC defaults to its public endpoint. BNB Chain's public
 endpoints refuse old logs and archive calls, or rate-limit them far below a backfill's pace, so
 `BNB_RPC_URL` has no default: it must name an archive node. A node that serves narrower
-`eth_getLogs` ranges works too, with more requests: the indexer learns the limit from the node's
-first refusal.
+`eth_getLogs` ranges works too, with more requests: when the node refuses a range as too wide, the
+indexer keeps to the limit the refusal states or, if it states none, halves the range until the
+node accepts it and keeps that width.
 
 ```sh
 cd apps/indexer
@@ -209,30 +210,30 @@ same options) also read `apps/indexer/.env` when it exists.
    is in the chain data, since its attribution may need the auction's winner.
 5. Fetches details for the new blocks: the orders traded and their trades' protocol fees,
    rechecking the last 10 minutes of trades whose fees the API did not list yet. The snapshot waits
-   for them when their lookups take at most 8 minutes at the CoW API's rate, as after an outage of
-   a few hours, and gives them twice that estimate, at least 2 minutes. If they would take longer,
-   one of them fails or they run past that time, the snapshot is written without the
-   auction-detail figures; the details then catch up before their backfill (step 7), and the
-   snapshot is written again at the end of the run (step 8).
+   for these lookups if they are estimated to take at most 8 minutes at the CoW API's rate, as after
+   an outage of a few hours. The time limit is twice the estimate, with a minimum of 2 minutes. If
+   the estimate is too long, a lookup fails or the time limit is reached, the snapshot is written
+   without the auction-detail figures. The details then catch up before their backfill (step 7),
+   and the snapshot is written again at the end of the run (step 8).
 6. Marks the data current and, with `--snapshot`, writes the snapshot.
 7. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
    settlements, followed by their auction lookups, followed by their details. Settlement history
    is kept at least as deep as auction history. Trades stored before the schema held order uids
    get theirs from their `Trade` events.
-8. Writes the snapshot again if it would show more than at step 6: a whole day more of history,
-   or the details of the new blocks when they caught up after it. A backfill that the budget
-   stopped short of a whole day adds nothing the snapshot shows, so the run ends without it.
+8. Writes the snapshot again if it would show a whole day more of history than at step 6, or if
+   the details of the new blocks have since caught up. Otherwise the run ends without writing it
+   again: a backfill that the budget stopped short of a whole day adds nothing the snapshot shows.
 
 On an empty database there is nothing to catch up: the backfill starts at the safe block and the
 snapshot is written once it ends. Every step commits as it goes, so an interrupted run loses
 nothing. Requests are paced: by default at most 15 RPC calls per second (`eth_call` at a thirtieth
-of that, the public Base RPC's tightest limit) and 3 CoW API requests per second, slowing down
-when a server answers that the rate is too high. A refused key, a spent quota or a request to wait
-more than a minute ends the run at once, and the log gives the endpoint's answer; the next run
-tries again on schedule. Each run's summary counts its RPC calls by method, the figure to compare
-with a provider's quota. At 5 CoW API requests per second, filling in the details of a version 2
-database with 90 days of auctions on Base takes about a day: about 200,000 auctions to score again
-and 240,000 orders whose trades are looked up one order at a time.
+of that, the public Base RPC's tightest limit) and 3 CoW API requests per second, slowing down when
+a server answers that the rate is too high. A rejected key, an exhausted quota or a request to wait
+more than a minute ends the run at once, and the log gives the endpoint's answer; the next run tries
+again on schedule. Each run's summary counts its RPC calls by method, the figure to compare with a
+provider's quota. At 5 CoW API requests per second, filling in the details of a version 2 database
+with 90 days of auctions on Base takes about a day: about 200,000 auctions to score again and
+240,000 orders whose trades are looked up one order at a time.
 
 ### Keep it running
 
@@ -240,8 +241,8 @@ and 240,000 orders whose trades are looked up one order at a time.
 default 10), counted from the start of each run; a failed run is logged and the next one runs on
 schedule. Set `--budget-minutes` to the interval: the backfill stops when the next run is due, so
 fresh data never waits for a long backfill, and while history is being filled no time between runs
-is idle. A run whose backfill adds no whole day of history ends there, without writing the
-snapshot again, so the next run starts on time.
+is idle. Unless its backfill adds a whole day of history or its details catch up after the first
+snapshot, a run ends without writing the snapshot again, so the next run starts on time.
 
 ```sh
 REFRESH_MINUTES=10 sh apps/indexer/loop.sh --chain-days 30 --auction-days 7 --budget-minutes 10 \
@@ -428,21 +429,26 @@ Measured on the live deployment: the site on 3–5 Oct 2026, the indexers on 15 
   is well within [R2's free tier](https://developers.cloudflare.com/r2/pricing/#free-tier): 10
   GB-month of storage, 1 million writes and 10 million reads a month.
 - **Indexers.** Both networks' indexers run as two containers on one AWS EC2 t4g.medium in
-  Frankfurt (2 Graviton vCPUs, 4 GB of memory) with a 16 GB gp3 disk. Base's database takes about
-  420 MB at 180 days of settlements and 90 days of auctions, and `--prune` keeps it there. BNB
-  Chain's takes about 620 MB with 25 of its 90 days of auctions, and about 1.1 GB once they are all
-  in (estimated). Caught up, a Base run takes 30–40 seconds every 10 minutes, about 26 of them
-  building the snapshot. While a network's history is being filled, its runs use the whole 10
-  minutes. During a run the containers peak at about 0.55 GB (Base) and 0.85 GB (BNB Chain,
-  filling its history), and the host keeps about 2.8 GB free. On demand, the instance costs
-  $0.0384 an hour, the disk $0.0952 per GB-month and its public IPv4 address $0.005 an hour
-  ([EC2](https://aws.amazon.com/ec2/pricing/on-demand/),
-  [VPC](https://aws.amazon.com/vpc/pricing/)): about $33 a month. Daily disk snapshots kept for a
-  week and two CloudWatch alarms add about $1–2.
+  Frankfurt (2 Graviton vCPUs, 4 GB of memory) with a 16 GB gp3 disk.
+
+    Base's database takes about 420 MB at 180 days of settlements and 90 days of auctions, and
+    `--prune` keeps it there. BNB Chain's takes about 620 MB with 25 of its 90 days of auctions, and
+    about 1.1 GB once they are all in (estimated).
+
+    Caught up, a Base run takes 30–40 seconds every 10 minutes, about 26 of them building the
+    snapshot. While a network's history is being filled, its runs use the whole 10 minutes. During a
+    run the containers peak at about 0.55 GB (Base) and 0.85 GB (BNB Chain, filling its history), and
+    the host keeps about 2.8 GB free.
+
+    On demand, the instance costs $0.0384 an hour, the disk $0.0952 per GB-month and its public IPv4
+    address $0.005 an hour ([EC2](https://aws.amazon.com/ec2/pricing/on-demand/),
+    [VPC](https://aws.amazon.com/vpc/pricing/)): about $33 a month. Daily disk snapshots kept for a
+    week and two CloudWatch alarms add about $1–2.
+
 - **Data.** The indexer reads public endpoints without API keys for Base: its RPC, CoW's API and
   CoW's solver registry. BNB Chain requires an archive RPC endpoint (`BNB_RPC_URL`); the live
-  indexer uses NodeReal's free plan, 10 million compute units a month. It makes about two calls
-  per settlement, a receipt and a transaction: about 14,000 a day on BNB Chain, an estimated 7–8
+  indexer uses NodeReal's free plan, 10 million compute units a month. It makes about two calls per
+  settlement, a receipt and a transaction: about 14,000 calls a day on BNB Chain, an estimated 7–8
   million compute units a month.
 
 ## Repository layout

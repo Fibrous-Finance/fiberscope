@@ -135,7 +135,7 @@ endpoints refuse old logs and archive calls, or rate-limit them far below a back
 `BNB_RPC_URL` has no default: it must name an archive node. A node that serves narrower
 `eth_getLogs` ranges works too, with more requests: when the node refuses a range as too wide, the
 indexer keeps to the limit the refusal states or, if it states none, halves the range until the
-node accepts it and keeps that width.
+node accepts it and uses that width for later ranges, but never fewer than 100 blocks.
 
 ```sh
 cd apps/indexer

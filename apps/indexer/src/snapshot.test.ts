@@ -4,18 +4,24 @@ import { describe, test } from "node:test";
 import type { Snapshot } from "@fiberscope/core";
 
 import { ROUTER, SETTLEMENT } from "./chain.ts";
-import { BLOCKS_PER_DAY, timeOf, WETH } from "./config.ts";
 import type { OrderDetail, Solution } from "./cow.ts";
 import { Registry } from "./registry.ts";
 import type { RegistryEntry } from "./registry.ts";
-import { windowStart } from "./rules.ts";
 import { buildSnapshot } from "./snapshot.ts";
 import { Store } from "./store.ts";
 import type { StoredFee } from "./store.ts";
 
 const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+const WETH = "0x4200000000000000000000000000000000000006";
+/** A day of Base blocks, one every 2 seconds. */
+const DAY = 43_200;
 /** Three whole days of chain data, from block 1: bucket 2 starts there, bucket 0 ends here. */
-const END = 3 * BLOCKS_PER_DAY;
+const END = 3 * DAY;
+
+/** A block's time as on Base: block 0 at 1686789347, then one every 2 seconds. */
+function timeOf(block: number): number {
+	return 1_686_789_347 + 2 * block;
+}
 
 const ARC = "0xa1c1";
 const RIZZOLVER = "0x8f58";
@@ -202,6 +208,8 @@ async function build(): Promise<Snapshot> {
 				fee: "4100000000000",
 			})),
 			prices: [{ block: 1, answer: 2_000e8 }],
+			// Base's block times, anchored at the ends of the range.
+			anchors: [1, END].map((block) => ({ block, time: timeOf(block) })),
 		},
 		range
 	);
@@ -272,7 +280,7 @@ async function build(): Promise<Snapshot> {
 	// The details cover the last two days. arc0's order is not in CoW's order book; the
 	// stranger's quote names the zero address; the orders of the other arc batches were never
 	// looked up.
-	store.setDetailRange({ from: windowStart(END, 2), to: END });
+	store.setDetailRange({ from: END - 2 * DAY + 1, to: END });
 	store.saveOrders([
 		{ uid: uid("won"), block: END - 10, detail: quoted(ARC, true) },
 		{ uid: uid("routed"), block: END - 5, detail: quoted(ARC, false) },

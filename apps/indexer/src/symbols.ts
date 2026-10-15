@@ -1,6 +1,6 @@
 import { decodeSymbol } from "./abi.ts";
 import { ethCall, SELECTOR } from "./chain.ts";
-import { NATIVE_ETH } from "./config.ts";
+import { NATIVE_TOKEN, NETWORK } from "./config.ts";
 import { log, shortAddress } from "./log.ts";
 import { describeError } from "./pacer.ts";
 import type { Rpc } from "./rpc.ts";
@@ -17,7 +17,7 @@ export async function resolveSymbols(
 	tokens: string[]
 ): Promise<Map<string, string>> {
 	const symbols = store.symbols();
-	symbols.set(NATIVE_ETH, "ETH");
+	symbols.set(NATIVE_TOKEN, NETWORK.native.symbol);
 	const missing = [...new Set(tokens)].filter((token) => !symbols.has(token));
 	if (missing.length === 0) return symbols;
 	try {

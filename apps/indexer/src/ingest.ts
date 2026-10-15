@@ -3,6 +3,7 @@ import {
 	getInputs,
 	getLogs,
 	getReceipts,
+	headerAnchors,
 	orderUidOf,
 	parseSettlementLogs,
 	ROUTER,
@@ -10,8 +11,9 @@ import {
 	SETTLEMENT,
 	TOPIC,
 } from "./chain.ts";
-import type { TradeRow } from "./chain.ts";
-import { LOG_RANGE, NETWORK } from "./config.ts";
+import type { Log, TradeRow } from "./chain.ts";
+import type { Anchor } from "./clock.ts";
+import { NETWORK } from "./config.ts";
 import { duration, fmt, log, throttledLog } from "./log.ts";
 import { answerAt, feedSegments, pricePoints } from "./prices.ts";
 import type { FeedSegment } from "./prices.ts";
@@ -76,8 +78,9 @@ class AllowList {
 /**
  * Fetches everything a block range adds: settlements and trades from the settlement contract's
  * logs, a receipt and the calldata of each batch transaction, with the order terms the calldata
- * gives its trades, and the ETH/USD answers of the aggregators that `feed` says the Chainlink
- * proxy used. Flash-loan router senders and recipients get an AllowList verdict on the way.
+ * gives its trades, the native token's USD answers of the aggregators that `feed` says the
+ * Chainlink proxy used, and the clock's anchors. Flash-loan router senders and recipients get an
+ * AllowList verdict on the way.
  */
 async function fetchChunk(
 	rpc: Rpc,
@@ -133,7 +136,30 @@ async function fetchChunk(
 	for (const { tx, block, sender, recipient } of txs) {
 		if (routed.has(tx)) await checkRouterParties(allowList, sender, recipient, block);
 	}
-	return { range, settlements, trades, txs, prices: pricePoints(feed, logs, range) };
+	return {
+		range,
+		settlements,
+		trades,
+		txs,
+		prices: pricePoints(feed, logs, range),
+		anchors: await anchorsOf(rpc, range, logs),
+	};
+}
+
+/**
+ * The block times a range gives the clock: the block of every log, with the timestamp the node
+ * gives it; or, when no log carries one (a range without logs, or a node that does not add it),
+ * the timestamps of the range's first and last blocks from their headers.
+ */
+async function anchorsOf(rpc: Rpc, range: BlockRange, logs: Log[]): Promise<Anchor[]> {
+	const times = new Map<number, number>();
+	for (const entry of logs) {
+		if (entry.blockTimestamp !== undefined) {
+			times.set(Number(entry.blockNumber), Number(entry.blockTimestamp));
+		}
+	}
+	if (times.size === 0) return headerAnchors(rpc, [...new Set([range.from, range.to])]);
+	return [...times].map(([block, time]) => ({ block, time }));
 }
 
 /** Gives trades the order terms their transaction's calldata holds, and logs the ones it lacks. */
@@ -170,17 +196,20 @@ async function checkRouterParties(
 }
 
 /**
- * Gives the first block of the chain data an ETH/USD price when it has none. Each backfill pass
- * stores the proxy's answer at the bottom of its range only when it gets there, so a pass the
- * budget stopped leaves the blocks below its lowest AnswerUpdated without a rate.
+ * Gives the first block of the chain data a price of the native token when it has none. Each
+ * backfill pass stores the proxy's answer at the bottom of its range only when it gets there, so
+ * a pass the budget stopped leaves the blocks below its lowest AnswerUpdated without a price.
  */
-export async function seedEthUsd(store: Store, rpc: Rpc): Promise<void> {
+export async function seedNativeUsd(store: Store, rpc: Rpc): Promise<void> {
 	const chain = store.chainRange();
 	if (chain === null) return;
-	const first = store.firstEthUsdBlock();
+	const first = store.firstNativeUsdBlock();
 	if (first !== null && first <= chain.from) return;
-	store.saveEthUsdPoint({ block: chain.from, answer: await answerAt(rpc, chain.from) });
-	log(`ETH/USD: stored the answer at block ${chain.from}, the first of the chain data`);
+	store.saveNativeUsdPoint({ block: chain.from, answer: await answerAt(rpc, chain.from) });
+	log(
+		`${NETWORK.native.symbol}/USD: stored the answer at block ${chain.from}, the first of the ` +
+			"chain data"
+	);
 }
 
 /**
@@ -198,8 +227,8 @@ export async function backfillChain(
 ): Promise<void> {
 	const top = (store.chainRange()?.from ?? head + 1) - 1;
 	const ranges: BlockRange[] = [];
-	for (let to = top; to >= low; to -= LOG_RANGE) {
-		ranges.push({ from: Math.max(low, to - LOG_RANGE + 1), to });
+	for (let to = top; to >= low; to -= NETWORK.logRange) {
+		ranges.push({ from: Math.max(low, to - NETWORK.logRange + 1), to });
 	}
 	await ingest(store, rpc, ranges, "backfill", stats, stop);
 }
@@ -212,8 +241,8 @@ export async function catchUpChain(
 	stats: IngestStats
 ): Promise<void> {
 	const ranges: BlockRange[] = [];
-	for (let from = store.chainRange()!.to + 1; from <= head; from += LOG_RANGE) {
-		ranges.push({ from, to: Math.min(head, from + LOG_RANGE - 1) });
+	for (let from = store.chainRange()!.to + 1; from <= head; from += NETWORK.logRange) {
+		ranges.push({ from, to: Math.min(head, from + NETWORK.logRange - 1) });
 	}
 	await ingest(store, rpc, ranges, "catch-up", stats);
 }
@@ -221,8 +250,8 @@ export async function catchUpChain(
 /**
  * Fetches ranges a few at a time and commits them strictly in order, each in one transaction
  * with the new chain range, so the ingested range stays contiguous and a crash loses nothing.
- * The ETH/USD feed's aggregators are resolved once for the whole pass. Once `stop` aborts, no
- * further range is fetched.
+ * The aggregators behind the native token's feed are resolved once for the whole pass. Once
+ * `stop` aborts, no further range is fetched.
  */
 async function ingest(
 	store: Store,
@@ -289,8 +318,8 @@ export async function fillOrderUids(store: Store, rpc: Rpc, stop?: AbortSignal):
 	const gap = store.uidGap();
 	if (gap === null || stop?.aborted) return;
 	const ranges: BlockRange[] = [];
-	for (let to = gap.to; to >= gap.from; to -= LOG_RANGE) {
-		ranges.push({ from: Math.max(gap.from, to - LOG_RANGE + 1), to });
+	for (let to = gap.to; to >= gap.from; to -= NETWORK.logRange) {
+		ranges.push({ from: Math.max(gap.from, to - NETWORK.logRange + 1), to });
 	}
 	log(`order uids: blocks ${gap.from}..${gap.to}, ${fmt(ranges.length)} ranges`);
 	const started = performance.now();

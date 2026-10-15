@@ -1,10 +1,10 @@
 #!/bin/sh
 # Runs `sync` with this script's arguments every REFRESH_MINUTES (whole minutes, default 10),
 # counted from the start of each run. A failed run is logged and the next one runs on schedule.
-# With SEED_DB_URL set and no database at DB_PATH yet, the database is first downloaded from that
-# URL (`cli.ts seed`), which moves the indexer to a new host without indexing again.
-# REFRESH_MINUTES, SEED_DB_URL and DB_PATH are read from this script's environment; ./.env is
-# read only by each `sync`.
+# With SEED_DB_URL set and no database yet, the database is first downloaded from that URL
+# (`cli.ts seed`), which moves the indexer to a new host without indexing again.
+# REFRESH_MINUTES, SEED_DB_URL, DB_PATH and NETWORK are read from this script's environment;
+# ./.env is read only by each `sync`.
 set -eu
 cd "$(dirname "$0")"
 
@@ -12,7 +12,9 @@ cd "$(dirname "$0")"
 child=
 trap 'if [ -n "$child" ]; then kill "$child" 2>/dev/null; fi; exit 0' INT TERM
 
-if [ -n "${SEED_DB_URL:-}" ] && [ ! -e "${DB_PATH:?DB_PATH must be set with SEED_DB_URL}" ]; then
+# The database: DB_PATH, else the indexer's default for the network, .data/<network>.db.
+db=${DB_PATH:-.data/${NETWORK:-base}.db}
+if [ -n "${SEED_DB_URL:-}" ] && [ ! -e "$db" ]; then
 	node src/cli.ts seed --url "$SEED_DB_URL"
 fi
 

@@ -14,7 +14,9 @@ COPY packages/core packages/core
 COPY apps/indexer apps/indexer
 RUN pnpm install --frozen-lockfile --prod --filter @fiberscope/indexer...
 
-ENV DB_PATH=/data/base.db
+# The indexer's default database, apps/indexer/.data/<network>.db, lives on the volume:
+# /data/base.db for Base, /data/bnb.db for BNB Chain (NETWORK=bnb).
+RUN mkdir /data && ln -s /data apps/indexer/.data
 # The commit the image is built from, written into every snapshot and linked in the page's footer:
 # docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD) ... from a clean checkout of that commit.
 ARG GIT_COMMIT=""

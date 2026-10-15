@@ -5,15 +5,15 @@ import { NETWORK } from "./config.ts";
 import type { Rpc } from "./rpc.ts";
 import type { BlockRange } from "./rules.ts";
 
-const FEED = NETWORK.contracts.ethUsdFeed;
+const FEED = NETWORK.native.usdFeed;
 
-/** A Chainlink ETH/USD answer (8 decimals) that holds from `block` until the next point. */
+/** A Chainlink answer for the native token's USD price (8 decimals), valid until the next point. */
 export interface PricePoint {
 	block: number;
 	answer: number;
 }
 
-/** A block range served by one Chainlink aggregator behind the ETH/USD proxy. */
+/** A block range served by one Chainlink aggregator behind the native token's USD feed. */
 export interface FeedSegment {
 	from: number;
 	to: number;
@@ -52,7 +52,7 @@ export async function feedSegments(rpc: Rpc, from: number, to: number): Promise<
 	return [{ from, to: same, aggregator, seed }, ...(await feedSegments(rpc, switched, to))];
 }
 
-/** The ETH/USD answer the proxy gave at a block (8 decimals). */
+/** The native token's USD price the feed gave at a block (8 decimals). */
 export async function answerAt(rpc: Rpc, block: number): Promise<number> {
 	const round = await rpc.call<string>(
 		"eth_call",
@@ -85,8 +85,11 @@ export function pricePoints(segments: FeedSegment[], logs: Log[], range: BlockRa
 	return points;
 }
 
-/** ETH/USD at a block: the latest answer at or before it. `points` is sorted by block. */
-export function ethUsdAt(points: PricePoint[], block: number): number | null {
+/**
+ * The native token's USD price at a block: the latest answer at or before it. `points` is sorted
+ * by block.
+ */
+export function nativeUsdAt(points: PricePoint[], block: number): number | null {
 	let low = 0;
 	let high = points.length - 1;
 	let found = -1;

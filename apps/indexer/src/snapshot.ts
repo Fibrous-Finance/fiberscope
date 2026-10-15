@@ -10,13 +10,13 @@ import type {
 } from "@fiberscope/core";
 
 import { ROUTER } from "./chain.ts";
-import { NETWORK, timeOf } from "./config.ts";
+import { NETWORK } from "./config.ts";
 import { auctionOutcomes, creditedBatches, tradeFees, TradeValuer } from "./facts.ts";
 import type { Batch } from "./facts.ts";
 import { shortAddress } from "./log.ts";
-import { ethUsdAt } from "./prices.ts";
+import { nativeUsdAt } from "./prices.ts";
 import type { Registry, RegistryEntry, SolverIdentity } from "./registry.ts";
-import { auctionLosses, bucketOf, completeBuckets, quoteSolver, windowStart } from "./rules.ts";
+import { auctionLosses, Days, quoteSolver } from "./rules.ts";
 import type { RankedSolution } from "./rules.ts";
 import type { Store, TradeDetailRow, TradeValueRow } from "./store.ts";
 
@@ -47,7 +47,7 @@ export interface SnapshotStats {
 	noSurplus: number;
 	/** Of the trades with a surplus, the unusual ones (more than a tenth of their value). */
 	unusual: number;
-	/** Batches in the chain coverage without an ETH/USD rate, so without a cost. */
+	/** Batches in the chain coverage without the native token's USD price, so without a cost. */
 	uncosted: number;
 	/** Trades in the detail coverage. */
 	detailTrades: number;
@@ -100,13 +100,15 @@ export async function buildSnapshot(
 	const chain = store.chainRange();
 	if (chain === null) throw new Error("The database holds no chain data: run sync first");
 	const end = chain.to;
-	const chainDays = completeBuckets(end, chain);
+	const clock = store.clock();
+	const days = new Days(clock, end);
+	const chainDays = days.completeBuckets(chain);
 	const auctionRange = store.auctionRange();
-	const auctionDays = Math.min(chainDays, completeBuckets(end, auctionRange));
+	const auctionDays = Math.min(chainDays, days.completeBuckets(auctionRange));
 	// Surplus also needs order terms, read from each trade's calldata as it is stored.
 	const surplusDays = auctionDays;
 	// Scores, quotes and fees are looked up in CoW's API after the auction data.
-	const detailDays = Math.min(auctionDays, completeBuckets(end, store.detailRange()));
+	const detailDays = Math.min(auctionDays, days.completeBuckets(store.detailRange()));
 	const lastRunAt = store.lastRunAt();
 	if (lastRunAt === null) throw new Error("No sync has completed yet");
 
@@ -169,10 +171,10 @@ export async function buildSnapshot(
 	const networkLatest: Batch[] = [];
 	if (chainDays > 0) {
 		for (const batch of creditedBatches(store, registry, {
-			from: windowStart(end, chainDays),
+			from: days.windowStart(chainDays),
 			to: end,
 		})) {
-			const d = bucketOf(end, batch.block);
+			const d = days.bucketOf(batch.block);
 			const entry = tally(batch.solver);
 			entry.seen.add(batch.address);
 			entry.batches[d]++;
@@ -198,13 +200,13 @@ export async function buildSnapshot(
 	const count = zeros(auctionDays);
 	const solutions = zeros(auctionDays);
 	if (auctionDays > 0) {
-		const range = { from: windowStart(end, auctionDays), to: end };
+		const range = { from: days.windowStart(auctionDays), to: end };
 		for (const trade of store.tradeRows(range)) {
 			const { usd, pricedSides, surplus } = valuer.value(trade);
 			stats.trades++;
 			if (usd === null) stats.unpriced++;
 			else if (pricedSides === 1) stats.oneSided++;
-			const d = bucketOf(end, trade.block);
+			const d = days.bucketOf(trade.block);
 			const entry = creditOf(trade);
 			if (usd === null || !entry) continue;
 			entry.volume[d] += usd;
@@ -225,7 +227,7 @@ export async function buildSnapshot(
 			}
 		}
 		for (const auction of auctionOutcomes(store.solutionsByStart(range), registry)) {
-			const d = bucketOf(end, auction.startBlock);
+			const d = days.bucketOf(auction.startBlock);
 			if (d < 0) continue;
 			count[d]++;
 			solutions[d] += auction.solutions;
@@ -250,10 +252,10 @@ export async function buildSnapshot(
 
 	// Quotes count for the solver that gave them, fees for the solver that settled the trade.
 	if (detailDays > 0) {
-		const range = { from: windowStart(end, detailDays), to: end };
+		const range = { from: days.windowStart(detailDays), to: end };
 		for (const trade of store.tradeDetails(range)) {
 			stats.detailTrades++;
-			const d = bucketOf(end, trade.block);
+			const d = days.bucketOf(trade.block);
 			const settler = creditOf(trade);
 			const quoter = quoteSolver(trade.quoteSolver);
 			if (quoter !== null) {
@@ -295,7 +297,7 @@ export async function buildSnapshot(
 		const row: SettlementSummary = {
 			tx: batch.tx,
 			block: batch.block,
-			time: timeOf(batch.block) * 1000,
+			time: clock.time(batch.block) * 1000,
 			trades: batch.trades,
 			swaps: batch.swaps,
 			pair: { sell: symbol(trades[0].sellToken), buy: symbol(trades[0].buyToken) },
@@ -382,7 +384,7 @@ export async function buildSnapshot(
 					.toSorted(addressOrder)
 					.map(({ env, address, active }) => ({ env, address, active })),
 				lastSettlement: last
-					? { tx: last.tx, block: last.block, time: timeOf(last.block) * 1000 }
+					? { tx: last.tx, block: last.block, time: clock.time(last.block) * 1000 }
 					: null,
 				batches: history ? sum(history.batches) : 0,
 			};
@@ -395,20 +397,20 @@ export async function buildSnapshot(
 				a.id.localeCompare(b.id)
 		);
 
-	const points = store.ethUsdPoints();
+	const points = store.nativeUsdPoints();
 	const latestAuctions: AuctionSummary[] = [
 		...auctionOutcomes(
 			auctionRange ? store.latestSolutions(auctionRange, LATEST_AUCTIONS) : [],
 			registry
 		),
 	].map((auction) => {
-		const ethUsd = ethUsdAt(points, auction.startBlock);
+		const nativeUsd = nativeUsdAt(points, auction.startBlock);
 		return {
 			id: auction.id,
-			time: timeOf(auction.startBlock) * 1000,
+			time: clock.time(auction.startBlock) * 1000,
 			entered: [...auction.entrants.keys()],
 			winners: auction.winners,
-			solutions: auction.ranked.map((solution) => listedSolution(solution, ethUsd)),
+			solutions: auction.ranked.map((solution) => listedSolution(solution, nativeUsd)),
 		};
 	});
 
@@ -417,7 +419,7 @@ export async function buildSnapshot(
 		network: NETWORK.id,
 		builtAt: Date.now(),
 		commit: options.commit ?? undefined,
-		end: { block: end, time: timeOf(end) * 1000 },
+		end: { block: end, time: clock.time(end) * 1000 },
 		lastRunAt,
 		refreshMinutes: options.refreshMinutes,
 		coverage: { chainDays, auctionDays, surplusDays, detailDays },
@@ -431,14 +433,15 @@ export async function buildSnapshot(
 }
 
 /**
- * A solution as the snapshot lists it: its score in USD at the auction's ETH/USD rate, to 6
- * significant figures (enough to tell scores 0.001% apart), and its flags only when set.
+ * A solution as the snapshot lists it: its score in USD at the native token's USD price when the
+ * auction started, to 6 significant figures (enough to tell scores 0.001% apart), and its flags
+ * only when set.
  */
-function listedSolution(solution: RankedSolution, ethUsd: number | null): AuctionSolution {
+function listedSolution(solution: RankedSolution, nativeUsd: number | null): AuctionSolution {
 	const score =
-		solution.score === null || ethUsd === null
+		solution.score === null || nativeUsd === null
 			? null
-			: Number(((Number(solution.score) / 1e18) * ethUsd).toPrecision(6));
+			: Number(((Number(solution.score) / 1e18) * nativeUsd).toPrecision(6));
 	const listed: AuctionSolution = { solver: solution.solver, score };
 	if (solution.filteredOut) listed.filteredOut = true;
 	if (solution.winner) listed.winner = true;

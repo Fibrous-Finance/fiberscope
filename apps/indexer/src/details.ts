@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { LOG_RANGE, NETWORK, timeOf } from "./config.ts";
+import { NETWORK } from "./config.ts";
 import type { Competition, ExecutedFee, FeePolicy, OrderDetail, OrderTrade } from "./cow.ts";
 import { duration, fmt, log, throttledLog } from "./log.ts";
 import type { BlockRange } from "./rules.ts";
@@ -116,7 +116,7 @@ export async function processDetailRange(
 				const trade = listed.get(`${block}:${logIndex}`);
 				if (trade)
 					saved.push({ block, logIndex, fees: withPartners(trade.fees, partnerFees) });
-				else if (now - timeOf(block) >= MISS_IS_FINAL_AFTER) {
+				else if (now - store.timeOf(block) >= MISS_IS_FINAL_AFTER) {
 					saved.push({ block, logIndex, fees: null });
 				}
 			}
@@ -152,7 +152,7 @@ export async function backfillDetails(
 	const before = { ...stats };
 	const report = throttledLog();
 	for (let top = start; top >= low;) {
-		const range = { from: Math.max(low, top - LOG_RANGE + 1), to: top };
+		const range = { from: Math.max(low, top - NETWORK.logRange + 1), to: top };
 		const auctioned = () => (store.auctionRange()?.from ?? Infinity) <= range.from;
 		await until(() => auctioned() || watch.auctionsDone, signal);
 		if (!auctioned() || signal.aborted) break;
@@ -194,9 +194,9 @@ export async function catchUpDetails(
 	for (
 		let from = Math.max(range.from, range.to + 1 - recheck);
 		from <= auctions.to;
-		from += LOG_RANGE
+		from += NETWORK.logRange
 	) {
-		const to = Math.min(auctions.to, from + LOG_RANGE - 1);
+		const to = Math.min(auctions.to, from + NETWORK.logRange - 1);
 		if (!(await processDetailRange(store, source, { from, to }, stats, signal))) break;
 		store.setDetailRange({ from: range.from, to: Math.max(range.to, to) });
 	}

@@ -2,6 +2,8 @@ import { mkdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import { parseArgs } from "node:util";
 
+import { NETWORKS } from "@fiberscope/core";
+
 import { attributionReport, termsReport } from "./checks.ts";
 import { DEFAULT_DB_PATH, DEFAULT_SNAPSHOT_PATH, type Env, NETWORK, readEnv } from "./config.ts";
 import { CowApi } from "./cow.ts";
@@ -20,10 +22,10 @@ import { windowReport } from "./window.ts";
 const USAGE = `Usage:
   node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune]
                        [--snapshot <path>]
-      Catch up with Base's safe block, then backfill at least N days of chain data and M days of
-      auction data, with the auctions' scores and the quotes and fees of the orders traded.
-      Resumable and idempotent: a re-run fetches only what is missing. With --budget-minutes the
-      backfill stops B minutes after the start and the next run resumes it.
+      Catch up with the network's safe block, then backfill at least N days of chain data and M
+      days of auction data, with the auctions' scores and the quotes and fees of the orders
+      traded. Resumable and idempotent: a re-run fetches only what is missing. With
+      --budget-minutes the backfill stops B minutes after the start and the next run resumes it.
       With --prune, once the head is caught up, chain data older than N days (at least M, as for
       the backfill) is deleted with its auction data, and so is the auction data of settlements
       older than M days; with both at 0 nothing is deleted. With --snapshot the snapshot is
@@ -47,10 +49,11 @@ const USAGE = `Usage:
       host without indexing again. It is integrity-checked before it is used.
 
 Every command takes --db <path> (default DB_PATH, else ${relative(process.cwd(), DEFAULT_DB_PATH)}).
-Environment: BASE_RPC_URL, BASE_RPC_RPS, COW_API_RPS, REFRESH_MINUTES, GIT_COMMIT. With
-SNAPSHOT_R2_BUCKET (plus CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and
-optionally SNAPSHOT_R2_KEY, default ${NETWORK.id}/snapshot.json) every snapshot written is also
-uploaded to that R2 bucket.
+Environment: NETWORK, the network to index (${Object.keys(NETWORKS).join(" or ")}, default base), and
+its RPC endpoint and rate: BASE_RPC_URL and BASE_RPC_RPS, or BNB_RPC_URL (required) and
+BNB_RPC_RPS. Also COW_API_RPS, REFRESH_MINUTES and GIT_COMMIT. With SNAPSHOT_R2_BUCKET (plus
+CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and optionally SNAPSHOT_R2_KEY,
+default ${NETWORK.id}/snapshot.json) every snapshot written is also uploaded to that R2 bucket.
 `;
 
 async function main(): Promise<void> {
@@ -192,7 +195,7 @@ async function writeSnapshot(store: Store, rpc: Rpc, env: Env, out: string): Pro
 	log(
 		`  priced trades in the surplus days: ${fmt(stats.surplusPriced)}, ` +
 			`${fmt(stats.noSurplus)} without order terms, ${fmt(stats.unusual)} with unusual ` +
-			`surplus; batches without an ETH/USD rate: ${fmt(stats.uncosted)}`
+			`surplus; batches without the ${NETWORK.native.symbol}/USD rate: ${fmt(stats.uncosted)}`
 	);
 	log(
 		`  trades in the detail days: ${fmt(stats.detailTrades)}, ${fmt(stats.unknownFees)} ` +

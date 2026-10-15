@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { NETWORK, WETH } from "./config.ts";
+import { NETWORK } from "./config.ts";
 import type { Competition, ExecutedFee, OrderDetail, OrderTrade } from "./cow.ts";
 import { backfillDetails, processDetailRange, withPartners } from "./details.ts";
 import type { DetailSource, DetailStats } from "./details.ts";
@@ -9,8 +9,12 @@ import type { BlockRange } from "./rules.ts";
 import { Store } from "./store.ts";
 
 const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+const WETH = "0x4200000000000000000000000000000000000006";
 const SOLVER = "0x5050505050505050505050505050505050505050";
 const QUOTER = "0x6060606060606060606060606060606060606060";
+/** Now in Unix seconds, and the block taken to be the head then. */
+const NOW = Math.floor(Date.now() / 1000);
+const HEAD = 10_000_000;
 
 /** A transaction hash spelled from a readable label. */
 function hash(label: string): string {
@@ -22,7 +26,10 @@ function uid(label: string): string {
 	return `0x${Buffer.from(label).toString("hex").padStart(112, "0")}`;
 }
 
-/** Commits one-trade batches, each filling the order of its label, as the chain data of `range`. */
+/**
+ * Commits one-trade batches, each filling the order of its label, as the chain data of `range`,
+ * whose blocks come every 2 seconds up to HEAD at NOW.
+ */
 function ingest(store: Store, range: BlockRange, settled: { label: string; block: number }[]) {
 	const current = store.chainRange();
 	store.commitChunk(
@@ -56,6 +63,10 @@ function ingest(store: Store, range: BlockRange, settled: { label: string; block
 				fee: "500001",
 			})),
 			prices: [{ block: range.from, answer: 2_000e8 }],
+			anchors: [range.from, range.to].map((block) => ({
+				block,
+				time: NOW - 2 * (HEAD - block),
+			})),
 		},
 		{
 			from: Math.min(current?.from ?? range.from, range.from),
@@ -280,12 +291,11 @@ describe("detail lookups", () => {
 
 	test("a trade the API does not list yet is looked up again only while it is recent", async () => {
 		const store = new Store(":memory:");
-		const head = Math.floor((Date.now() / 1000 - NETWORK.genesisTime) / NETWORK.blockTime);
 		// 1,000 blocks are 2,000 seconds: past the finality window. 10 blocks are within it.
-		const range = { from: head - 1_000, to: head };
+		const range = { from: HEAD - 1_000, to: HEAD };
 		ingest(store, range, [
-			{ label: "old", block: head - 1_000 },
-			{ label: "new", block: head - 10 },
+			{ label: "old", block: HEAD - 1_000 },
+			{ label: "new", block: HEAD - 10 },
 		]);
 		const api = fakeApi(
 			[],
@@ -297,8 +307,8 @@ describe("detail lookups", () => {
 		);
 		await processDetailRange(store, api, range, stats());
 		await processDetailRange(store, api, range, stats());
-		assert.equal(feesChecked(store, head - 1_000), 0);
-		assert.equal(feesChecked(store, head - 10), null);
+		assert.equal(feesChecked(store, HEAD - 1_000), 0);
+		assert.equal(feesChecked(store, HEAD - 10), null);
 		assert.deepEqual(api.askedTrades, [uid("new"), uid("old"), uid("new")]);
 	});
 

@@ -27,11 +27,14 @@ export interface Status {
 	endBlock: number | null;
 	/** Minutes between data updates. */
 	refreshMinutes: number;
-	/** When the failed request was made (error state); null otherwise. */
+	/**
+	 * When the newest request was made, if it failed; null otherwise. The page then shows the last
+	 * data that loaded, if any, and the error state without it.
+	 */
 	failedAt: number | null;
 	/**
 	 * When the page fetches again on its own (server clock): a minute after the indexer's next
-	 * upload is due while live, every minute while delayed or in error.
+	 * upload is due while live, every minute while delayed, in error or after a failed request.
 	 */
 	nextTryAt: number;
 	/** `state` is "delayed": period wording reads "in the {period} to {asOf}". */

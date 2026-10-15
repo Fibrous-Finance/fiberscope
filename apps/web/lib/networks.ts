@@ -49,7 +49,6 @@ export const SITE_NETWORKS: Record<NetworkId, SiteNetwork> = {
 		image: "/og-image.png",
 		listed: true,
 	},
-	// Unlisted until its history is complete and its figures match Dune's Spellbook.
 	bnb: {
 		...BNB,
 		nameFrom: 820,
@@ -58,7 +57,7 @@ export const SITE_NETWORKS: Record<NetworkId, SiteNetwork> = {
 		wordNameFrom: 881,
 		wordFrom: 780,
 		image: "/og-image-bnb.png",
-		listed: false,
+		listed: true,
 	},
 };
 

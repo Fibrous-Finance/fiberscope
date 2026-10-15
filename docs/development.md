@@ -87,9 +87,9 @@ does, so no sentence, title or source line splits it.
 ### Launching a network
 
 An unlisted network's page and data work as a listed one's, but only its own page's menu shows it,
-`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain is
-unlisted until its history is complete and its batches, trades, DEX swaps and gas have been checked
-against Dune's Spellbook, as Base's were (see [Validation](methodology.md#validation)). To launch a
+`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. A network
+stays unlisted until its history is complete and its batches, trades, DEX swaps and gas have been
+checked against Dune's Spellbook (see [Validation](methodology.md#validation)). To launch a
 network, set its `listed` to `true` in `apps/web/lib/networks.ts`: every page's menu then shows its
 row, the sitemap lists its page, and its page may be indexed as the others are.
 
@@ -340,9 +340,8 @@ search results.
   page that robots.txt blocks keeps its `noindex` unread and can still be listed. It names the
   sitemap only on the indexed host.
 - `/sitemap.xml` lists each listed network's page, last modified at the newest block of its
-  snapshot: `/`, and `/bnb` once BNB Chain is launched (see
-  [Launching a network](#launching-a-network)). It is rendered per request, because `SITE_URL` is
-  a Worker variable that `next build` does not see.
+  snapshot: `/` and `/bnb`. It is rendered per request, because `SITE_URL` is a Worker variable
+  that `next build` does not see.
 - Each network's page has a canonical link to itself, `/` or `/bnb`: query strings such as
   `?period=7d` are views of the same page. An unlisted network's page is `noindex` on every host.
 - The home page carries WebSite structured data (JSON-LD), which gives search results the site's

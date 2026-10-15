@@ -87,11 +87,11 @@
 		},
 		"attribution": {
 			"term": "Attribution",
-			"text": "Settlements sent through CoW’s flash-loan router{bundles, select, yes { or through Euler’s contracts for CoW’s Atomic Bundles, both of which call the settlement contract on a solver’s behalf,} other {}} go to the transaction’s recipient when it is a registered or allow-listed solver, else to its sender when that is one, else to the auction’s winner; as a last resort, to the sender."
+			"text": "Settlements through CoW’s flash-loan router{bundles, select, yes { or Euler’s contracts for CoW’s Atomic Bundles follow the same rule. Both call the settlement contract on a solver’s behalf. Credit goes} other { are credited}} to the transaction’s recipient if it is a registered or allow-listed solver other than {bundles, select, yes {these contracts} other {the router}}, else to its sender if that is one, else to the winner CoW’s solver-competition API names for the transaction; failing that, to the sender."
 		},
 		"registry": {
 			"term": "Registry",
-			"text": "Status and submission addresses from CoW’s solver registry for {network}, plus addresses that settle on {network} and are on the settlement contract’s on-chain solver allow-list but are not listed as active. These additional addresses are shown as active; today there {count, plural, =0 {are none} one {is one, {overrides}} =2 {are two, {overrides}} other {are #, {overrides}}}. A retired address is one the registry marks inactive."
+			"text": "Status and submission addresses from CoW’s solver registry for {network}, plus addresses that settle on {network} and are on the settlement contract’s on-chain solver allow-list but are not listed as active for that network. These additional addresses are shown as active; today there {count, plural, =0 {are none} one {is one, {overrides}} =2 {are two, {overrides}} other {are #, {overrides}}}. A retired address is one the registry marks inactive."
 		},
 		"freshness": {
 			"term": "Freshness",

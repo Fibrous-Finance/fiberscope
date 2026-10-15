@@ -18,6 +18,9 @@ import type { NetworkId, Snapshot } from "@fiberscope/core";
 export type SnapshotResult =
 	{ ok: true; snapshot: Snapshot; at: number } | { ok: false; at: number };
 
+/** A load that succeeded. */
+export type LoadedSnapshot = Extract<SnapshotResult, { ok: true }>;
+
 /** The part of an R2 bucket binding the loader uses. */
 interface SnapshotBucket {
 	get(key: string): Promise<{ json<T>(): Promise<T> } | null>;

@@ -45,6 +45,52 @@ another network's data. The page's view is in its query string:
 `pnpm build` builds the site for production, and `pnpm --filter @fiberscope/web start` serves that
 build.
 
+## Networks on the site
+
+Every network's page is the same page component with that network's data and facts: Base at `/`,
+BNB Chain at `/bnb`. Two modules describe a network:
+
+- `packages/core/src/networks.ts` holds its facts, which the indexer reads with and the page's copy
+  names: its page's path, its block explorer (`scan`, `scanName`), its native and wrapped tokens,
+  whether a transaction pays an L1 data fee (`l1DataFee`), Dune's table of its trades
+  (`duneTable`), its Atomic Bundles (`contracts.bundles`) and the addresses CoW's registry lacks
+  (`overrides`), with the evidence for each.
+- `apps/web/lib/networks.ts` holds how the site shows it, in the order of the header's network
+  menu: the widths from which the header shows the network's name (`nameFrom`) and the Live label
+  (`liveFrom`), its link preview (`image`) and whether it is listed (`listed`). The networks still
+  to come, which the menu shows as SOON, are there too (`UPCOMING`).
+
+The copy takes the network's name from `Header.network.<id>` in
+`apps/web/messages/en/header.json`. A name of two words carries a no-break space, as "BNB Chain"
+does, so no sentence, title or source line splits it.
+
+### Adding a network
+
+1. Its facts: an entry in `NETWORKS` in `packages/core/src/networks.ts`, and its id in `NetworkId`.
+2. Its presentation: an entry in `SITE_NETWORKS` in `apps/web/lib/networks.ts`, after the live
+   networks, with `listed: false` until its launch. Its header widths are measured with its name,
+   in every data state, so the header ends inside the content edge at every width: `nameFrom` and
+   `liveFrom`, from which the name and the Live label show next to the Live dot (Base 760 and
+   980px, BNB Chain 820 and 1,020px, with at least 4px to spare), and `compactWordNameFrom`,
+   `wordNameFrom` and `wordFrom`, from which the name and the word show next to the other states'
+   word (Delayed, Loading, No data). If it was a SOON network, take it out of `UPCOMING`.
+3. Its mark: the network's logo in one colour, `fill="currentColor"`, its viewBox cropped to the
+   mark and any metadata the file carries removed, in `MARKS` in
+   `apps/web/components/frame/NetworkMark.tsx`, with its size in a 14px box (11–14px, for optical
+   weight: solid shapes smaller).
+4. Its route: `apps/web/app/<path>/page.tsx`, as `apps/web/app/bnb/page.tsx`.
+5. Its link preview: `apps/web/public/og-image-<id>.png`, 1200 × 630, with a one-day cache entry in
+   `apps/web/public/_headers`.
+6. Its name: `Header.network.<id>`.
+
+### Launching a network
+
+An unlisted network's page and data work as a listed one's, but only its own page's menu shows it,
+`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain is
+unlisted until its history is complete and its figures match Dune's Spellbook. To launch a network,
+set its `listed` to `true` in `apps/web/lib/networks.ts`: every page's menu then shows its row, the
+sitemap lists its page, and its page may be indexed as the others are.
+
 ## The indexer
 
 `apps/indexer` reads data from Base or BNB Chain (see [Choosing the network](#choosing-the-network))
@@ -98,7 +144,8 @@ another network's database. To run a second network beside Base, run a second in
 own `NETWORK`, RPC variables, database and snapshot path: another `loop.sh`, or another container
 from the same image with its own volume (see [The indexer](#the-indexer-1)). The default R2 keys
 already differ. Each indexer paces its own requests, so on one host their CoW API request rates
-add up. The site shows each network on its own page: Base at `/`, BNB Chain at `/bnb`.
+add up. The site shows each network on its own page: Base at `/`, BNB Chain at `/bnb` (see
+[Networks on the site](#networks-on-the-site)).
 
 ### Block times
 
@@ -244,8 +291,8 @@ pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build
 ```
 
 `pnpm format` fixes formatting. Tests use `node:test` and sit next to the code they test
-(`*.test.ts` in `packages/core` and `apps/indexer`). CI runs the same checks on every pull request
-and every push to `main` (`.github/workflows/ci.yml`).
+(`*.test.ts` in `packages/core`, `apps/indexer` and `apps/web/lib`). CI runs the same checks on
+every pull request and every push to `main` (`.github/workflows/ci.yml`).
 
 ## Deployment
 
@@ -274,10 +321,10 @@ which `preview_urls: true` keeps on independently of that address.
 copy, create an R2 bucket and set `bucket_name` and `SITE_URL` in `wrangler.jsonc`, and set
 `ALLOW_INDEXING` to `"false"` unless the copy should appear in search results.
 `apps/web/public/_headers` sets the cache policy of static files: one year, immutable, for the
-fingerprinted files under `/_next/static/`, and one day for the icons and the social image
-(`favicon.svg`, `favicon.ico`, `apple-touch-icon.png` and `og-image.png`), which keep their names
-when they change. `favicon.ico` is there for clients that ask for it by name; without the file,
-each such request would render the not-found page.
+fingerprinted files under `/_next/static/`, and one day for the icons and the social images
+(`favicon.svg`, `favicon.ico`, `apple-touch-icon.png`, `og-image.png` and `og-image-bnb.png`),
+which keep their names when they change. `favicon.ico` is there for clients that ask for it by
+name; without the file, each such request would render the not-found page.
 
 ### Search engines
 
@@ -290,11 +337,12 @@ search results.
 - `/robots.txt` lets every crawler in on every host, so crawlers can read those `noindex` tags: a
   page that robots.txt blocks keeps its `noindex` unread and can still be listed. It names the
   sitemap only on the indexed host.
-- `/sitemap.xml` lists each network's page, `/` and `/bnb`, last modified at the newest block of its
-  snapshot. It is rendered per request, because `SITE_URL` is a Worker variable that `next build`
-  does not see.
+- `/sitemap.xml` lists each listed network's page, last modified at the newest block of its
+  snapshot: `/`, and `/bnb` once BNB Chain is launched (see
+  [Launching a network](#launching-a-network)). It is rendered per request, because `SITE_URL` is
+  a Worker variable that `next build` does not see.
 - Each network's page has a canonical link to itself, `/` or `/bnb`: query strings such as
-  `?period=7d` are views of the same page.
+  `?period=7d` are views of the same page. An unlisted network's page is `noindex` on every host.
 - The home page carries WebSite structured data (JSON-LD), which gives search results the site's
   name.
 
@@ -389,6 +437,8 @@ Measured on the live deployment on 3–5 Oct 2026.
 | `apps/indexer/src/rules.ts`     | The counting rules as pure functions: days, attribution, volume, surplus, cost |
 | `apps/indexer/src/snapshot.ts`  | Builds the snapshot from the database                                          |
 | `packages/core/src/snapshot.ts` | The snapshot contract                                                          |
+| `packages/core/src/networks.ts` | Each network's facts                                                           |
 | `packages/core/src/view`        | The view model: windows, shares, ranks, averages and the charts' scales        |
 | `apps/web/components`           | The page's sections                                                            |
+| `apps/web/lib/networks.ts`      | How the site shows each network                                                |
 | `apps/web/messages/en`          | Every reader-facing string, through next-intl                                  |

@@ -24,7 +24,7 @@ const RETIRED = "text-[10.5px] tracking-[.06em] text-fa uppercase";
  * one since it starts sit behind a second toggle.
  */
 export function Registry() {
-	const { network, snapshot, layout } = useDashboard();
+	const { networkName, snapshot, layout } = useDashboard();
 	const t = useTranslations("Winning.registry");
 	const f = useFormat();
 	const [open, setOpen] = useState(false);
@@ -46,7 +46,7 @@ export function Registry() {
 			>
 				<span className="text-[16px] font-medium tracking-[-0.01em]">{t("title")}</span>
 				<span className="text-[14px] text-pretty text-mu">
-					{t("summary", { total: registry.total, network: network.name })}
+					{t("summary", { total: registry.total, network: networkName })}
 				</span>
 				<Caret
 					open={open}
@@ -100,7 +100,7 @@ export function Registry() {
 					</div>
 					<div className="mt-3.5 flex flex-wrap justify-between gap-x-5 gap-y-1.5 foot-line">
 						<span>{t("note")}</span>
-						<span>{t("source", { network: network.name })}</span>
+						<span>{t("source", { network: networkName })}</span>
 					</div>
 				</>
 			) : null}

@@ -8,6 +8,7 @@ import { useDashboard } from "@/components/dashboard/context";
 import { Section } from "@/components/ui/Section";
 
 import { useFormat } from "@/lib/format";
+import { overridesText } from "@/lib/networks";
 
 /** Definitions, in two columns: the measures, then where the data comes from and how it is made. */
 const MEASURES = [
@@ -45,18 +46,24 @@ type Term = (typeof MEASURES)[number] | (typeof SOURCES)[number];
 
 export function Methodology() {
 	const t = useTranslations("Methodology");
+	const ts = useTranslations("Enter.solutions");
 	const f = useFormat();
-	const { network, snapshot, status } = useDashboard();
+	const { network, networkName, snapshot, status } = useDashboard();
 	// Without figures on the page (error, or reloading after one), the definitions leave out the
 	// numbers that describe the data.
 	const data = status.state === "error" || status.state === "loading" ? null : snapshot;
-	// The network's facts, which the definitions name.
+	// The network's facts, which the definitions name: the registry lists the addresses it lacks.
 	const facts = {
-		network: network.name,
+		network: networkName,
 		native: network.native.symbol,
 		wrapped: network.native.wrappedSymbol,
 		duneTable: network.duneTable,
 		l1: network.l1DataFee ? "yes" : "no",
+		bundles: network.contracts.bundles.length > 0 ? "yes" : "no",
+		count: network.overrides.length,
+		overrides: overridesText(network.overrides, f.list, (name) =>
+			ts("possessive", { solver: name })
+		),
 	};
 
 	const text = (key: Term) => {
@@ -85,8 +92,6 @@ export function Methodology() {
 				: t("terms.coverage.noData");
 		}
 		if (key === "gas") return t("terms.gas.text", { minBatches: MIN_BATCHES_PER_DAY });
-		// The addresses the registry leaves out differ from one network to the next.
-		if (key === "registry") return t(`terms.registry.text.${network.id}`);
 		return t(`terms.${key}.text`, facts);
 	};
 	// Compact: one column, 14px above each term.

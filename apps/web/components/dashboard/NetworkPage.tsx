@@ -3,33 +3,31 @@ import { headers } from "next/headers";
 
 import { getTranslations } from "next-intl/server";
 
-import type { Network, NetworkId } from "@fiberscope/core";
+import type { NetworkId } from "@fiberscope/core";
 
 import { Dashboard } from "@/components/dashboard/Dashboard";
 
 import { looksLikePhone } from "@/lib/device";
+import { SITE_NETWORKS } from "@/lib/networks";
 import { parseSelection } from "@/lib/selection";
 import { loadSnapshot } from "@/lib/snapshot";
-
-/** The networks with a social image of their own (in public/): Base's names Base. */
-const SOCIAL_IMAGE: Partial<Record<NetworkId, string>> = { base: "/og-image.png" };
 
 /** A network's page: the overview of its data, in the view its query string selects. */
 export async function NetworkPage({
 	network,
 	searchParams,
 }: {
-	network: Network;
+	network: NetworkId;
 	searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
 	const [result, params, request] = await Promise.all([
-		loadSnapshot(network.id),
+		loadSnapshot(network),
 		searchParams,
 		headers(),
 	]);
 	return (
 		<Dashboard
-			network={network.id}
+			network={network}
 			result={result}
 			selection={parseSelection(params)}
 			phone={looksLikePhone(request)}
@@ -38,19 +36,26 @@ export async function NetworkPage({
 }
 
 /**
- * A network's page title, description and link previews. Period, measure and solver live in the
- * query string; the network's page itself is one, so its path is the canonical address.
+ * A network's page title, description and link previews, each with its own image. Period, measure
+ * and solver live in the query string; the network's page itself is one, so its path is the
+ * canonical address. An unlisted network's page is noindex, whatever the site allows.
  */
-export async function networkMetadata(network: Network): Promise<Metadata> {
-	const t = await getTranslations("Meta");
-	const values = { network: network.name };
+export async function networkMetadata(id: NetworkId): Promise<Metadata> {
+	const [t, tn] = await Promise.all([getTranslations("Meta"), getTranslations("Header.network")]);
+	const network = SITE_NETWORKS[id];
+	const values = { network: tn(id) };
 	const title = t("title", values);
 	const description = t("ogDescription", values);
-	const url = SOCIAL_IMAGE[network.id];
-	// metadataBase (in the layout) makes the URLs absolute.
-	const images = url
-		? [{ url, type: "image/png", width: 1200, height: 630, alt: t("ogImageAlt", values) }]
-		: undefined;
+	// metadataBase (in the layout) makes the URL absolute.
+	const images = [
+		{
+			url: network.image,
+			type: "image/png",
+			width: 1200,
+			height: 630,
+			alt: t("ogImageAlt", values),
+		},
+	];
 	return {
 		alternates: { canonical: network.path },
 		title,
@@ -63,11 +68,9 @@ export async function networkMetadata(network: Network): Promise<Metadata> {
 			siteName: "Fiberscope",
 			images,
 		},
-		twitter: {
-			card: images ? "summary_large_image" : "summary",
-			title,
-			description,
-			images,
-		},
+		twitter: { card: "summary_large_image", title, description, images },
+		// Left out for a listed network, which keeps the layout's rule: a robots field here, even an
+		// empty one, would replace it.
+		...(!network.listed && { robots: { index: false } }),
 	};
 }

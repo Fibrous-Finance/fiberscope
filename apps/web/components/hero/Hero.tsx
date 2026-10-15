@@ -20,7 +20,7 @@ export function Hero() {
 	const t = useTranslations("Hero");
 	const tc = useTranslations("Common");
 	const f = useFormat();
-	const { view, status, network } = useDashboard();
+	const { view, status, networkName } = useDashboard();
 
 	if (status.state === "loading") {
 		return (
@@ -101,7 +101,7 @@ export function Hero() {
 				{empty
 					? // Batches can settle without volume data (no auction data yet): say which.
 						t(batches > 0 ? "empty.noVolume" : "empty.headline", {
-							network: network.name,
+							network: networkName,
 							span,
 						})
 					: t("headline", {
@@ -109,7 +109,7 @@ export function Hero() {
 							n: fraction.key === "oneIn" ? fraction.n : 0,
 							// "Two in five" counts things; volume takes "two-fifths".
 							kind: view.measure,
-							network: network.name,
+							network: networkName,
 							measure: tc(`measure.${view.measure}`),
 							span,
 						})}
@@ -169,10 +169,10 @@ export function Hero() {
 /** Every state starts with the eyebrow. */
 function Frame({ busy, children }: { busy?: boolean; children: ReactNode }) {
 	const t = useTranslations("Hero");
-	const { network } = useDashboard();
+	const { networkName } = useDashboard();
 	return (
 		<section aria-busy={busy || undefined} className="pt-[clamp(48px,8vw,108px)]">
-			<p className="eyebrow">{t("eyebrow", { network: network.name })}</p>
+			<p className="eyebrow">{t("eyebrow", { network: networkName })}</p>
 			{children}
 		</section>
 	);

@@ -53,7 +53,7 @@ export function Efficiency() {
 	const t = useTranslations("Efficiency");
 	const f = useFormat();
 	const view = useView();
-	const { network, snapshot } = useDashboard();
+	const { network, networkName, snapshot } = useDashboard();
 	const { hovered, setHovered } = useHover();
 	const { average, lowest, minBatches } = view.gas;
 	const swaps = view.swaps;
@@ -229,9 +229,7 @@ export function Efficiency() {
 					<span />
 				</div>
 			</div>
-			<FootLine
-				source={t("source", { network: network.name, native: network.native.symbol })}
-			>
+			<FootLine source={t("source", { network: networkName, native: network.native.symbol })}>
 				<span className="max-wide:hidden">{t("note")}</span>
 				<span className="wide:hidden">{t("noteCompact")}</span>
 			</FootLine>

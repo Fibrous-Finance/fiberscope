@@ -1,13 +1,28 @@
 /**
- * Networks Fiberscope indexes, each shown on a page of its own (`path`). The page's network menu
- * lists them in `NETWORKS`'s order, then the upcoming networks. A new network also needs its route
- * (apps/web/app), its registry term in the methodology (`Methodology.terms.registry.text`) and its
- * mark in the menu (a colour token in apps/web/app/globals.css).
+ * Networks Fiberscope indexes, each shown on a page of its own (`path`): the facts the indexer
+ * reads it with and the page's copy names. How the site shows each one (its row in the network
+ * menu, its header widths, its link preview, whether it is listed yet) is in
+ * apps/web/lib/networks.ts; docs/development.md ("Networks on the site") lists what a new network
+ * needs.
  */
 export type NetworkId = "base" | "bnb";
 
+/**
+ * A submission address CoW's solver registry (its CMS) lacks for a network, though it is
+ * allow-listed on-chain (GPv2AllowListAuthentication) and settles there. The indexer adds it as an
+ * active prod address, over any CMS entry for the same address; the page's methodology lists it.
+ */
+export interface RegistryOverride {
+	/** Lowercase hex address. */
+	address: string;
+	/** CoW's id for the solver; it groups the solver's addresses. */
+	solverId: string;
+	name: string;
+}
+
 export interface Network {
 	id: NetworkId;
+	/** The network's name in the indexer's messages; the page's copy takes `Header.network.{id}`. */
 	name: string;
 	/** The site's page for this network. */
 	path: string;
@@ -63,6 +78,8 @@ export interface Network {
 		 */
 		bundles: string[];
 	};
+	/** Addresses the registry lacks on this network, with the evidence for each. */
+	overrides: RegistryOverride[];
 }
 
 export const BASE: Network = {
@@ -95,6 +112,15 @@ export const BASE: Network = {
 		// None: Euler's SDK lists bundles for Ethereum and BNB Chain only.
 		bundles: [],
 	},
+	overrides: [
+		// Rizzolver: a prod address allow-listed on-chain but missing from the CMS, which lists
+		// only a retired one.
+		{
+			address: "0x8f5835e9d756c9bd934bce527157a4b0ef3c5cb7",
+			solverId: "rizzolver",
+			name: "Rizzolver",
+		},
+	],
 };
 
 export const BNB: Network = {
@@ -136,6 +162,25 @@ export const BNB: Network = {
 			"0xcc054cd4b814a2caeb63c6f6a446435480a383f3",
 		],
 	},
+	overrides: [
+		// Rizzolver: the address of its Base entry, allow-listed on BNB Chain too. The CMS lists it
+		// (prod, active) for Ethereum only and, for BNB Chain, only a retired one, as for Base;
+		// Dune's Spellbook lists it as Rizzolver on BNB Chain (cow_protocol_bnb_solvers).
+		{
+			address: "0x8f5835e9d756c9bd934bce527157a4b0ef3c5cb7",
+			solverId: "rizzolver",
+			name: "Rizzolver",
+		},
+		// Fractal: allow-listed on BNB Chain, where CoW's competition data names it as the winning
+		// solver of the auctions it settles, e.g. through Euler's open-position bundle in tx
+		// 0x4b61e1649a3e48af1b1a5b5a36a91e87e6436ec361b4b428a24a9c6fd5080e07. The CMS lists it
+		// (prod, active) for Ethereum only, as does Dune's Spellbook (cow_protocol_ethereum_solvers).
+		{
+			address: "0x95480d3f27658e73b2785d30beb0c847d78294c7",
+			solverId: "fractal",
+			name: "Fractal",
+		},
+	],
 };
 
 export const NETWORKS: Record<NetworkId, Network> = { base: BASE, bnb: BNB };

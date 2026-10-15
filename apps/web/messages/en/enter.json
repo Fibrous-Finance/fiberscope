@@ -43,7 +43,7 @@
 		"pair": "<swap>{sell} → {buy}</swap>{more, plural, =0 {} other {<extra> +#</extra>}}",
 		"more": "Show {count} more",
 		"fewer": "Show fewer",
-		"note": "Transaction cost: what the transaction paid on {network}{l1, select, yes {, including the L1 data fee} other {}}. Fees: charged on the settlement’s trades by CoW’s protocol and by partners. Quoted by: the solver whose quote the first trade’s order was placed with.",
+		"note": "Transaction cost: {l1, select, yes {what the transaction paid on {network}, including the L1 data fee.} other {what the transaction paid for gas on {network}.}} Fees: charged on the settlement’s trades by CoW’s protocol and by partners. Quoted by: the solver whose quote the first trade’s order was placed with.",
 		"source": "Source: CoW Protocol API · {network} settlement events",
 		"items": {
 			"trades": "{trades, plural, one {# trade} other {# trades}}",

@@ -450,7 +450,7 @@ function useDetail(row: Row) {
 				cow: `https://explorer.cow.fi/${chain.explorerSlug}/tx/${s.tx}`,
 				cowLabel: tc("cowExplorerLabel", link),
 				scan: `${chain.scan}/tx/${s.tx}`,
-				scanLabel: tc("scanLabel", { explorer: chain.scanName, ...link }),
+				scanLabel: tc("chainExplorerLabel", { explorer: chain.scanName, ...link }),
 			};
 		}),
 	};
@@ -545,7 +545,7 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 													rel="noopener"
 													className="-my-1 py-1 whitespace-nowrap quiet"
 												>
-													{tc.rich("scan", {
+													{tc.rich("chainExplorer", {
 														explorer: d.explorer,
 														arrow,
 													})}
@@ -746,7 +746,10 @@ export function DetailWide({ row, width }: { row: Row; width: number }) {
 											aria-label={s.scanLabel}
 											className="whitespace-nowrap quiet"
 										>
-											{tc.rich("scan", { explorer: d.explorer, arrow })}
+											{tc.rich("chainExplorer", {
+												explorer: d.explorer,
+												arrow,
+											})}
 										</a>
 									</span>
 								</div>
@@ -869,7 +872,7 @@ export function DetailCompact({ row }: { row: Row }) {
 										rel="noopener"
 										className="-my-[15px] py-[15px] whitespace-nowrap quiet"
 									>
-										{tc.rich("scan", { explorer: d.explorer, arrow })}
+										{tc.rich("chainExplorer", { explorer: d.explorer, arrow })}
 									</a>
 								</>
 							)}
@@ -920,7 +923,10 @@ export function DetailCompact({ row }: { row: Row }) {
 										className={COMPACT_LINK}
 									>
 										<span>
-											{tc.rich("scan", { explorer: d.explorer, arrow })}
+											{tc.rich("chainExplorer", {
+												explorer: d.explorer,
+												arrow,
+											})}
 										</span>
 									</a>
 								</span>

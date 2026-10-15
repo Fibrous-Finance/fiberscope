@@ -41,7 +41,7 @@ const SKELETON_NAMES = [62, 48, 55, 40, 51, 44, 58, 37];
 /** "Who is winning": the leaderboard, with an expandable detail per solver, then the registry. */
 export function Winning() {
 	const view = useView();
-	const { network, snapshot, sort, status } = useDashboard();
+	const { network, networkName, snapshot, sort, status } = useDashboard();
 	const t = useTranslations("Winning");
 	const tc = useTranslations("Common");
 	const ts = useTranslations("Surplus.header");
@@ -145,7 +145,7 @@ export function Winning() {
 		const align = `|--:|---|${"--:|".repeat(columns.length)}`;
 		// Pasted elsewhere, "Share" needs its measure.
 		const source = t("markdownSource", {
-			network: network.name,
+			network: networkName,
 			measure: tc(`measure.${view.measure}`),
 			window: span,
 		});
@@ -168,7 +168,8 @@ export function Winning() {
 				view.measure,
 				figures,
 				details,
-				exportCoverage(view, figures, details)
+				exportCoverage(view, figures, details),
+				network.id
 			),
 			`fiberscope-${network.id}-${view.period}-${view.measure}.csv`
 		);
@@ -210,7 +211,7 @@ export function Winning() {
 			</div>
 			<Table rows={rows} />
 			<List rows={rows} />
-			<FootLine source={t("source", { network: network.name })}>
+			<FootLine source={t("source", { network: networkName })}>
 				{t.rich("note", {
 					earlier: view.hasEarlierWindow ? "yes" : "no",
 					previous: tc(`previousPeriod.${view.period}`),

@@ -12,7 +12,9 @@ import {
 
 import { useRouter } from "next/navigation";
 
-import { buildView, NETWORKS } from "@fiberscope/core";
+import { useTranslations } from "next-intl";
+
+import { buildView } from "@fiberscope/core";
 import type { Measure, NetworkId, Period, Snapshot, Sort } from "@fiberscope/core";
 
 import { Change } from "@/components/change/Change";
@@ -27,6 +29,7 @@ import { Methodology } from "@/components/methodology/Methodology";
 import { Winning, WinningSkeleton } from "@/components/winning/Winning";
 
 import { useFormat } from "@/lib/format";
+import { SITE_NETWORKS } from "@/lib/networks";
 import { parseSelection, selectionQuery } from "@/lib/selection";
 import type { Selection } from "@/lib/selection";
 import type { SnapshotResult } from "@/lib/snapshot";
@@ -66,7 +69,8 @@ export function Dashboard({
 	/** The request most likely comes from a phone: render the compact layout before measuring. */
 	phone: boolean;
 }) {
-	const network = NETWORKS[networkId];
+	const network = SITE_NETWORKS[networkId];
+	const networkName = useTranslations("Header.network")(networkId);
 	const router = useRouter();
 	const f = useFormat();
 	const snapshot = result.ok ? result.snapshot : null;
@@ -195,6 +199,7 @@ export function Dashboard({
 		<DashboardContext
 			value={{
 				network,
+				networkName,
 				snapshot,
 				view,
 				period,
@@ -219,7 +224,8 @@ export function Dashboard({
 				<Header
 					network={network}
 					status={status}
-					// Another network's page opens with this period and measure; solver ids differ.
+					// Another network's page opens with this period and measure; auction and solver
+					// ids differ between networks.
 					query={selectionQuery({ period, measure, solver: null })}
 				/>
 				<div className="page">
@@ -239,7 +245,7 @@ export function Dashboard({
 						) : null}
 						<Methodology />
 					</main>
-					<Footer network={network} dataCommit={snapshot?.commit} />
+					<Footer dataCommit={snapshot?.commit} />
 				</div>
 			</HoverContext>
 		</DashboardContext>

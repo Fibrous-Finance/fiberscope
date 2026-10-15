@@ -50,7 +50,7 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 	const th = useTranslations("Hero");
 	const f = useFormat();
 	const view = useView();
-	const { network, snapshot, status } = useDashboard();
+	const { network, networkName, snapshot, status } = useDashboard();
 	const { hovered, setHovered } = useHover();
 	const [expanded, setExpanded] = useState(false);
 	const { ref: scroller, more: moreColumns } = useScrollMore();
@@ -130,7 +130,11 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 			scan: `${network.scan}/tx/${s.tx}`,
 			// Every row has the same two links: their names say which settlement they open.
 			cowLabel: tc("cowExplorerLabel", { time, pair: pairText }),
-			scanLabel: tc("scanLabel", { explorer: network.scanName, time, pair: pairText }),
+			scanLabel: tc("chainExplorerLabel", {
+				explorer: network.scanName,
+				time,
+				pair: pairText,
+			}),
 		};
 	});
 
@@ -263,7 +267,10 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 										aria-label={row.scanLabel}
 										className="whitespace-nowrap quiet"
 									>
-										{tc.rich("scan", { explorer: network.scanName, arrow })}
+										{tc.rich("chainExplorer", {
+											explorer: network.scanName,
+											arrow,
+										})}
 									</a>
 								</span>
 							</div>
@@ -328,7 +335,10 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 										className={COMPACT_LINK}
 									>
 										<span>
-											{tc.rich("scan", { explorer: network.scanName, arrow })}
+											{tc.rich("chainExplorer", {
+												explorer: network.scanName,
+												arrow,
+											})}
 										</span>
 									</a>
 								</span>
@@ -359,8 +369,8 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 					<Caret open={expanded} />
 				</button>
 			) : null}
-			<FootLine source={t("source", { network: network.name })}>
-				{t("note", { network: network.name, l1: network.l1DataFee ? "yes" : "no" })}
+			<FootLine source={t("source", { network: networkName })}>
+				{t("note", { network: networkName, l1: network.l1DataFee ? "yes" : "no" })}
 			</FootLine>
 		</div>
 	);

@@ -23,7 +23,7 @@
 		},
 		"cost": {
 			"term": "Transaction cost",
-			"text": "What a settlement transaction paid on {network}: gas used × gas price{l1, select, yes {, plus the L1 data fee} other {}}, in USD at Chainlink’s {native}/USD rate in its block. A transaction that holds several batches splits its cost evenly between them, as it splits gas. Per trade: a solver’s cost divided by the trades it filled."
+			"text": "What a settlement transaction paid on {network}: gas used × gas price{l1, select, yes {, plus the L1 data fee,} other {,}} in USD at Chainlink’s {native}/USD rate in its block. A transaction that holds several batches splits its cost evenly between them, as it splits gas. Per trade: a solver’s cost divided by the trades it filled."
 		},
 		"swaps": {
 			"term": "DEX swaps",
@@ -51,7 +51,7 @@
 		},
 		"networkAverage": {
 			"term": "Network average",
-			"text": "Gas, transaction cost and DEX swaps per trade across all solvers, weighted by trades. Typical surplus across all solvers, weighted by volume."
+			"text": "Gas, transaction cost and DEX swaps per trade across all solvers on {network}, weighted by trades. Typical surplus across all solvers on {network}, weighted by volume."
 		},
 		"entered": {
 			"term": "Entered",
@@ -87,14 +87,11 @@
 		},
 		"attribution": {
 			"term": "Attribution",
-			"text": "Settlements sent through CoW’s flash-loan router go to the transaction’s recipient when it is a registered or allow-listed solver, else to its sender when that is one, else to the auction’s winner; as a last resort, to the sender."
+			"text": "Settlements sent through CoW’s flash-loan router{bundles, select, yes { or through Euler’s contracts for CoW’s Atomic Bundles, both of which call the settlement contract on a solver’s behalf,} other {}} go to the transaction’s recipient when it is a registered or allow-listed solver, else to its sender when that is one, else to the auction’s winner; as a last resort, to the sender."
 		},
 		"registry": {
 			"term": "Registry",
-			"text": {
-				"base": "Status and submission addresses from CoW’s solver registry for Base, plus addresses that settle on Base and are on the settlement contract’s on-chain solver allow-list but are not listed as active. These additional addresses are shown as active; today there is one, Rizzolver’s 0x8f58…5cb7. A retired address is one the registry marks inactive.",
-				"bnb": "Status and submission addresses from CoW’s solver registry for BNB Chain, plus two addresses that settle on BNB Chain and are on the settlement contract’s on-chain solver allow-list but that the registry lists only for Ethereum: Rizzolver’s 0x8f58…5cb7 and Fractal’s 0x9548…94c7. These are shown as active. A retired address is one the registry marks inactive."
-			}
+			"text": "Status and submission addresses from CoW’s solver registry for {network}, plus addresses that settle on {network} and are on the settlement contract’s on-chain solver allow-list but are not listed as active. These additional addresses are shown as active; today there {count, plural, =0 {are none} one {is one, {overrides}} =2 {are two, {overrides}} other {are #, {overrides}}}. A retired address is one the registry marks inactive."
 		},
 		"freshness": {
 			"term": "Freshness",

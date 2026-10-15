@@ -1,11 +1,9 @@
-import { BASE } from "@fiberscope/core";
-
 import { networkMetadata, NetworkPage } from "@/components/dashboard/NetworkPage";
 
 import { siteUrl } from "@/lib/site";
 
 export function generateMetadata() {
-	return networkMetadata(BASE);
+	return networkMetadata("base");
 }
 
 /** The home page: Base. */
@@ -26,7 +24,7 @@ export default function BasePage({ searchParams }: PageProps<"/">) {
 					__html: JSON.stringify(website).replace(/</g, "\\u003c"),
 				}}
 			/>
-			<NetworkPage network={BASE} searchParams={searchParams} />
+			<NetworkPage network="base" searchParams={searchParams} />
 		</>
 	);
 }

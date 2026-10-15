@@ -1,3 +1,4 @@
+import type { NetworkId } from "../networks.ts";
 import type { AuctionDetails } from "./details.ts";
 import type { SurplusCost, SurplusCostFigures } from "./surplus.ts";
 import { DAY_MS } from "./view.ts";
@@ -8,7 +9,8 @@ import type { Measure, Row, View } from "./view.ts";
  * in them. The CSV says so on every row with ISO 8601 UTC instants, so a file keeps it without
  * breaking parsers; the Markdown with a mark after each partly covered column and a footnote per
  * mark. The CSV is machine-readable, so the same in every language; the page writes the Markdown
- * in its own words from `ExportCoverage`.
+ * in its own words from `ExportCoverage`. Every CSV row also names its network, so files of two
+ * networks, whose solver ids are the same, can be merged into one table.
  */
 
 /** A coverage footnote of the Markdown: which one, over how many of the window's days. */
@@ -144,6 +146,7 @@ const CSV_COLUMNS = [
 	"auction_data_from_utc",
 	"surplus_data_from_utc",
 	"detail_data_from_utc",
+	"network",
 ];
 
 /**
@@ -152,15 +155,17 @@ const CSV_COLUMNS = [
  * gas are whole. `_pct` columns are percentages; `_share` columns are 0–1 fractions to three
  * decimals, `filtered_out_share` and `quotes_share` to four, the tenth of a percent the page gives
  * them in. Solutions and quotes are counts over the detail days, and fees are on the trades the
- * solver settled. The last five columns say which days the others cover; an empty "from" means
- * the source has no data in the window, and the columns it feeds are empty.
+ * solver settled. The five columns before the last say which days the others cover; an empty
+ * "from" means the source has no data in the window, and the columns it feeds are empty. The last,
+ * `network`, is the id of the network the rows come from (`base`, `bnb`), the same on every row.
  */
 export function leaderboardCsv(
 	rows: readonly Row[],
 	measure: Measure,
 	figures: SurplusCost,
 	details: AuctionDetails,
-	coverage: ExportCoverage
+	coverage: ExportCoverage,
+	network: NetworkId
 ): string {
 	// A value to `digits` decimals once scaled (a 0.42 share is 42.00 in percent); empty if unknown.
 	const decimals = (value: number | null | undefined, digits: number, scale = 1) =>
@@ -210,6 +215,7 @@ export function leaderboardCsv(
 			decimals(detail?.protocolFees, 2),
 			decimals(detail?.partnerFees, 2),
 			...window,
+			network,
 		].join(",");
 	});
 	return [CSV_COLUMNS.join(","), ...lines].join("\n");

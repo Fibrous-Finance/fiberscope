@@ -39,8 +39,7 @@ export function Surplus() {
 	const th = useTranslations("Hero");
 	const f = useFormat();
 	const view = useView();
-	// The page's network; `network` below holds the surplus figures of all its solvers.
-	const { snapshot, status, network: chain } = useDashboard();
+	const { snapshot, status, networkName } = useDashboard();
 	const { hovered, setHovered } = useHover();
 
 	const surplus = surplusAndCost(snapshot!, view);
@@ -235,7 +234,7 @@ export function Surplus() {
 							/>
 						</div>
 					</div>
-					<FootLine source={t("source", { network: chain.name })}>
+					<FootLine source={t("source", { network: networkName })}>
 						<span className="max-wide:hidden">{t("note")}</span>
 						<span className="wide:hidden">{t("noteCompact")}</span>
 					</FootLine>

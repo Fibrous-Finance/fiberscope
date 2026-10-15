@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { backfillAuctions, catchUpAuctions, resolveRouterSenders } from "./auctions.ts";
+import { backfillAuctions, catchUpAuctions, resolveRelaySenders } from "./auctions.ts";
 import type { AuctionStats, ChainWatch } from "./auctions.ts";
 import { Clock } from "./clock.ts";
 import type { Anchor } from "./clock.ts";
@@ -8,7 +8,13 @@ import { NETWORK } from "./config.ts";
 import type { CowApi } from "./cow.ts";
 import { backfillDetails, catchUpDetails } from "./details.ts";
 import type { DetailStats, DetailWatch } from "./details.ts";
-import { backfillChain, catchUpChain, fillOrderUids, seedNativeUsd } from "./ingest.ts";
+import {
+	backfillChain,
+	catchUpChain,
+	fillOrderUids,
+	fillRelayVerdicts,
+	seedNativeUsd,
+} from "./ingest.ts";
 import type { IngestStats } from "./ingest.ts";
 import { log } from "./log.ts";
 import { OVERRIDES } from "./overrides.ts";
@@ -72,6 +78,9 @@ export async function sync(
 		details: { scores: 0, orders: 0, fees: 0, seconds: 0 },
 	};
 	await seedNativeUsd(store, rpc);
+	// Relay settlements stored before their relay was listed lack the AllowList verdicts that
+	// attribution reads: they get them before anything reads them.
+	await fillRelayVerdicts(store, rpc);
 
 	// Catch up: chain data to the head, then the auctions of the new blocks. A long pause since
 	// the last run leaves the head far behind, so this repeats, at most three times, until the end
@@ -89,7 +98,7 @@ export async function sync(
 			await catchUpAuctions(store, cow, stats.auctions);
 			if ((await safeHead(rpc)).block - store.chainRange()!.to <= CATCH_UP_SLACK) break;
 		}
-		await resolveRouterSenders(store, cow, registry, stats.auctions);
+		await resolveRelaySenders(store, cow, registry, stats.auctions);
 		days = new Days(store.clock(), store.chainRange()!.to);
 		if (options.prune && chainDays > 0) {
 			store.prune(
@@ -158,10 +167,10 @@ export async function sync(
 			details.auctionsDone = true;
 		}
 		// Once the auction backfill is done, the CoW API's rate allowance is idle while the chain
-		// backfill runs on: spend it on the router settlements whose attribution needs the API's
+		// backfill runs on: spend it on the relay settlements whose attribution needs the API's
 		// winner, as their blocks arrive.
 		while (!chain.done) {
-			await resolveRouterSenders(store, cow, registry, stats.auctions, stop);
+			await resolveRelaySenders(store, cow, registry, stats.auctions, stop);
 			for (let waited = 0; waited < 20 && !chain.done; waited++) await sleep(500);
 		}
 	})();

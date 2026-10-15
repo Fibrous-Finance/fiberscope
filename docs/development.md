@@ -136,7 +136,7 @@ the same summary.
 | `node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune] [--snapshot <path>]` | Catches up with the network's safe block, then backfills at least N days of settlements and M days of auctions. With `--snapshot`, writes the snapshot once caught up, and again if the backfill added history. With `--budget-minutes`, the backfill stops B minutes after the start, and the next run resumes it. With `--prune`, deletes the data older than those depths once caught up (see below); with both at 0 it deletes nothing.                                                              |
 | `node src/cli.ts snapshot [--out <path>]`                                                                     | Writes the snapshot from the database (default `apps/web/data/<network>/snapshot.json`).                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `node src/cli.ts window --from <block> --to <block>`                                                          | Prints totals (batches, trades, DEX swaps, volume, surplus, gas and cost; scores and filtered-out solutions; quotes; protocol and partner fees) and the per-solver table for a block range, from the database.                                                                                                                                                                                                                                                                                           |
-| `node src/cli.ts attribution --from <block> --to <block>`                                                     | Uses the database to compare each batch's credited solver address in a block range with the solver address of the winning solution for its transaction in CoW's competition data. Breaks down flash-loan router batches by how the credited address was chosen. See [Validation](methodology.md#validation).                                                                                                                                                                                             |
+| `node src/cli.ts attribution --from <block> --to <block>`                                                     | Uses the database to compare each batch's credited solver address in a block range with the solver address of the winning solution for its transaction in CoW's competition data. Breaks down relay batches (through the flash-loan router or an Atomic Bundle) by how the credited address was chosen. See [Attribution](methodology.md#attribution) and [Validation](methodology.md#validation).                                                                                                       |
 | `node src/cli.ts terms --from <block> --to <block> [--sample N]`                                              | Counts trades with order terms decoded from `settle()` calldata, grouped by how the calldata reached the settlement contract. It then samples trades across the block range and routes, targeting N trades (default: 90). For each sampled trade, it rereads and decodes the transaction from the RPC, compares the executed fee with the fee in its `Trade` event, and compares the signed-order fields with the corresponding fields in CoW's order book. See [Validation](methodology.md#validation). |
 | `node src/cli.ts seed --url <url>`                                                                            | Downloads a database from `<url>` when there is none yet, so a new host does not index again. It never overwrites a database and runs SQLite's integrity check on the download before using it.                                                                                                                                                                                                                                                                                                          |
 
@@ -146,24 +146,26 @@ same options) also read `apps/indexer/.env` when it exists.
 ### What a sync does
 
 1. Refreshes CoW's solver registry; if the registry is unavailable, it uses the last copy.
-2. Catches up: settlements, receipts and calldata up to the network's safe block, then the
+2. For settlements stored before their relay was added to the indexer, checks the senders and
+   recipients against the allow-list so attribution can use the results.
+3. Catches up: settlements, receipts and calldata up to the network's safe block, then the
    auctions behind the new settlements. On Base, the safe block is the newest block whose
    transactions Base has posted to Ethereum. On BNB Chain, it is the newest justified block; in
    BNB Chain's fast finality, justification is the stage before finalization.
-3. With `--prune`, deletes settlements older than N days (at least M, as for the backfill) with
+4. With `--prune`, deletes settlements older than N days (at least M, as for the backfill) with
    their auction data, and the auction data, orders and fees of settlements older than M days. A
-   flash-loan router settlement keeps its auction while it is in the chain data, since its
-   attribution may need the auction's winner.
-4. Fetches details for the new blocks: the orders traded and their trades' protocol fees,
+   relay settlement (through the flash-loan router or an Atomic Bundle) keeps its auction while it
+   is in the chain data, since its attribution may need the auction's winner.
+5. Fetches details for the new blocks: the orders traded and their trades' protocol fees,
    rechecking the last 10 minutes of trades whose fees the API did not list yet. If one of these
    lookups fails, or they take more than 2 minutes, the snapshot is written without the
    auction-detail figures, and the rest is caught up after it.
-5. Marks the data current and, with `--snapshot`, writes the snapshot.
-6. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
+6. Marks the data current and, with `--snapshot`, writes the snapshot.
+7. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
    settlements, followed by their auction lookups, followed by their details. Settlement history
    is kept at least as deep as auction history. Trades stored before the schema held order uids
    get theirs from their `Trade` events.
-7. Writes the snapshot again if the history grew.
+8. Writes the snapshot again if the history grew.
 
 On an empty database there is nothing to catch up: the backfill starts at the safe block and the
 snapshot is written once it ends. Every step commits as it goes, so an interrupted run loses

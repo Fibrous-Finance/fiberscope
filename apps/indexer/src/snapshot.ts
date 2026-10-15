@@ -9,7 +9,7 @@ import type {
 	SolverAddress,
 } from "@fiberscope/core";
 
-import { ROUTER } from "./chain.ts";
+import { RELAYS } from "./chain.ts";
 import { NETWORK } from "./config.ts";
 import { auctionOutcomes, creditedBatches, tradeFees, TradeValuer } from "./facts.ts";
 import type { Batch } from "./facts.ts";
@@ -164,9 +164,9 @@ export async function buildSnapshot(
 		unsplitFees: 0,
 	};
 
-	// Trades follow their batch's credit: a router batch's by its block and log index, any other
+	// Trades follow their batch's credit: a relay batch's by its block and log index, any other
 	// to the solver that settled it.
-	const routed = new Map<string, Tally>();
+	const relayed = new Map<string, Tally>();
 	// The latest batches of all solvers together, oldest first.
 	const networkLatest: Batch[] = [];
 	if (chainDays > 0) {
@@ -187,13 +187,13 @@ export async function buildSnapshot(
 			if (entry.latest.length > LATEST_SETTLEMENTS) entry.latest.shift();
 			networkLatest.push(batch);
 			if (networkLatest.length > LATEST_NETWORK_SETTLEMENTS) networkLatest.shift();
-			if (batch.viaRouter) routed.set(`${batch.block}:${batch.logIndex}`, entry);
+			if (batch.relay !== null) relayed.set(`${batch.block}:${batch.logIndex}`, entry);
 		}
 	}
 	// The tally a trade's batch is credited to.
 	const creditOf = (trade: { solver: string; block: number; settlementLogIndex: number }) =>
-		trade.solver === ROUTER
-			? routed.get(`${trade.block}:${trade.settlementLogIndex}`)
+		RELAYS.includes(trade.solver)
+			? relayed.get(`${trade.block}:${trade.settlementLogIndex}`)
 			: tallies.get(registry.identify(trade.solver).id);
 
 	const valuer = new TradeValuer(store);

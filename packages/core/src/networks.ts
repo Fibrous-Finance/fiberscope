@@ -56,6 +56,12 @@ export interface Network {
 		allowList: string;
 		/** CoW's flash-loan router: it settles on behalf of the auction winner. */
 		flashLoanRouter: string;
+		/**
+		 * The network's Atomic Bundles (formerly Generalized Wrappers), lowercase: contracts CoW
+		 * DAO allow-lists that a solver calls instead of the settlement contract, and that call
+		 * `settle` on its behalf.
+		 */
+		bundles: string[];
 	};
 }
 
@@ -86,6 +92,8 @@ export const BASE: Network = {
 		settlement: "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
 		allowList: "0x2c4c28ddbdac9c5e7055b4c863b72ea0149d8afe",
 		flashLoanRouter: "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69",
+		// None: Euler's SDK lists bundles for Ethereum and BNB Chain only.
+		bundles: [],
 	},
 };
 
@@ -117,6 +125,16 @@ export const BNB: Network = {
 		settlement: "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
 		allowList: "0x2c4c28ddbdac9c5e7055b4c863b72ea0149d8afe",
 		flashLoanRouter: "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69",
+		// Euler's, to open, close and collateral-swap positions: COWSWAP_CHAIN_CONFIG[56] in
+		// euler-xyz/euler-sdks (packages/euler-v2-sdk/src/services/executionService/
+		// cowSwapHelpers.ts). Each is allow-listed, settles through the settlement contract
+		// (`SETTLEMENT()`) and gives the `name()` of its contract in
+		// cowprotocol/euler-integration-contracts, which lists no addresses itself.
+		bundles: [
+			"0x64c26b3a182826fe2ab8c04c8caf40b0c4bf9a66",
+			"0x4f4ce927188637b4a1d91350c3114f4bd301dd02",
+			"0xcc054cd4b814a2caeb63c6f6a446435480a383f3",
+		],
 	},
 };
 

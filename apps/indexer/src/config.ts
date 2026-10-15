@@ -61,7 +61,11 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): Env {
 	// The RPC's variables are named after the network.
 	const rpc = `${NETWORK.id.toUpperCase()}_RPC`;
 	const rpcUrl = env[`${rpc}_URL`] || PUBLIC_RPC[NETWORK.id];
-	if (!rpcUrl) throw new Error(`${rpc}_URL must be set: ${NETWORK.name} has no default RPC`);
+	if (!rpcUrl) {
+		throw new Error(
+			`${rpc}_URL must be set: the indexer has no default RPC for ${NETWORK.name}`
+		);
+	}
 	return {
 		dbPath: env.DB_PATH || DEFAULT_DB_PATH,
 		rpcUrl,
@@ -109,7 +113,9 @@ function positive(env: NodeJS.ProcessEnv, name: string, fallback: number): numbe
 
 function network(id: string): Network {
 	if (!Object.hasOwn(NETWORKS, id)) {
-		throw new Error(`NETWORK must be one of ${Object.keys(NETWORKS).join(", ")}, got "${id}"`);
+		const ids = Object.keys(NETWORKS);
+		const list = ids.length > 1 ? `${ids.slice(0, -1).join(", ")} or ${ids.at(-1)}` : ids[0];
+		throw new Error(`NETWORK must be ${list}; got "${id}"`);
 	}
 	return NETWORKS[id as NetworkId];
 }

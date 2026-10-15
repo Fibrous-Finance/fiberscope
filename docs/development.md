@@ -13,9 +13,9 @@ pnpm install
 
 ## Run the site
 
-The site shows each network on a page of its own, Base at `/` and BNB Chain at `/bnb`, from that
+The site has a page for each network: Base at `/` and BNB Chain at `/bnb`. Each page reads its
 network's snapshot: one JSON file, written by the indexer, that holds every figure the page shows.
-Index a day of Base to get Base's:
+Index a day of Base to create its snapshot:
 
 ```sh
 cd apps/indexer
@@ -50,13 +50,13 @@ build.
 Every network's page is the same page component with that network's data and facts: Base at `/`,
 BNB Chain at `/bnb`. Two modules describe a network:
 
-- `packages/core/src/networks.ts` holds its facts, which the indexer reads with and the page's copy
-  names: its page's path, its block explorer (`scan`, `scanName`), its native and wrapped tokens,
-  whether a transaction pays an L1 data fee (`l1DataFee`), Dune's table of its trades
-  (`duneTable`), its Atomic Bundles (`contracts.bundles`) and the addresses CoW's registry lacks
-  (`overrides`), with the evidence for each.
-- `apps/web/lib/networks.ts` holds how the site shows it, in the order of the header's network
-  menu: the widths from which the header shows the network's name (`nameFrom`) and the Live label
+- `packages/core/src/networks.ts` holds each network's facts, used by the indexer and the page: its
+  page's path, its block explorer (`scan`, `scanName`), its native and wrapped tokens, whether a
+  transaction pays an L1 data fee (`l1DataFee`), Dune's table of its trades (`duneTable`), its
+  Atomic Bundles (`contracts.bundles`) and its registry overrides (`overrides`), with supporting
+  evidence for each override.
+- `apps/web/lib/networks.ts` holds how the site shows it, in the order of the header's network menu:
+  the minimum widths at which the header shows the network's name (`nameFrom`) and the Live label
   (`liveFrom`), its link preview (`image`) and whether it is listed (`listed`). The networks still
   to come, which the menu shows as SOON, are there too (`UPCOMING`).
 
@@ -68,13 +68,14 @@ does, so no sentence, title or source line splits it.
 
 1. Its facts: an entry in `NETWORKS` in `packages/core/src/networks.ts`, and its id in `NetworkId`.
 2. Its presentation: an entry in `SITE_NETWORKS` in `apps/web/lib/networks.ts`, after the live
-   networks, with `listed: false` until its launch. Its header widths are measured with its name,
-   in every data state, so the header ends inside the content edge at every width: `nameFrom` and
-   `liveFrom`, from which the name and the Live label show next to the Live dot (Base 760 and
-   980px, BNB Chain 820 and 1,020px, with at least 4px to spare), and `compactWordNameFrom`,
-   `wordNameFrom` and `wordFrom`, from which the name and the word show next to the other states'
-   word (Delayed, Loading, No data). If it was a SOON network, take it out of `UPCOMING`.
-3. Its mark: the network's logo in one colour, `fill="currentColor"`, its viewBox cropped to the
+   networks, with `listed: false` until its launch. Measure the header widths with the network's
+   name in every data state so the header stays inside the content edge at every width. `nameFrom`
+   and `liveFrom` set the minimum widths at which the name and the Live label appear next to the
+   Live dot (Base 760 and 980px, BNB Chain 820 and 1,020px, with at least 4px to spare).
+   `compactWordNameFrom`, `wordNameFrom` and `wordFrom` control when the network name and status
+   word appear in the Delayed, Loading and No data states. If it was a SOON network, take it out of
+   `UPCOMING`.
+3. Its mark: the network's logo in one color, `fill="currentColor"`, its viewBox cropped to the
    mark and any metadata the file carries removed, in `MARKS` in
    `apps/web/components/frame/NetworkMark.tsx`, with its size in a 14px box (11–14px, for optical
    weight: solid shapes smaller).
@@ -87,9 +88,10 @@ does, so no sentence, title or source line splits it.
 
 An unlisted network's page and data work as a listed one's, but only its own page's menu shows it,
 `/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain is
-unlisted until its history is complete and its figures match Dune's Spellbook. To launch a network,
-set its `listed` to `true` in `apps/web/lib/networks.ts`: every page's menu then shows its row, the
-sitemap lists its page, and its page may be indexed as the others are.
+unlisted until its history is complete and its batches, trades, DEX swaps and gas have been checked
+against Dune's Spellbook, as Base's were (see [Validation](methodology.md#validation)). To launch a
+network, set its `listed` to `true` in `apps/web/lib/networks.ts`: every page's menu then shows its
+row, the sitemap lists its page, and its page may be indexed as the others are.
 
 ## The indexer
 
@@ -253,7 +255,7 @@ at the network's default), it first downloads the database with `seed`.
 | `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                                                                                                                                |
 | `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | indexer | The account, and the S3 credentials of an R2 API token with Object Read & Write on that bucket only                                                                                                                         |
 | `GIT_COMMIT`                                                        | indexer | The full commit hash for the indexer's code, recorded in every snapshot. The page's footer links to it when `SITE_COMMIT` is also set. The Docker image sets this variable from its `GIT_COMMIT` build argument             |
-| `SNAPSHOT_R2_KEY`                                                   | indexer | The object key every snapshot is uploaded to (default `<network>/snapshot.json`, so `base/snapshot.json` for Base), which is the key the site reads                                                                         |
+| `SNAPSHOT_R2_KEY`                                                   | indexer | The object key every snapshot is uploaded to (default `<network>/snapshot.json`, so `base/snapshot.json` for Base). The site reads only the default key, so a snapshot uploaded under another key does not reach the page   |
 | `SNAPSHOT_SOURCE`                                                   | web     | `r2` (as in `wrangler.jsonc`): each network's page reads `<network>/snapshot.json` through the `SNAPSHOTS` binding. Any other value, or none, reads local files from `SNAPSHOT_DIR`                                         |
 | `SNAPSHOT_DIR`                                                      | web     | The directory of the local snapshots, one `<network>/snapshot.json` each (default `apps/web/data`)                                                                                                                          |
 | `SITE_URL`                                                          | web     | The site's origin (default `http://localhost:3000`): absolute link-preview URLs, the canonical link, the sitemap, and the one host search engines may index                                                                 |
@@ -271,7 +273,7 @@ site; the indexer writes it and the site derives every view from it with the vie
 - Time is divided into rolling days of 24 hours based on block time (see
   [Block times](#block-times)), working backward from the newest block (`end`). Daily series are
   newest first and zero-filled, so index `d` is always the day `d` days back. `network` names the
-  network the snapshot covers; the site refuses a snapshot of another network than the page's.
+  network the snapshot covers; the site refuses a snapshot for a network other than the page's.
 - `coverage` says how many days hold complete data: `chainDays` for batches, trades, DEX swaps,
   gas and transaction cost; `auctionDays` for volume, entries and wins; `surplusDays` for surplus;
   `detailDays` for solutions, filtered-out solutions, losses, quotes and protocol fees.

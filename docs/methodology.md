@@ -89,10 +89,11 @@ settlement data in the window, or every solver when none has that many.
 
 ### Transaction cost
 
-What a settlement transaction paid on its network: gas used × effective gas price, plus on Base the
-L1 data fee (BNB Chain has none), in USD at Chainlink's ETH/USD rate on Base and BNB/USD on BNB
-Chain in its block. A transaction that holds several batches splits its cost evenly, as it splits
-gas. Per trade: a solver's cost divided by the trades it filled.
+What a settlement transaction paid on its network: gas used × effective gas price, plus the L1 data
+fee on Base (BNB Chain has none). The cost is converted to USD at the Chainlink rate in the
+transaction's block: ETH/USD on Base, BNB/USD on BNB Chain. A transaction that holds several batches
+splits its cost evenly, as it splits gas. Per trade: a solver's cost divided by the trades it
+filled.
 
 ### DEX swaps
 

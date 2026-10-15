@@ -3,7 +3,13 @@ import { describe, test } from "node:test";
 
 import { NETWORK } from "./config.ts";
 import type { Competition, ExecutedFee, OrderDetail, OrderTrade } from "./cow.ts";
-import { backfillDetails, processDetailRange, withPartners } from "./details.ts";
+import {
+	backfillDetails,
+	catchUpDetails,
+	detailCatchUpRequests,
+	processDetailRange,
+	withPartners,
+} from "./details.ts";
 import type { DetailSource, DetailStats } from "./details.ts";
 import type { BlockRange } from "./rules.ts";
 import { Store } from "./store.ts";
@@ -322,6 +328,62 @@ describe("detail lookups", () => {
 		assert.equal(await processDetailRange(store, api, { from: 100, to: 199 }, stats()), false);
 		assert.deepEqual(store.unscoredAuctions({ from: 100, to: 199 }), []);
 		assert.deepEqual(api.askedOrders, []);
+	});
+});
+
+describe("detail catch-up", () => {
+	test("counts ahead the requests it makes", async () => {
+		const store = new Store(":memory:");
+		ingest(store, { from: 100, to: 4_199 }, [
+			{ label: "checked", block: 1_500 },
+			{ label: "unlisted", block: 1_800 },
+			{ label: "new", block: 2_500 },
+			{ label: "newer", block: 3_000 },
+		]);
+		// The details reach block 1,999. The catch-up starts 300 blocks (10 minutes) lower, to look
+		// again for the fees of the trade the API did not list yet; the trade below it is done.
+		store.setDetailRange({ from: 100, to: 1_999 });
+		store.saveOrders([
+			{ uid: uid("checked"), block: 1_500, detail: order([]) },
+			{ uid: uid("unlisted"), block: 1_800, detail: order([]) },
+		]);
+		store.saveTradeFees(uid("checked"), [{ block: 1_500, logIndex: 1, fees: [] }]);
+		const auction = competition(1, 2_600, ["new"]);
+		saveUnscored(store, auction);
+		const blocks = { unlisted: 1_800, new: 2_500, newer: 3_000 };
+		const api = fakeApi(
+			[auction],
+			new Map(Object.keys(blocks).map((label) => [uid(label), order([])])),
+			new Map(
+				Object.entries(blocks).map(([label, block]) => [
+					uid(label),
+					[{ block, logIndex: 1, fees: [fee("volume", "1")] }],
+				])
+			)
+		);
+		let requests = 0;
+		const counting: DetailSource = {
+			async competition(id) {
+				requests++;
+				return api.competition(id);
+			},
+			async orders(uids) {
+				requests++;
+				return api.orders(uids);
+			},
+			async trades(orderUid) {
+				requests++;
+				return api.trades(orderUid);
+			},
+		};
+
+		// One auction to score, one request for the two new orders and one for each of their
+		// trades, and one for the trades of the order whose fees were not listed.
+		assert.equal(detailCatchUpRequests(store), 5);
+		await catchUpDetails(store, counting, stats());
+		assert.equal(requests, 5);
+		assert.deepEqual(store.detailRange(), { from: 100, to: 4_199 });
+		assert.equal(detailCatchUpRequests(store), 0);
 	});
 });
 

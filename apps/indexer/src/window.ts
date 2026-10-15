@@ -79,10 +79,12 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 	let gas = 0;
 	let swaps = 0;
 	let cost = 0;
+	// The native token's USD price points, read once for every batch's cost and trade's value.
+	const points = store.nativeUsdPoints();
 	// Trades follow their batch's credit: a relay batch's by its block and log index, any other
 	// to the solver that settled it.
 	const relayedRows = new Map<string, Row>();
-	for (const batch of creditedBatches(store, registry, range)) {
+	for (const batch of creditedBatches(store, registry, range, points)) {
 		const entry = row(batch.solver);
 		entry.batches++;
 		entry.trades += batch.trades;
@@ -99,7 +101,7 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		}
 	}
 
-	const valuer = new TradeValuer(store);
+	const valuer = new TradeValuer(points);
 	// The row a trade's batch is credited to.
 	const creditOf = (trade: { solver: string; block: number; settlementLogIndex: number }) =>
 		RELAYS.includes(trade.solver)
@@ -198,8 +200,12 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		for (const winner of auction.winners) rows.get(winner.solver)!.won++;
 	}
 
+	// Ties go by id, as in the snapshot, not by the order the rows were first seen in.
 	const sorted = [...rows.values()].sort(
-		(a, b) => b.batches - a.batches || b.entered - a.entered
+		(a, b) =>
+			b.batches - a.batches ||
+			b.entered - a.entered ||
+			a.identity.id.localeCompare(b.identity.id)
 	);
 	const settling = sorted.filter((entry) => entry.batches > 0).length;
 	const bps = surplusVolume > 0 ? ((surplus / surplusVolume) * 10_000).toFixed(2) : "—";

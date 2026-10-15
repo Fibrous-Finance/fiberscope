@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { parseCmsPage, Registry } from "./registry.ts";
+import { fetchCmsEntries, parseCmsPage, Registry } from "./registry.ts";
 import type { CmsPage, RegistryEntry } from "./registry.ts";
 
 interface CmsItem {
@@ -64,6 +64,47 @@ describe("CMS parsing", () => {
 		assert.deepEqual(entries, [
 			{ address: "0xaaaa", env: "prod", active: true, solverId: "arc", name: "Arc" },
 		]);
+	});
+});
+
+describe("CMS fetch", () => {
+	const arc: CmsItem = {
+		address: "0xAAAA",
+		chainId: 8453,
+		env: "prod",
+		active: true,
+		solverId: "arc",
+		name: "Arc",
+	};
+
+	test("asks for the chain's entries, page by page", async (t) => {
+		const urls: string[] = [];
+		t.mock.method(globalThis, "fetch", async (url: string) => {
+			urls.push(url);
+			const item = { ...arc, address: `0x000${urls.length}` };
+			return Response.json({ ...page([item]), meta: { pagination: { pageCount: 2 } } });
+		});
+		const entries = await fetchCmsEntries(8453, new AbortController().signal);
+		assert.deepEqual(
+			entries.map((entry) => entry.address),
+			["0x0001", "0x0002"]
+		);
+		assert.equal(urls.length, 2);
+		for (const [i, url] of urls.entries()) {
+			const query = new URL(url).searchParams;
+			assert.equal(query.get("filters[network][chainId][$eq]"), "8453");
+			assert.equal(query.get("pagination[page]"), String(i + 1));
+		}
+	});
+
+	test("makes one attempt", async (t) => {
+		const fetch = t.mock.method(
+			globalThis,
+			"fetch",
+			async () => new Response(null, { status: 503 })
+		);
+		await assert.rejects(fetchCmsEntries(8453, new AbortController().signal), /HTTP 503/);
+		assert.equal(fetch.mock.callCount(), 1);
 	});
 });
 

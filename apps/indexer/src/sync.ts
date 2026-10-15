@@ -6,7 +6,7 @@ import { Clock } from "./clock.ts";
 import type { Anchor } from "./clock.ts";
 import { NETWORK } from "./config.ts";
 import type { CowApi } from "./cow.ts";
-import { backfillDetails, catchUpDetails } from "./details.ts";
+import { backfillDetails, catchUpDetails, detailCatchUpRequests } from "./details.ts";
 import type { DetailStats, DetailWatch } from "./details.ts";
 import {
 	backfillChain,
@@ -16,12 +16,13 @@ import {
 	seedNativeUsd,
 } from "./ingest.ts";
 import type { IngestStats } from "./ingest.ts";
-import { log } from "./log.ts";
+import { duration, fmt, log } from "./log.ts";
 import { OVERRIDES } from "./overrides.ts";
 import { describeError } from "./pacer.ts";
 import { fetchCmsEntries, Registry } from "./registry.ts";
 import type { Rpc } from "./rpc.ts";
 import { Days } from "./rules.ts";
+import { coverage } from "./snapshot.ts";
 import type { Store } from "./store.ts";
 
 export interface SyncOptions {
@@ -34,8 +35,8 @@ export interface SyncOptions {
 	/** Delete the data older than the requested depths once the head is caught up. */
 	prune: boolean;
 	/**
-	 * Writes the snapshot, once the data is current and again when the backfill adds history (on an
-	 * empty database, only after the backfill).
+	 * Writes the snapshot: once the data is current, and again at the end of the run if it would
+	 * show more by then (on an empty database, only after the backfill).
 	 */
 	writeSnapshot: (() => Promise<void>) | null;
 }
@@ -48,16 +49,24 @@ export interface SyncStats {
 
 /** Blocks the end may trail the head after a catch-up round before another round runs: 5 minutes. */
 const CATCH_UP_SLACK = Math.ceil(300 / NETWORK.blockTime);
-/** The longest the details' catch-up may hold up the snapshot before it stops (2 minutes). */
-const DETAIL_CATCH_UP_MS = 120_000;
+/** The longest the CMS may take before a run goes on with the cached registry (10 seconds). */
+const CMS_TIMEOUT_MS = 10_000;
+/**
+ * The longest the details' lookups may take at the CoW API's rate and still hold up the snapshot
+ * (8 minutes). After a longer outage, the snapshot goes without them at once.
+ */
+const DETAIL_CATCH_UP_FITS_MS = 480_000;
+/** The least time the details' catch-up gets before the snapshot goes without it (2 minutes). */
+const DETAIL_CATCH_UP_MIN_MS = 120_000;
 
 /**
  * Brings the database up to date. Chain and auction data catch up with the network's safe block,
  * and the details (the auctions' scores, and the quotes and protocol fees of the orders traded)
- * with the auctions; that makes the data current (the last run time) and is when the snapshot is
- * written. Then chain, auction and detail history are backfilled to the requested depths, within
- * the budget if there is one; the snapshot is written again if history grew. Every step resumes
- * where an interrupted or stopped run left off.
+ * with the auctions unless their lookups would hold up the snapshot too long; that makes the data
+ * current (the last run time) and is when the snapshot is written. Then chain, auction and detail
+ * history are backfilled to the requested depths, within the budget if there is one; the snapshot
+ * is written again if it would show more by then. Every step resumes where an interrupted or
+ * stopped run left off.
  */
 export async function sync(
 	store: Store,
@@ -67,7 +76,7 @@ export async function sync(
 ): Promise<SyncStats> {
 	const { budgetMinutes, writeSnapshot } = options;
 	const budget = budgetMinutes === null ? null : AbortSignal.timeout(budgetMinutes * 60_000);
-	const registry = await refreshRegistry(store);
+	const registry = await refreshRegistry(store, AbortSignal.timeout(CMS_TIMEOUT_MS));
 	const chainDays = Math.max(options.chainDays, options.auctionDays);
 	if (store.chainRange() === null && chainDays === 0) {
 		throw new Error("The database is empty: pass --chain-days to backfill");
@@ -89,6 +98,8 @@ export async function sync(
 	// own header places the days until the backfill brings the anchors of their blocks.
 	const empty = store.chainRange() === null;
 	let days: Days;
+	// The coverage of the snapshot written once caught up, to tell whether the run adds to it.
+	let shown: string | null = null;
 	if (empty) {
 		const head = await safeHead(rpc);
 		days = new Days(new Clock([head], NETWORK.blockTime), head.block);
@@ -106,20 +117,27 @@ export async function sync(
 				options.auctionDays > 0 ? days.windowStart(options.auctionDays) : null
 			);
 		}
-		// The details of the new blocks, for the snapshot. Their lookups must not hold it up: if
-		// one fails, or they run long, the snapshot goes without them and the next run catches up.
-		try {
-			await catchUpDetails(
-				store,
-				cow,
-				stats.details,
-				AbortSignal.timeout(DETAIL_CATCH_UP_MS)
+		// The details of the new blocks, for the snapshot. Their lookups hold it up only while they
+		// fit DETAIL_CATCH_UP_FITS_MS at the API's rate. If they would take longer, fail or run
+		// past their time, the snapshot goes without them; the rest of the run catches them up
+		// first, and the snapshot is written again once they have.
+		const requests = detailCatchUpRequests(store);
+		const wait = detailCatchUpWait(requests, cow.rate);
+		if (wait === null) {
+			log(
+				`details catch-up: ${fmt(requests)} lookups, about ` +
+					`${duration(requests / cow.rate)}; the snapshot goes first`
 			);
-		} catch (error) {
-			log(`details catch-up failed: ${describeError(error)}; the next run catches up`);
+		} else {
+			try {
+				await catchUpDetails(store, cow, stats.details, AbortSignal.timeout(wait));
+			} catch (error) {
+				log(`details catch-up failed: ${describeError(error)}; retried after the snapshot`);
+			}
 		}
 		store.setLastRunAt(Date.now());
 		await writeSnapshot?.();
+		shown = JSON.stringify(coverage(store, days));
 	}
 
 	// Backfill. The chain runs newest first and the auction backfill trails it, so the RPC and
@@ -127,9 +145,6 @@ export async function sync(
 	// before it goes deeper: auction history never waits for the full chain depth. The details
 	// trail the auction backfill. The trades stored before the schema held order uids get them
 	// from the RPC.
-	const chainFrom = store.chainRange()?.from;
-	const auctionFrom = store.auctionRange()?.from;
-	const detailFrom = store.detailRange()?.from;
 	const chain: ChainWatch = { done: false };
 	const details: DetailWatch = { auctionsDone: false, uidsDone: false };
 	const abort = new AbortController();
@@ -175,7 +190,7 @@ export async function sync(
 		}
 	})();
 	const detailWork = (async () => {
-		// Whatever the catch-up before the snapshot left, if it stopped early.
+		// What the catch-up before the snapshot left: all of it when it did not run.
 		await catchUpDetails(store, cow, stats.details);
 		if (options.auctionDays > 0) {
 			const low = days.reach(options.auctionDays);
@@ -190,18 +205,22 @@ export async function sync(
 	await seedNativeUsd(store, rpc);
 
 	if (empty && store.chainRange() !== null) store.setLastRunAt(Date.now());
-	const grew =
-		store.chainRange()?.from !== chainFrom ||
-		store.auctionRange()?.from !== auctionFrom ||
-		store.detailRange()?.from !== detailFrom;
-	if (grew && store.lastRunAt() !== null) await writeSnapshot?.();
+	// The snapshot again only if it would show more: on an empty database, the first one; else a
+	// whole day more of some data, or the details that caught up after the snapshot. A backfill
+	// the budget stopped short of a whole day adds nothing it shows. `days` is the run's, so where
+	// the chain backfill went below its clock's anchors, a new day may count a run early or late.
+	const grown = shown !== null && JSON.stringify(coverage(store, days)) !== shown;
+	if (grown || (shown === null && store.lastRunAt() !== null)) await writeSnapshot?.();
 	return stats;
 }
 
-/** CMS entries refreshed into the cache and merged with the overrides; the cache covers outages. */
-async function refreshRegistry(store: Store): Promise<Registry> {
+/**
+ * CMS entries refreshed into the cache and merged with the overrides. The CMS gets one attempt,
+ * which `signal` bounds, so it never holds up a run long: the cached copy covers its outages.
+ */
+export async function refreshRegistry(store: Store, signal: AbortSignal): Promise<Registry> {
 	try {
-		const entries = await fetchCmsEntries(NETWORK.chainId);
+		const entries = await fetchCmsEntries(NETWORK.chainId, signal);
 		if (entries.length === 0) throw new Error(`no entries for chain ${NETWORK.chainId}`);
 		store.replaceCmsEntries(entries);
 		log(`registry: ${entries.length} CMS entries + ${OVERRIDES.length} overrides`);
@@ -209,6 +228,19 @@ async function refreshRegistry(store: Store): Promise<Registry> {
 		log(`registry: CMS unavailable (${describeError(error)}); using the cached copy`);
 	}
 	return new Registry(store.cmsEntries(), OVERRIDES);
+}
+
+/**
+ * How long the details' catch-up may hold up the snapshot, given the API requests it makes (see
+ * detailCatchUpRequests) and the API's rate: twice the time they take at that rate, so a slower
+ * API still fits, and at least DETAIL_CATCH_UP_MIN_MS, in whole milliseconds as
+ * AbortSignal.timeout takes them. Null when they take longer than DETAIL_CATCH_UP_FITS_MS: the
+ * snapshot then goes without them at once.
+ */
+export function detailCatchUpWait(requests: number, requestsPerSecond: number): number | null {
+	const ms = (requests / requestsPerSecond) * 1000;
+	if (ms > DETAIL_CATCH_UP_FITS_MS) return null;
+	return Math.ceil(Math.max(DETAIL_CATCH_UP_MIN_MS, 2 * ms));
 }
 
 /**

@@ -3,14 +3,7 @@ import type { Relay } from "./chain.ts";
 import { nativeUsdAt } from "./prices.ts";
 import type { PricePoint } from "./prices.ts";
 import type { Registry, SolverIdentity } from "./registry.ts";
-import {
-	batchCostUsd,
-	creditedAddress,
-	feeUsd,
-	priceToken,
-	tradeSurplus,
-	tradeVolumeUsd,
-} from "./rules.ts";
+import { batchCostUsd, creditedAddress, feeUsd, tradeSurplus, tradeVolumeUsd } from "./rules.ts";
 import type { BlockRange, CreditSource, RankedSolution, TradeSurplus } from "./rules.ts";
 import type { SolutionRow, Store, TradeDetailRow, TradeValueRow } from "./store.ts";
 
@@ -36,13 +29,16 @@ export interface Batch {
 	cost: number | null;
 }
 
-/** The batches of a block range in block order, credited and costed, read one at a time. */
+/**
+ * The batches of a block range in block order, credited and costed, read one at a time. `points`
+ * are the native token's USD price points (Store.nativeUsdPoints), for a caller that has them.
+ */
 export function* creditedBatches(
 	store: Store,
 	registry: Registry,
-	range: BlockRange
+	range: BlockRange,
+	points: PricePoint[] = store.nativeUsdPoints()
 ): Generator<Batch> {
-	const points = store.nativeUsdPoints();
 	for (const row of store.batchRows(range)) {
 		const credited = creditedAddress(
 			{
@@ -82,65 +78,48 @@ export interface TradeValue {
 	surplus: TradeSurplus | null;
 }
 
-/** What valuing a trade needs: its auction, its block and its two sides. */
+/** What valuing a trade needs: its block and its two sides with their native prices. */
 export type PricedTrade = Pick<
 	TradeValueRow,
-	"auctionId" | "block" | "sellToken" | "buyToken" | "sellAmount" | "buyAmount"
+	"block" | "sellAmount" | "sellPrice" | "buyAmount" | "buyPrice"
 >;
 
 /**
- * Values trades with their own auction's native prices and the native token's USD price at their
- * block.
+ * Values trades with their own auction's native prices, which their rows carry, and the native
+ * token's USD price at their block.
  */
 export class TradeValuer {
-	readonly #store: Store;
 	readonly #points: PricePoint[];
-	readonly #prices = new Map<number, Map<string, string>>();
 
-	constructor(store: Store) {
-		this.#store = store;
-		this.#points = store.nativeUsdPoints();
+	/** `points`: the native token's USD price points, sorted by block (Store.nativeUsdPoints). */
+	constructor(points: PricePoint[]) {
+		this.#points = points;
 	}
 
 	value(trade: TradeValueRow): TradeValue {
-		const { usd, sellPrice, buyPrice } = this.#priced(trade);
+		const usd = this.usd(trade);
 		return {
 			usd,
-			pricedSides: usd === null ? 0 : Number(sellPrice !== null) + Number(buyPrice !== null),
+			pricedSides:
+				usd === null
+					? 0
+					: Number(trade.sellPrice !== null) + Number(trade.buyPrice !== null),
 			surplus: tradeSurplus(usd, trade),
 		};
 	}
 
-	/** A trade's USD value alone (see value). */
+	/** A trade's USD value alone (see value); null when it is unpriced. */
 	usd(trade: PricedTrade): number | null {
-		return this.#priced(trade).usd;
-	}
-
-	#priced(trade: PricedTrade): {
-		usd: number | null;
-		sellPrice: string | null;
-		buyPrice: string | null;
-	} {
-		if (trade.auctionId === null) return { usd: null, sellPrice: null, buyPrice: null };
-		const prices = this.#pricesOf(trade.auctionId);
-		const sellPrice = prices.get(priceToken(trade.sellToken)) ?? null;
-		const buyPrice = prices.get(priceToken(trade.buyToken)) ?? null;
 		const nativeUsd = nativeUsdAt(this.#points, trade.block);
-		const usd =
-			nativeUsd === null
-				? null
-				: tradeVolumeUsd(trade.sellAmount, sellPrice, trade.buyAmount, buyPrice, nativeUsd);
-		return { usd, sellPrice, buyPrice };
-	}
-
-	#pricesOf(auctionId: number): Map<string, string> {
-		let prices = this.#prices.get(auctionId);
-		if (!prices) {
-			if (this.#prices.size >= 4_096) this.#prices.clear();
-			prices = this.#store.auctionPrices(auctionId);
-			this.#prices.set(auctionId, prices);
-		}
-		return prices;
+		return nativeUsd === null
+			? null
+			: tradeVolumeUsd(
+					trade.sellAmount,
+					trade.sellPrice,
+					trade.buyAmount,
+					trade.buyPrice,
+					nativeUsd
+				);
 	}
 }
 
@@ -181,17 +160,19 @@ export interface AuctionOutcome {
 	solutions: number;
 	/** Whether its solutions carry their scores and filter outcomes. */
 	scored: boolean;
-	/** By solver id, best rank first. */
+	/** By solver id, in the rows' order: best rank first when they come by ranking. */
 	entrants: Map<string, Entrant>;
-	/** One entry per winning solver id, best rank first. */
+	/** One entry per winning solver id, in the rows' order as entrants are. */
 	winners: { solver: string; tx: string | null }[];
-	/** Every solution in CoW's ranking, with its solver's id. */
+	/** Every solution with its solver's id, in the rows' order: CoW's ranking when they come by it. */
 	ranked: RankedSolution[];
 }
 
 /**
- * Groups solution rows (sorted by auction, then ranking) into auctions keyed by solver id, and
- * yields each auction once its rows are read.
+ * Groups solution rows, which come auction by auction, into auctions keyed by solver id, and
+ * yields each auction once its rows are read. The counts do not depend on the order of an
+ * auction's rows; the lists follow it, so a caller that lists them reads the rows by ranking
+ * (Store.latestSolutions).
  */
 export function* auctionOutcomes(
 	rows: Iterable<SolutionRow>,

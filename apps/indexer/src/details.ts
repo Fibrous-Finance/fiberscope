@@ -174,10 +174,45 @@ export async function backfillDetails(
 }
 
 /**
- * Extends the detail range up to the end of the auction data. It starts a little below the
- * previous end, to look again for the fees of recent trades the API had not listed yet. When
- * `signal` aborts it stops after the lookups in flight, and the detail range ends at the last
- * whole block range.
+ * The block range the details' catch-up goes over: from a little below the end of the detail
+ * range, to look again for the fees of recent trades the API had not listed yet, to the end of
+ * the auction data. Null when the details have caught up with the auctions.
+ */
+function catchUpRange(store: Store): BlockRange | null {
+	const range = store.detailRange();
+	const auctions = store.auctionRange();
+	if (range === null || auctions === null || range.to >= auctions.to) return null;
+	const recheck = Math.ceil(MISS_IS_FINAL_AFTER / NETWORK.blockTime);
+	return { from: Math.max(range.from, range.to + 1 - recheck), to: auctions.to };
+}
+
+/**
+ * About how many API requests the details' catch-up makes: one per auction to score, one per
+ * ORDERS_PER_REQUEST orders to look up, and one per order whose trades' fees are due, counting
+ * each order not looked up yet as one CoW's order book has.
+ */
+export function detailCatchUpRequests(store: Store): number {
+	const range = catchUpRange(store);
+	if (range === null) return 0;
+	const unknown = store.unknownOrders(range).length;
+	const due = new Set(
+		store
+			.pendingFeeTrades(range)
+			.filter((trade) => trade.found)
+			.map((trade) => trade.uid)
+	);
+	return (
+		store.unscoredAuctions(range).length +
+		Math.ceil(unknown / ORDERS_PER_REQUEST) +
+		unknown +
+		due.size
+	);
+}
+
+/**
+ * Extends the detail range up to the end of the auction data, over catchUpRange. When `signal`
+ * aborts it stops after the lookups in flight, and the detail range ends at the last whole block
+ * range.
  */
 export async function catchUpDetails(
 	store: Store,
@@ -185,18 +220,13 @@ export async function catchUpDetails(
 	stats: DetailStats,
 	signal?: AbortSignal
 ): Promise<void> {
-	const range = store.detailRange();
-	const auctions = store.auctionRange();
-	if (range === null || auctions === null || range.to >= auctions.to) return;
-	const recheck = Math.ceil(MISS_IS_FINAL_AFTER / NETWORK.blockTime);
+	const span = catchUpRange(store);
+	if (span === null) return;
+	const range = store.detailRange()!;
 	const started = performance.now();
 	const before = { ...stats };
-	for (
-		let from = Math.max(range.from, range.to + 1 - recheck);
-		from <= auctions.to;
-		from += NETWORK.logRange
-	) {
-		const to = Math.min(auctions.to, from + NETWORK.logRange - 1);
+	for (let from = span.from; from <= span.to; from += NETWORK.logRange) {
+		const to = Math.min(span.to, from + NETWORK.logRange - 1);
 		if (!(await processDetailRange(store, source, { from, to }, stats, signal))) break;
 		store.setDetailRange({ from: range.from, to: Math.max(range.to, to) });
 	}

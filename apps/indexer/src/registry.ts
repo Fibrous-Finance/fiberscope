@@ -1,7 +1,3 @@
-import { setTimeout as sleep } from "node:timers/promises";
-
-import { backoff, describeError } from "./pacer.ts";
-
 /** One submission address of a solver. */
 export interface RegistryEntry {
 	/** Lowercase hex address. */
@@ -27,6 +23,8 @@ export interface ListedSolver {
 }
 
 const CMS_URL = "https://cms.cow.fi/api/solver-networks";
+/** Entries per CMS page: the most the CMS returns. */
+const CMS_PAGE_SIZE = 100;
 
 /**
  * CoW's solver registry for one chain, keyed by address. CMS entries come first and overrides
@@ -96,12 +94,26 @@ function preference(entry: RegistryEntry): number {
 	return (entry.active ? 0 : 2) + (entry.env === "prod" ? 0 : 1);
 }
 
-/** Fetches every CMS solver-network entry for a chain, page by page. */
-export async function fetchCmsEntries(chainId: number): Promise<RegistryEntry[]> {
+/**
+ * Fetches every CMS solver-network entry for a chain, which the request filters by chain: one
+ * page on every network so far. One attempt, which `signal` bounds as a whole: a failure throws,
+ * and the caller falls back to its cached copy.
+ */
+export async function fetchCmsEntries(
+	chainId: number,
+	signal: AbortSignal
+): Promise<RegistryEntry[]> {
 	const entries: RegistryEntry[] = [];
 	for (let page = 1, pages = 1; page <= pages; page++) {
-		const url = `${CMS_URL}?populate=*&pagination[pageSize]=100&pagination[page]=${page}`;
-		const body = (await getJson(url)) as CmsPage;
+		const url =
+			`${CMS_URL}?populate=*&filters[network][chainId][$eq]=${chainId}` +
+			`&pagination[pageSize]=${CMS_PAGE_SIZE}&pagination[page]=${page}`;
+		const response = await fetch(url, { signal });
+		if (!response.ok) {
+			await response.body?.cancel();
+			throw new Error(`HTTP ${response.status}`);
+		}
+		const body = (await response.json()) as CmsPage;
 		pages = body.meta?.pagination?.pageCount ?? 1;
 		entries.push(...parseCmsPage(body, chainId));
 	}
@@ -140,18 +152,4 @@ export function parseCmsPage(page: CmsPage, chainId: number): RegistryEntry[] {
 		});
 	}
 	return entries;
-}
-
-async function getJson(url: string): Promise<unknown> {
-	for (let attempt = 0; ; attempt++) {
-		try {
-			const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-			if (response.ok) return await response.json();
-			await response.body?.cancel();
-			throw new Error(`HTTP ${response.status}`);
-		} catch (error) {
-			if (attempt === 3) throw new Error(`${url}: ${describeError(error)}`);
-			await sleep(backoff(attempt + 1));
-		}
-	}
 }

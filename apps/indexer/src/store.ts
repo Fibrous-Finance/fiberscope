@@ -9,7 +9,7 @@ import { RELAYS } from "./chain.ts";
 import type { SettlementRow, TradeRow } from "./chain.ts";
 import { Clock } from "./clock.ts";
 import type { Anchor } from "./clock.ts";
-import { NETWORK } from "./config.ts";
+import { NATIVE_TOKEN, NETWORK } from "./config.ts";
 import type { Competition, ExecutedFee, FeePolicy, OrderDetail, Solution } from "./cow.ts";
 import { log } from "./log.ts";
 import type { PricePoint } from "./prices.ts";
@@ -87,7 +87,12 @@ export interface TradeValueRow {
 	limitSellAmount: string | null;
 	limitBuyAmount: string | null;
 	feeAmount: string | null;
-	auctionId: number | null;
+	/**
+	 * The native prices its auction gave its sell and buy tokens (see priceToken); null when the
+	 * trade has no auction or the auction gave its token no price.
+	 */
+	sellPrice: string | null;
+	buyPrice: string | null;
 }
 
 /** A trade with its order terms and its transaction's recipient, for checking the terms. */
@@ -139,11 +144,13 @@ export interface TradeDetailRow {
 	settlementLogIndex: number;
 	/** The address that called `settle` for the trade's settlement. */
 	solver: string;
-	auctionId: number | null;
 	sellToken: string;
 	buyToken: string;
 	sellAmount: string;
 	buyAmount: string;
+	/** See TradeValueRow. */
+	sellPrice: string | null;
+	buyPrice: string | null;
 	/** 1 when CoW's order book has the order, 0 when it lacks it, null when not looked up. */
 	found: number | null;
 	quoteSolver: string | null;
@@ -892,16 +899,6 @@ export class Store {
 		);
 	}
 
-	/** The native prices stored for an auction, by token. */
-	auctionPrices(auctionId: number): Map<string, string> {
-		const rows = this.#all<{ token: string; price: string }>(
-			`SELECT a.address AS token, p.price FROM auction_prices p JOIN addresses a ON a.id = p.token
-				WHERE p.auction_id = ?`,
-			auctionId
-		);
-		return new Map(rows.map((row) => [row.token, row.price]));
-	}
-
 	/** The solver of the winning solution that settled `tx`, from the tx's competition. */
 	apiWinner(tx: string): string | null {
 		const row = this.#get<{ solver: string }>(
@@ -915,12 +912,14 @@ export class Store {
 	}
 
 	/**
-	 * Solutions of the auctions that started in a block range, by auction then ranking, read one
-	 * at a time.
+	 * Solutions of the auctions that started in a block range, read one at a time: by auction, in
+	 * the order of their start, then in the API's order, not by ranking. That is the order of the
+	 * indexes, so a window's millions of solutions are never sorted.
 	 */
 	solutionsByStart(range: BlockRange): IterableIterator<SolutionRow> {
 		return this.#iterate(
-			`${SOLUTION_ROWS} WHERE a.start_block BETWEEN ? AND ? ORDER BY a.id, s.ranking`,
+			`${SOLUTION_ROWS} WHERE a.start_block BETWEEN ? AND ?
+				ORDER BY a.start_block, a.id, s.position`,
 			range.from,
 			range.to
 		);
@@ -1327,17 +1326,34 @@ export class Store {
 	}
 }
 
+/**
+ * The id of the token whose native price values the token in `column` (see priceToken): the
+ * native token's placeholder is priced as the wrapped native token. Both addresses are the
+ * code's own constants.
+ */
+function priceTokenId(column: string): string {
+	return `CASE ${column} WHEN (SELECT id FROM addresses WHERE address = '${NATIVE_TOKEN}')
+		THEN (SELECT id FROM addresses WHERE address = '${NETWORK.native.wrapped}') ELSE ${column} END`;
+}
+
+/** The native prices of a trade's tokens in its auction (auction_txs `a`), as sp and bp. */
+const TRADE_PRICES = `LEFT JOIN auction_prices sp
+		ON sp.auction_id = a.auction_id AND sp.token = ${priceTokenId("tr.sell_token")}
+	LEFT JOIN auction_prices bp
+		ON bp.auction_id = a.auction_id AND bp.token = ${priceTokenId("tr.buy_token")}`;
+
 const TRADE_ROWS = `SELECT ${hexOf("s.tx")} AS tx, so.address AS solver,
 	tr.settlement_log_index AS settlementLogIndex, tr.block, st.address AS sellToken,
 	bt.address AS buyToken, tr.sell_amount AS sellAmount, tr.buy_amount AS buyAmount,
 	tr.limit_sell_amount AS limitSellAmount, tr.limit_buy_amount AS limitBuyAmount,
-	tr.fee_amount AS feeAmount, a.auction_id AS auctionId
+	tr.fee_amount AS feeAmount, sp.price AS sellPrice, bp.price AS buyPrice
 	FROM trades tr
 	JOIN settlements s ON s.block = tr.block AND s.log_index = tr.settlement_log_index
 	JOIN addresses so ON so.id = s.solver
 	JOIN addresses st ON st.id = tr.sell_token
 	JOIN addresses bt ON bt.id = tr.buy_token
-	LEFT JOIN auction_txs a ON a.tx = s.tx`;
+	LEFT JOIN auction_txs a ON a.tx = s.tx
+	${TRADE_PRICES}`;
 
 const SOLUTION_ROWS = `SELECT a.id AS auctionId, a.start_block AS startBlock, ad.address AS solver,
 	s.winner, CASE WHEN s.tx IS NULL THEN NULL ELSE ${hexOf("s.tx")} END AS tx,
@@ -1345,9 +1361,10 @@ const SOLUTION_ROWS = `SELECT a.id AS auctionId, a.start_block AS startBlock, ad
 	FROM auctions a JOIN solutions s ON s.auction_id = a.id JOIN addresses ad ON ad.id = s.solver`;
 
 const TRADE_DETAIL_ROWS = `SELECT tr.block, tr.log_index AS logIndex,
-	tr.settlement_log_index AS settlementLogIndex, so.address AS solver, a.auction_id AS auctionId,
+	tr.settlement_log_index AS settlementLogIndex, so.address AS solver,
 	st.address AS sellToken, bt.address AS buyToken, tr.sell_amount AS sellAmount,
-	tr.buy_amount AS buyAmount, o.found, qs.address AS quoteSolver,
+	tr.buy_amount AS buyAmount, sp.price AS sellPrice, bp.price AS buyPrice, o.found,
+	qs.address AS quoteSolver,
 	o.quote_verified AS quoteVerified, tr.fees_checked AS feesChecked,
 	(SELECT GROUP_CONCAT(COALESCE(f.partner, '?') || ' ' || f.amount || ' ' || fa.address, ',')
 		FROM trade_fees f JOIN addresses fa ON fa.id = f.token
@@ -1359,4 +1376,5 @@ const TRADE_DETAIL_ROWS = `SELECT tr.block, tr.log_index AS logIndex,
 	JOIN addresses bt ON bt.id = tr.buy_token
 	LEFT JOIN auction_txs a ON a.tx = s.tx
 	LEFT JOIN orders o ON o.uid = tr.order_uid
-	LEFT JOIN addresses qs ON qs.id = o.quote_solver`;
+	LEFT JOIN addresses qs ON qs.id = o.quote_solver
+	${TRADE_PRICES}`;

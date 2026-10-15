@@ -47,18 +47,18 @@ build.
 
 ## The indexer
 
-`apps/indexer` reads one network's data, Base's or BNB Chain's (see
-[Choosing the network](#choosing-the-network)), and CoW's API into a SQLite database
-(`apps/indexer/.data/base.db` for Base) and writes the snapshot from it. Node 24 runs the
-indexer's TypeScript directly. The indexer has no build step or third-party dependencies; it uses
-`node:sqlite` for SQLite. Settlements and trades are stored by block, addresses by id, and hashes
-and order uids as bytes (`apps/indexer/src/store.ts`). The database records its schema version and
-its network's chain id. The indexer upgrades a version 2 or 3 database in place, both written for
-Base: the next syncs fill in what version 3 adds, and version 4 adds the clock's anchors (see
-[Block times](#block-times)). It refuses a database of another network, and one written by an
-older version: delete it to index again, or `seed` a current copy. The snapshot is built while
-the rows are read, one at a time, so the indexer's memory does not grow with the depth of the
-history.
+`apps/indexer` reads data from Base or BNB Chain (see [Choosing the network](#choosing-the-network))
+and from CoW's API into a SQLite database (`apps/indexer/.data/base.db` for Base) and writes the
+snapshot from it. Node 24 runs the indexer's TypeScript directly. The indexer has no build step or
+third-party dependencies; it uses `node:sqlite` for SQLite. Settlements and trades are stored by
+block, addresses by id, and hashes and order uids as bytes (`apps/indexer/src/store.ts`). The
+database records its schema version and its network's chain id. The indexer upgrades version 2
+and 3 databases in place. These databases were written for Base. The next syncs fill in what
+version 3 adds, and version 4 adds the clock's anchors (see [Block times](#block-times)). It
+refuses a database from another network; use a separate database for each network. It also
+refuses a database written by an unsupported older version: delete it to index again, or `seed` a
+current copy. The snapshot is built while the rows are read, one at a time, so the indexer's
+memory does not grow with the depth of the history.
 
 Besides each settlement's auction, the indexer keeps from CoW's API:
 
@@ -97,30 +97,30 @@ A database holds one network: it records the network's chain id, and the indexer
 another network's database. To run a second network beside Base, run a second indexer with its
 own `NETWORK`, RPC variables, database and snapshot path: another `loop.sh`, or another container
 from the same image with its own volume (see [The indexer](#the-indexer-1)). The default R2 keys
-already differ. The two share nothing, and each paces its own requests, so on one host their CoW
-API requests add up. The site shows each network on its own page: Base at `/`, BNB Chain at
-`/bnb`.
+already differ. Each indexer paces its own requests, so on one host their CoW API request rates
+add up. The site shows each network on its own page: Base at `/`, BNB Chain at `/bnb`.
 
 ### Block times
 
 Every figure is counted in rolling days of 24 hours, and the page shows when each settlement and
 auction happened, but the chain data gives block numbers. Base makes a block every 2 seconds
-exactly, so a formula would turn its block numbers into times. BNB Chain makes one about every
-0.45 seconds, but not exactly, several in the same second, and at a pace that changed several
-times (3 seconds a block, then 1.5, 0.75 and, from January 2026, 0.45): a formula would be hours
-off for blocks 180 days back.
+exactly, so a formula would turn its block numbers into times. BNB Chain's block interval is about
+0.45 seconds but varies, with several blocks in the same second. Its pace has changed several
+times (3 seconds a block, then 1.5, 0.75 and, from January 2026, 0.45), so a formula based on a
+fixed block interval would be hours off for blocks 180 days back.
 
-So the indexer keeps a clock (`apps/indexer/src/clock.ts`) of anchors: blocks whose timestamps it
-has read, kept in the `anchors` table. Each block range it ingests adds the block of every log,
-with the timestamp the node gives the log (`blockTimestamp`), so every settlement's block is an
-anchor; a range without logs, or a node that does not add the timestamp, adds its first and last
-blocks with their headers' timestamps instead. A block's time is interpolated between the
-anchors around it, to the second, and beyond them it is extrapolated with the network's average
+The indexer therefore keeps a clock (`apps/indexer/src/clock.ts`) based on anchors: blocks whose
+timestamps it has read and stored in the `anchors` table. When the node provides log timestamps
+(`blockTimestamp`), each block range the indexer ingests adds the block of every log with its
+timestamp, so every settlement's block is an anchor. If a range has no logs or the node does not
+provide timestamps, the indexer adds the range's first and last blocks with their header
+timestamps instead. At an anchor, a block's time is its recorded timestamp; between anchors, it is
+interpolated to the second. Beyond the anchors, it is extrapolated using the network's average
 block time. Day d holds the blocks whose time lies in (end − (d + 1) days, end − d days], end
 being the newest block's time, so a day holds as many blocks as the chain made in it: 43,200 on
-Base, as before. Where a backfill must reach further back than the anchors, its depth is
-estimated with the average block time and taken 1% deeper. The extra blocks are harmless, since
-the snapshot counts only whole days, and their anchors place the next run's window exactly.
+Base, as before. When a backfill must reach further back than the anchors, its depth is estimated
+using the average block time, then increased by 1%. The extra blocks are harmless, since the
+snapshot counts only whole days, and their anchors place the next run's window exactly.
 
 A version 3 database was written for Base: its upgrade anchors both ends of its chain range with
 Base's 2-second times, so it needs no RPC and Base's times stay exact. Pruning keeps the last
@@ -146,9 +146,10 @@ same options) also read `apps/indexer/.env` when it exists.
 ### What a sync does
 
 1. Refreshes CoW's solver registry; if the registry is unavailable, it uses the last copy.
-2. Catches up: settlements, receipts and calldata up to the network's safe block (on Base the
-   newest block whose transactions Base has posted to Ethereum, on BNB Chain the newest justified
-   block), then the auctions behind the new settlements.
+2. Catches up: settlements, receipts and calldata up to the network's safe block, then the
+   auctions behind the new settlements. On Base, the safe block is the newest block whose
+   transactions Base has posted to Ethereum. On BNB Chain, it is the newest justified block; in
+   BNB Chain's fast finality, justification is the stage before finalization.
 3. With `--prune`, deletes settlements older than N days (at least M, as for the backfill) with
    their auction data, and the auction data, orders and fees of settlements older than M days. A
    flash-loan router settlement keeps its auction while it is in the chain data, since its
@@ -218,10 +219,10 @@ On Cloudflare, the site's variables come from `vars` in `apps/web/wrangler.jsonc
 site; the indexer writes it and the site derives every view from it with the view model in
 `packages/core/src/view`.
 
-- Time is cut into rolling days of 24 hours, by block time (see [Block times](#block-times)), that
-  end at the newest block (`end`). Daily series are newest first and zero-filled, so index `d` is
-  always the day `d` days back. `network` names the network the snapshot covers; the site refuses
-  a snapshot of another network than the page's.
+- Time is divided into rolling days of 24 hours based on block time (see
+  [Block times](#block-times)), working backward from the newest block (`end`). Daily series are
+  newest first and zero-filled, so index `d` is always the day `d` days back. `network` names the
+  network the snapshot covers; the site refuses a snapshot of another network than the page's.
 - `coverage` says how many days hold complete data: `chainDays` for batches, trades, DEX swaps,
   gas and transaction cost; `auctionDays` for volume, entries and wins; `surplusDays` for surplus;
   `detailDays` for solutions, filtered-out solutions, losses, quotes and protocol fees.
@@ -373,7 +374,7 @@ Measured on the live deployment on 3–5 Oct 2026.
   ([EC2](https://aws.amazon.com/ec2/pricing/on-demand/),
   [VPC](https://aws.amazon.com/vpc/pricing/)): about $19 a month.
 - **Data.** The indexer reads public endpoints without API keys for Base: its RPC, CoW's API and
-  CoW's solver registry. BNB Chain needs an archive RPC of one's own (`BNB_RPC_URL`).
+  CoW's solver registry. BNB Chain requires you to supply an archive RPC endpoint (`BNB_RPC_URL`).
 
 ## Repository layout
 

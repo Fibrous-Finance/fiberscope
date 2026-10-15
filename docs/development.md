@@ -417,27 +417,33 @@ again.
 
 ## Running costs
 
-Measured on the live deployment on 3–5 Oct 2026.
+Measured on the live deployment: the site on 3–5 Oct 2026, the indexers on 15 Oct 2026.
 
 - **Site.** The Worker is 5.47 MB, 1.14 MB gzipped, within the Workers Free plan's
   [size limit](https://developers.cloudflare.com/workers/platform/limits/#worker-size). Requests and
   CPU time per request depend on the plan: see
   [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/#workers).
-- **Snapshot.** One R2 object of about 280 KB, rewritten on every indexer run, every 10 minutes,
-  and read once per page view and once per update of an open page. That is well within
-  [R2's free tier](https://developers.cloudflare.com/r2/pricing/#free-tier): 10 GB-month of
-  storage, 1 million writes and 10 million reads a month.
-- **Indexer.** The database takes about 175 MB at 180 days of settlements and 90 days of auctions,
-  and `--prune` keeps it there. The live indexer runs on an AWS EC2 t4g.small in Frankfurt (2
-  Graviton vCPUs, 2 GB of memory) with a 16 GB gp3 disk. Caught up, a run takes about 20 seconds
-  every 10 minutes, most of it building the snapshot. The container holds about 0.16 GB between
-  runs, the database file in the page cache, and peaks at about 0.49 GB during a run, so any host
-  with 1 GB of RAM will do. On demand, the instance costs $0.0192 an hour, the disk $0.0952 per
-  GB-month and its public IPv4 address $0.005 an hour
+- **Snapshots.** One R2 object per network, about 400 KB for Base and 250 KB for BNB Chain,
+  rewritten every 10 minutes and read once per page view and once per update of an open page. That
+  is well within [R2's free tier](https://developers.cloudflare.com/r2/pricing/#free-tier): 10
+  GB-month of storage, 1 million writes and 10 million reads a month.
+- **Indexers.** Both networks' indexers run as two containers on one AWS EC2 t4g.medium in
+  Frankfurt (2 Graviton vCPUs, 4 GB of memory) with a 16 GB gp3 disk. Base's database takes about
+  420 MB at 180 days of settlements and 90 days of auctions, and `--prune` keeps it there. BNB
+  Chain's takes about 620 MB with 25 of its 90 days of auctions, and about 1.1 GB once they are all
+  in (estimated). Caught up, a Base run takes 30–40 seconds every 10 minutes, about 26 of them
+  building the snapshot. While a network's history is being filled, its runs use the whole 10
+  minutes. During a run the containers peak at about 0.55 GB (Base) and 0.85 GB (BNB Chain,
+  filling its history), and the host keeps about 2.8 GB free. On demand, the instance costs
+  $0.0384 an hour, the disk $0.0952 per GB-month and its public IPv4 address $0.005 an hour
   ([EC2](https://aws.amazon.com/ec2/pricing/on-demand/),
-  [VPC](https://aws.amazon.com/vpc/pricing/)): about $19 a month.
+  [VPC](https://aws.amazon.com/vpc/pricing/)): about $33 a month. Daily disk snapshots kept for a
+  week and two CloudWatch alarms add about $1–2.
 - **Data.** The indexer reads public endpoints without API keys for Base: its RPC, CoW's API and
-  CoW's solver registry. BNB Chain requires you to supply an archive RPC endpoint (`BNB_RPC_URL`).
+  CoW's solver registry. BNB Chain requires an archive RPC endpoint (`BNB_RPC_URL`); the live
+  indexer uses NodeReal's free plan, 10 million compute units a month. It makes about two calls
+  per settlement, a receipt and a transaction: about 14,000 a day on BNB Chain, an estimated 7–8
+  million compute units a month.
 
 ## Repository layout
 

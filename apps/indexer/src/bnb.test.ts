@@ -179,7 +179,7 @@ describe("BNB Chain", () => {
 			0
 		);
 		const [trade] = store.tradeRows(range);
-		const { usd, pricedSides } = new TradeValuer(store).value(trade);
+		const { usd, pricedSides } = new TradeValuer(store.nativeUsdPoints()).value(trade);
 		assert.equal(pricedSides, 2);
 		assert.ok(Math.abs(usd! - 600) < 1e-6);
 

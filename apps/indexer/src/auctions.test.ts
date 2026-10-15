@@ -129,7 +129,7 @@ describe("competition lookups", () => {
 		await processAuctionRange(store, api, { from: 100, to: 199 }, stats());
 		assert.deepEqual(api.asked, [hash("a"), hash("c")]);
 		assert.deepEqual(store.competitionLink(hash("b"))?.auctionId, 1);
-		const valuer = new TradeValuer(store);
+		const valuer = new TradeValuer(store.nativeUsdPoints());
 		for (const trade of store.tradeRows({ from: 100, to: 199 })) {
 			assert.equal(valuer.value(trade).pricedSides, 2, trade.tx);
 		}
@@ -158,7 +158,7 @@ describe("competition lookups", () => {
 			stats()
 		);
 		const [trade] = store.tradeRows({ from: 100, to: 199 });
-		const { usd, pricedSides } = new TradeValuer(store).value(trade);
+		const { usd, pricedSides } = new TradeValuer(store.nativeUsdPoints()).value(trade);
 		assert.equal(pricedSides, 2);
 		assert.ok(Math.abs(usd! - 1_000) < 1e-9);
 	});

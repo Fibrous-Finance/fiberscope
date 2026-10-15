@@ -32,7 +32,7 @@ import { useFormat } from "@/lib/format";
 import { SITE_NETWORKS } from "@/lib/networks";
 import { parseSelection, selectionQuery } from "@/lib/selection";
 import type { Selection } from "@/lib/selection";
-import type { SnapshotResult } from "@/lib/snapshot";
+import type { LoadedSnapshot, SnapshotResult } from "@/lib/snapshot";
 import { dataStatus } from "@/lib/status";
 
 const COMPACT_QUERY = "(max-width: 759.98px)";
@@ -73,7 +73,11 @@ export function Dashboard({
 	const networkName = useTranslations("Header.network")(networkId);
 	const router = useRouter();
 	const f = useFormat();
-	const snapshot = result.ok ? result.snapshot : null;
+	// The last load that succeeded: while the newest one has failed, the page goes on showing its
+	// data (live or delayed by its age) and asks again every minute.
+	const [kept, setKept] = useState<LoadedSnapshot | null>(result.ok ? result : null);
+	if (result.ok && result !== kept) setKept(result);
+	const snapshot = result.ok ? result.snapshot : (kept?.snapshot ?? null);
 	const [period, setPeriod] = useState<Period>(selection.period);
 	const [measure, setMeasure] = useState<Measure>(selection.measure);
 	const [sort, setSort] = useState<Sort | null>(null);
@@ -101,7 +105,7 @@ export function Dashboard({
 		[snapshot, period, measure]
 	);
 
-	const fresh = dataStatus(result, now);
+	const fresh = dataStatus(result, now, kept);
 	const state = retrying ? "loading" : fresh.state;
 	const status: Status = {
 		...fresh,

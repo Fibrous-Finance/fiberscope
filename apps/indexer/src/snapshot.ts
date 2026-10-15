@@ -92,6 +92,17 @@ interface Tally {
 	latest: Batch[];
 }
 
+/** The whole days of each kind of data a snapshot ending at `days.end` shows. */
+export function coverage(store: Store, days: Days): Snapshot["coverage"] {
+	const chainDays = days.completeBuckets(store.chainRange());
+	const auctionDays = Math.min(chainDays, days.completeBuckets(store.auctionRange()));
+	// Surplus also needs order terms, read from each trade's calldata as it is stored.
+	const surplusDays = auctionDays;
+	// Scores, quotes and fees are looked up in CoW's API after the auction data.
+	const detailDays = Math.min(auctionDays, days.completeBuckets(store.detailRange()));
+	return { chainDays, auctionDays, surplusDays, detailDays };
+}
+
 /** Builds the snapshot from stored rows; buckets are cut fresh at every call. */
 export async function buildSnapshot(
 	options: SnapshotOptions
@@ -102,13 +113,8 @@ export async function buildSnapshot(
 	const end = chain.to;
 	const clock = store.clock();
 	const days = new Days(clock, end);
-	const chainDays = days.completeBuckets(chain);
+	const { chainDays, auctionDays, surplusDays, detailDays } = coverage(store, days);
 	const auctionRange = store.auctionRange();
-	const auctionDays = Math.min(chainDays, days.completeBuckets(auctionRange));
-	// Surplus also needs order terms, read from each trade's calldata as it is stored.
-	const surplusDays = auctionDays;
-	// Scores, quotes and fees are looked up in CoW's API after the auction data.
-	const detailDays = Math.min(auctionDays, days.completeBuckets(store.detailRange()));
 	const lastRunAt = store.lastRunAt();
 	if (lastRunAt === null) throw new Error("No sync has completed yet");
 
@@ -164,16 +170,16 @@ export async function buildSnapshot(
 		unsplitFees: 0,
 	};
 
+	// The native token's USD price points, read once for every batch's cost and trade's value.
+	const points = store.nativeUsdPoints();
 	// Trades follow their batch's credit: a relay batch's by its block and log index, any other
 	// to the solver that settled it.
 	const relayed = new Map<string, Tally>();
 	// The latest batches of all solvers together, oldest first.
 	const networkLatest: Batch[] = [];
 	if (chainDays > 0) {
-		for (const batch of creditedBatches(store, registry, {
-			from: days.windowStart(chainDays),
-			to: end,
-		})) {
+		const range = { from: days.windowStart(chainDays), to: end };
+		for (const batch of creditedBatches(store, registry, range, points)) {
 			const d = days.bucketOf(batch.block);
 			const entry = tally(batch.solver);
 			entry.seen.add(batch.address);
@@ -196,7 +202,7 @@ export async function buildSnapshot(
 			? relayed.get(`${trade.block}:${trade.settlementLogIndex}`)
 			: tallies.get(registry.identify(trade.solver).id);
 
-	const valuer = new TradeValuer(store);
+	const valuer = new TradeValuer(points);
 	const count = zeros(auctionDays);
 	const solutions = zeros(auctionDays);
 	if (auctionDays > 0) {
@@ -397,7 +403,6 @@ export async function buildSnapshot(
 				a.id.localeCompare(b.id)
 		);
 
-	const points = store.nativeUsdPoints();
 	const latestAuctions: AuctionSummary[] = [
 		...auctionOutcomes(
 			auctionRange ? store.latestSolutions(auctionRange, LATEST_AUCTIONS) : [],

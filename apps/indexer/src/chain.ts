@@ -3,9 +3,9 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { hexBlock, word, wordAddress } from "./abi.ts";
 import type { Anchor } from "./clock.ts";
 import { NETWORK } from "./config.ts";
-import { log } from "./log.ts";
+import { fmt, log } from "./log.ts";
 import { backoff } from "./pacer.ts";
-import { RpcError } from "./rpc.ts";
+import { RpcError, RpcTimeout } from "./rpc.ts";
 import type { Rpc, RpcCall } from "./rpc.ts";
 import type { OrderTerms } from "./terms.ts";
 
@@ -170,7 +170,58 @@ export function ethCall(to: string, data: string, block: number | "latest"): Rpc
 	};
 }
 
-/** Fetches logs for a block range, halving the range when the node refuses it. */
+/** Times an eth_getLogs request may time out before it is halved instead of sent again. */
+const LOG_TIMEOUTS = 2;
+/**
+ * The narrowest width that a refusal stating no limit teaches (see getLogs): the width that works
+ * after halving may owe as much to the range's logs as to the endpoint's limit. An endpoint that
+ * allows fewer blocks costs each later range one refusal.
+ */
+const LEARNED_FLOOR = 100;
+/** Refusals about the width of a range, such as "Block range limit exceeded". */
+const WIDTH = /\brange\b|\bblocks?\b/i;
+/**
+ * Refusals that count the logs a request would return rather than its blocks, such as NodeReal's
+ * "logs count exceeds the limit 50000" and Infura's "query returned more than 10000 results. Try
+ * with this block range […]": a narrower range suits those logs, not every range.
+ */
+const COUNTED = /logs? count|results/i;
+/**
+ * How refusals state the widest eth_getLogs range an endpoint serves: thirdweb's "Maximum allowed
+ * number of requested blocks is 1000", BSC's and geth's "exceed maximum block range 5000", reth's
+ * "query exceeds max block range 1000", dRPC's "ranges over 10000 blocks are not supported" and
+ * QuickNode's "limited to a 10,000 range".
+ */
+const STATED_RANGE = [
+	/(\d[\d,]*)(k?)[ -]?blocks?\b/gi,
+	/\bblocks?(?: range(?: is| of)?| is| of):? (\d[\d,]*)(k?)\b/gi,
+	/\blimited to an? (\d[\d,]*)(k?)\b/gi,
+];
+
+/**
+ * The widest eth_getLogs range, in blocks, that a refusal says the endpoint serves; null when it
+ * says none. The smallest number it states, so "5000 blocks requested, 1000 blocks allowed" reads
+ * as 1,000.
+ */
+export function statedLogRange(message: string): number | null {
+	const stated = STATED_RANGE.flatMap((pattern) => [...message.matchAll(pattern)])
+		.map(
+			([, digits, thousands]) => Number(digits.replaceAll(",", "")) * (thousands ? 1_000 : 1)
+		)
+		.filter((blocks) => blocks > 0);
+	return stated.length === 0 ? null : Math.min(...stated);
+}
+
+/**
+ * Fetches logs for a block range, in requests no wider than the endpoint serves (Rpc.logRange),
+ * which its refusals teach for the rest of the process. A refusal that states a limit narrower
+ * than the request sets it. One about the range's width that states no limit halves the request,
+ * and the width that then works sets it, LEARNED_FLOOR blocks at least. Any other refusal halves
+ * the request for this range only: one that states a limit the request was within, or counts
+ * logs, is about the logs of a busy range, and one about anything else, such as "Resource not
+ * found", tells nothing of ranges. A request that times out LOG_TIMEOUTS times is halved for
+ * this range only as well.
+ */
 export async function getLogs(
 	rpc: Rpc,
 	from: number,
@@ -178,16 +229,57 @@ export async function getLogs(
 	address: string[],
 	topics: string[][]
 ): Promise<Log[]> {
-	try {
-		const filter = { fromBlock: hexBlock(from), toBlock: hexBlock(to), address, topics };
-		return await rpc.call<Log[]>("eth_getLogs", [filter]);
-	} catch (error) {
-		if (!(error instanceof RpcError) || from === to) throw error;
-		const mid = Math.floor((from + to) / 2);
-		log(`eth_getLogs ${from}..${to} refused (${error.message}); splitting the range`);
-		const low = await getLogs(rpc, from, mid, address, topics);
-		return low.concat(await getLogs(rpc, mid + 1, to, address, topics));
+	let logs: Log[] = [];
+	let width = Math.min(to - from + 1, rpc.logRange ?? Infinity);
+	// Whether the next width that works sets the limit, after a refusal of the width without one.
+	let learning = false;
+	for (let start = from; start <= to;) {
+		const end = Math.min(to, start + width - 1);
+		const span = end - start + 1;
+		const filter = { fromBlock: hexBlock(start), toBlock: hexBlock(end), address, topics };
+		try {
+			const options = span > 1 ? { timeouts: LOG_TIMEOUTS } : {};
+			logs = logs.concat(await rpc.call<Log[]>("eth_getLogs", [filter], options));
+		} catch (error) {
+			if (span === 1 || !(error instanceof RpcError || error instanceof RpcTimeout)) {
+				throw error;
+			}
+			const stated = error instanceof RpcError ? statedLogRange(error.message) : null;
+			if (stated !== null && stated < span) {
+				// Another getLogs of the same RPC may have learned a narrower width meanwhile.
+				rpc.logRange = Math.min(rpc.logRange ?? stated, stated);
+				width = rpc.logRange;
+				learning = false;
+				log(
+					`eth_getLogs ${start}..${end} refused (${error.message}); asking for ` +
+						`${fmt(width)} blocks at a time from now on`
+				);
+			} else {
+				width = Math.ceil(span / 2);
+				learning =
+					error instanceof RpcError &&
+					stated === null &&
+					WIDTH.test(error.message) &&
+					!COUNTED.test(error.message);
+				const why =
+					error instanceof RpcError
+						? `refused (${error.message})`
+						: `timed out ${LOG_TIMEOUTS} times`;
+				log(`eth_getLogs ${start}..${end} ${why}; halving the range`);
+			}
+			continue;
+		}
+		if (learning) {
+			learning = false;
+			const learned = Math.max(width, LEARNED_FLOOR);
+			if (learned < (rpc.logRange ?? Infinity)) {
+				rpc.logRange = learned;
+				log(`eth_getLogs: asking for ${fmt(learned)} blocks at a time from now on`);
+			}
+		}
+		start = end + 1;
 	}
+	return logs;
 }
 
 /** Block times from the blocks' headers. */
@@ -228,6 +320,9 @@ export async function getInputs(rpc: Rpc, txs: string[]): Promise<Map<string, st
 	return new Map([...found].map(([tx, { input }]) => [tx, input]));
 }
 
+/** Times byHash asks for the results the node lacks before it gives up. */
+const HASH_ATTEMPTS = 5;
+
 /** Fetches one result per transaction hash; the node may lag behind the logs for a moment. */
 async function byHash<T>(
 	rpc: Rpc,
@@ -238,9 +333,16 @@ async function byHash<T>(
 	const found = new Map<string, T>();
 	let pending = txs;
 	for (let attempt = 0; pending.length > 0; attempt++) {
-		if (attempt === 5)
+		if (attempt === HASH_ATTEMPTS)
 			throw new Error(`no ${noun} for ${pending.length} txs, e.g. ${pending[0]}`);
-		if (attempt > 0) await sleep(backoff(attempt));
+		if (attempt > 0) {
+			const delay = backoff(attempt);
+			log(
+				`rpc: no ${noun} yet for ${pending.length} txs, e.g. ${pending[0]}; asking again in ` +
+					`${(delay / 1000).toFixed(1)}s (attempt ${attempt + 1} of ${HASH_ATTEMPTS})`
+			);
+			await sleep(delay);
+		}
 		const outcomes = await rpc.batch(pending.map((tx) => ({ method, params: [tx] })));
 		const missing: string[] = [];
 		outcomes.forEach((outcome, i) => {

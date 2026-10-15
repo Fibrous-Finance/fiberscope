@@ -132,8 +132,9 @@ feed, and the defaults that are named after it: the RPC variables (`BASE_RPC_URL
 (`apps/web/data/<network>/snapshot.json`, where the site reads it) and the R2 key
 (`<network>/snapshot.json`). Base's RPC defaults to its public endpoint. BNB Chain's public
 endpoints refuse old logs and archive calls, or rate-limit them far below a backfill's pace, so
-`BNB_RPC_URL` has no default: it must name an archive node that takes `eth_getLogs` ranges of
-5,000 blocks.
+`BNB_RPC_URL` has no default: it must name an archive node. A node that serves narrower
+`eth_getLogs` ranges works too, with more requests: the indexer learns the limit from the node's
+first refusal.
 
 ```sh
 cd apps/indexer
@@ -182,7 +183,7 @@ the same summary.
 
 | Command                                                                                                       | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune] [--snapshot <path>]` | Catches up with the network's safe block, then backfills at least N days of settlements and M days of auctions. With `--snapshot`, writes the snapshot once caught up, and again if the backfill added history. With `--budget-minutes`, the backfill stops B minutes after the start, and the next run resumes it. With `--prune`, deletes the data older than those depths once caught up (see below); with both at 0 it deletes nothing.                                                              |
+| `node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune] [--snapshot <path>]` | Catches up with the network's safe block, then backfills at least N days of settlements and M days of auctions. With `--snapshot`, writes the snapshot once caught up, and again at the end if it would show more. With `--budget-minutes`, the backfill stops B minutes after the start, and the next run resumes it. With `--prune`, deletes the data older than those depths once caught up (see below); with both at 0 it deletes nothing.                                                           |
 | `node src/cli.ts snapshot [--out <path>]`                                                                     | Writes the snapshot from the database (default `apps/web/data/<network>/snapshot.json`).                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `node src/cli.ts window --from <block> --to <block>`                                                          | Prints totals (batches, trades, DEX swaps, volume, surplus, gas and cost; scores and filtered-out solutions; quotes; protocol and partner fees) and the per-solver table for a block range, from the database.                                                                                                                                                                                                                                                                                           |
 | `node src/cli.ts attribution --from <block> --to <block>`                                                     | Uses the database to compare each batch's credited solver address in a block range with the solver address of the winning solution for its transaction in CoW's competition data. Breaks down relay batches (through the flash-loan router or an Atomic Bundle) by how the credited address was chosen. See [Attribution](methodology.md#attribution) and [Validation](methodology.md#validation).                                                                                                       |
@@ -194,7 +195,8 @@ same options) also read `apps/indexer/.env` when it exists.
 
 ### What a sync does
 
-1. Refreshes CoW's solver registry; if the registry is unavailable, it uses the last copy.
+1. Refreshes CoW's solver registry, in one request of at most 10 seconds; if the registry does not
+   answer in time, it uses the last copy.
 2. For settlements stored before their relay was added to the indexer, checks the senders and
    recipients against the allow-list so attribution can use the results.
 3. Catches up: settlements, receipts and calldata up to the network's safe block, then the
@@ -206,23 +208,31 @@ same options) also read `apps/indexer/.env` when it exists.
    relay settlement (through the flash-loan router or an Atomic Bundle) keeps its auction while it
    is in the chain data, since its attribution may need the auction's winner.
 5. Fetches details for the new blocks: the orders traded and their trades' protocol fees,
-   rechecking the last 10 minutes of trades whose fees the API did not list yet. If one of these
-   lookups fails, or they take more than 2 minutes, the snapshot is written without the
-   auction-detail figures, and the rest is caught up after it.
+   rechecking the last 10 minutes of trades whose fees the API did not list yet. The snapshot waits
+   for them when their lookups take at most 8 minutes at the CoW API's rate, as after an outage of
+   a few hours, and gives them twice that estimate, at least 2 minutes. If they would take longer,
+   one of them fails or they run past that time, the snapshot is written without the
+   auction-detail figures; the details then catch up before their backfill (step 7), and the
+   snapshot is written again at the end of the run (step 8).
 6. Marks the data current and, with `--snapshot`, writes the snapshot.
 7. Backfills, newest first, until it reaches the requested depth or exhausts the time budget:
    settlements, followed by their auction lookups, followed by their details. Settlement history
    is kept at least as deep as auction history. Trades stored before the schema held order uids
    get theirs from their `Trade` events.
-8. Writes the snapshot again if the history grew.
+8. Writes the snapshot again if it would show more than at step 6: a whole day more of history,
+   or the details of the new blocks when they caught up after it. A backfill that the budget
+   stopped short of a whole day adds nothing the snapshot shows, so the run ends without it.
 
 On an empty database there is nothing to catch up: the backfill starts at the safe block and the
 snapshot is written once it ends. Every step commits as it goes, so an interrupted run loses
 nothing. Requests are paced: by default at most 15 RPC calls per second (`eth_call` at a thirtieth
 of that, the public Base RPC's tightest limit) and 3 CoW API requests per second, slowing down
-when a server answers that the rate is too high. At 5 CoW API requests per second, filling in the
-details of a version 2 database with 90 days of auctions on Base takes about a day: about 200,000
-auctions to score again and 240,000 orders whose trades are looked up one order at a time.
+when a server answers that the rate is too high. A refused key, a spent quota or a request to wait
+more than a minute ends the run at once, and the log gives the endpoint's answer; the next run
+tries again on schedule. Each run's summary counts its RPC calls by method, the figure to compare
+with a provider's quota. At 5 CoW API requests per second, filling in the details of a version 2
+database with 90 days of auctions on Base takes about a day: about 200,000 auctions to score again
+and 240,000 orders whose trades are looked up one order at a time.
 
 ### Keep it running
 
@@ -230,7 +240,8 @@ auctions to score again and 240,000 orders whose trades are looked up one order 
 default 10), counted from the start of each run; a failed run is logged and the next one runs on
 schedule. Set `--budget-minutes` to the interval: the backfill stops when the next run is due, so
 fresh data never waits for a long backfill, and while history is being filled no time between runs
-is idle.
+is idle. A run whose backfill adds no whole day of history ends there, without writing the
+snapshot again, so the next run starts on time.
 
 ```sh
 REFRESH_MINUTES=10 sh apps/indexer/loop.sh --chain-days 30 --auction-days 7 --budget-minutes 10 \

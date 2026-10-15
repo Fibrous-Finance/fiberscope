@@ -100,12 +100,15 @@ const TRADES_PAGE = 1_000;
 /** A polite client for CoW's solver-competition API: paced, and backing off when told to. */
 export class CowApi {
 	readonly root: string;
+	/** The most requests per second it makes, when the API does not ask for fewer. */
+	readonly rate: number;
 	readonly stats = { retries: 0, bytes: 0 };
 	#pacer: Pacer;
 
 	/** `root` is the network's API root, such as https://api.cow.fi/base. */
 	constructor(root: string, maxRequestsPerSecond: number) {
 		this.root = root;
+		this.rate = maxRequestsPerSecond;
 		this.#pacer = new Pacer(maxRequestsPerSecond);
 	}
 

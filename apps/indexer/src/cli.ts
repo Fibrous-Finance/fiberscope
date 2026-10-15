@@ -29,8 +29,9 @@ const USAGE = `Usage:
       With --prune, once the head is caught up, chain data older than N days (at least M, as for
       the backfill) is deleted with its auction data, and so is the auction data of settlements
       older than M days; with both at 0 nothing is deleted. With --snapshot the snapshot is
-      written once the head is caught up, and again if the backfill added history (on an empty
-      database, only after the backfill).
+      written once the head is caught up, and again at the end if it would show more: a whole
+      day more of history, or the details of the new blocks when they caught up after it (on an
+      empty database, only after the backfill).
   node src/cli.ts snapshot [--out <path>]
       Write the snapshot JSON (default ${relative(process.cwd(), DEFAULT_SNAPSHOT_PATH)}).
   node src/cli.ts window --from <block> --to <block>
@@ -122,6 +123,11 @@ async function main(): Promise<void> {
 					`(${rate(receipts, chainSeconds)}/s); ${fmt(rpc.stats.calls)} RPC calls, ` +
 					`${fmt(rpc.stats.retries)} retried requests`
 			);
+			// By method too, as providers that price methods differently count them.
+			const byMethod = Object.entries(rpc.stats.byMethod)
+				.sort(([, a], [, b]) => b - a)
+				.map(([method, calls]) => `${method} ${fmt(calls)}`);
+			log(`  RPC calls by method: ${byMethod.join(", ") || "none"}`);
 			log(
 				`  auctions ${auctions ? `${auctions.from}..${auctions.to}` : "none"}: ${fmt(lookups)} lookups ` +
 					`(${fmt(missing)} not found) in ${duration(auctionSeconds)} ` +

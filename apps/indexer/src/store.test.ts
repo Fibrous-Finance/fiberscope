@@ -129,7 +129,7 @@ describe("prune", () => {
 		);
 		assert.deepEqual([...new Set(auctions)], [2, 3]);
 		const [trade] = store.tradeRows({ from: 320, to: 320 });
-		assert.equal(new TradeValuer(store).value(trade).pricedSides, 2);
+		assert.equal(new TradeValuer(store.nativeUsdPoints()).value(trade).pricedSides, 2);
 		// The answer in force at block 150 stays, and so does the last anchor before it, so block
 		// 149 keeps its time.
 		assert.deepEqual(
@@ -187,6 +187,45 @@ describe("prune", () => {
 				[100, null, null, null],
 				[600, 1, 1, `0 1 ${USDC}`],
 			]
+		);
+	});
+});
+
+describe("trade rows", () => {
+	test("carry the native prices their own auction gave their tokens", () => {
+		const store = storeWith([
+			{ label: "a", block: 100 },
+			{ label: "b", block: 200 },
+			{ label: "c", block: 300 },
+		]);
+		settle(store, 1, 95, ["a"]);
+		// b's auction priced USDC only, and c has no competition.
+		store.saveCompetition(
+			{
+				auctionId: 2,
+				startBlock: 195,
+				txHashes: [hash("b")],
+				prices: new Map(),
+				solutions: [],
+			},
+			[[USDC, "400000000000000000000000000"]],
+			[{ tx: hash("b"), priced: true }],
+			0
+		);
+		const range = { from: 1, to: 1_000 };
+		const prices = (rows: { sellPrice: string | null; buyPrice: string | null }[]) =>
+			rows.map(({ sellPrice, buyPrice }) => [sellPrice, buyPrice]);
+		const expected = [
+			["500000000000000000000000000", "1000000000000000000"],
+			["400000000000000000000000000", null],
+			[null, null],
+		];
+		assert.deepEqual(prices([...store.tradeRows(range)]), expected);
+		assert.deepEqual(prices([...store.tradeDetails(range)]), expected);
+		const valuer = new TradeValuer(store.nativeUsdPoints());
+		assert.deepEqual(
+			[...store.tradeRows(range)].map((trade) => valuer.value(trade).pricedSides),
+			[2, 1, 0]
 		);
 	});
 });

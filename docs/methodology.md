@@ -219,13 +219,14 @@ with the quote but not the fees. A settlement's pair shows the tokens in its fir
 
 ## Attribution
 
-A settlement is credited to the solver that submitted it: the address that called `settle`. A
-relay calls `settle` on a solver's behalf, so the `Settlement` event names the relay instead. The
-relays are CoW's flash-loan router (`0x9da8b48441583a2b93e2ef8213aad0ec0b392c69`), which settles
-on the auction winner's behalf, and the network's
-[Atomic Bundles](https://docs.cow.fi/cow-protocol/concepts/order-types/wrappers): contracts CoW
-DAO allow-lists that a solver calls instead of the settlement contract. On BNB Chain these are
-Euler's, to open, close and collateral-swap positions (`0x64c26b3a182826fe2ab8c04c8caf40b0c4bf9a66`,
+A settlement is credited to the solver that submitted it: the address that called `settle`, unless
+that address is a relay. A relay calls `settle` on a solver's behalf, so the `Settlement` event
+names the relay instead. Here, relays are CoW's flash-loan router
+(`0x9da8b48441583a2b93e2ef8213aad0ec0b392c69`), which settles on the auction winner's behalf, and
+the network's [Atomic Bundles](https://docs.cow.fi/cow-protocol/concepts/order-types/wrappers):
+contracts that CoW DAO allow-lists and that a solver calls instead of the settlement contract. On
+BNB Chain, these are Euler's contracts for opening positions, closing positions and swapping
+collateral (`0x64c26b3a182826fe2ab8c04c8caf40b0c4bf9a66`,
 `0x4f4ce927188637b4a1d91350c3114f4bd301dd02` and `0xcc054cd4b814a2caeb63c6f6a446435480a383f3`);
 Base has none. A relay's settlements are credited to the solver behind them, in this order:
 
@@ -236,16 +237,16 @@ Base has none. A relay's settlements are credited to the solver behind them, in 
 4. as a last resort, the sender.
 
 Allow-listed means `isSolver` on `GPv2AllowListAuthentication` returns true. Each address is
-checked once, at the block of the first relay settlement seen with it; the settlements of a relay
-added to the indexer later get their checks on its next run.
+checked once, at the block of the first relay settlement seen with it. If a relay is added to the
+indexer later, the indexer completes the missing checks for its stored settlements on the next run.
 
 ## Registry and names
 
 Names, statuses and submission addresses come from CoW's solver registry for the network,
 refreshed on every indexer run; the last copy is kept for when the registry is unavailable. A
-solver groups its prod and barn addresses. An override adds an address the registry does not list
-as active for the network that settles there and is on the settlement contract's on-chain
-allow-list; it is shown as active. On Base there is one, Rizzolver's
+solver groups its prod and barn addresses. An override adds an address that settles on the
+network, is on the settlement contract's on-chain allow-list and is not listed as active for that
+network in the registry; it is shown as active. On Base there is one, Rizzolver's
 `0x8f5835e9d756c9bd934bce527157a4b0ef3c5cb7`. On BNB Chain there are two, both of which the
 registry lists for Ethereum only: Rizzolver's same address and Fractal's
 `0x95480d3f27658e73b2785d30beb0c847d78294c7`.

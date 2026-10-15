@@ -1,4 +1,5 @@
-import { ROUTER } from "./chain.ts";
+import { RELAYS } from "./chain.ts";
+import type { Relay } from "./chain.ts";
 import { NETWORK } from "./config.ts";
 import { auctionOutcomes, creditedBatches, tradeFees, TradeValuer } from "./facts.ts";
 import { fmt, shortAddress } from "./log.ts";
@@ -73,14 +74,14 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		return entry;
 	};
 	let batches = 0;
-	let routed = 0;
+	const relayed: Record<Relay, number> = { router: 0, bundle: 0 };
 	let uncosted = 0;
 	let gas = 0;
 	let swaps = 0;
 	let cost = 0;
-	// Trades follow their batch's credit: a router batch's by its block and log index, any other
+	// Trades follow their batch's credit: a relay batch's by its block and log index, any other
 	// to the solver that settled it.
-	const routedRows = new Map<string, Row>();
+	const relayedRows = new Map<string, Row>();
 	for (const batch of creditedBatches(store, registry, range)) {
 		const entry = row(batch.solver);
 		entry.batches++;
@@ -92,17 +93,17 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 		swaps += batch.swaps;
 		cost += batch.cost ?? 0;
 		if (batch.cost === null) uncosted++;
-		if (batch.viaRouter) {
-			routed++;
-			routedRows.set(`${batch.block}:${batch.logIndex}`, entry);
+		if (batch.relay !== null) {
+			relayed[batch.relay]++;
+			relayedRows.set(`${batch.block}:${batch.logIndex}`, entry);
 		}
 	}
 
 	const valuer = new TradeValuer(store);
 	// The row a trade's batch is credited to.
 	const creditOf = (trade: { solver: string; block: number; settlementLogIndex: number }) =>
-		trade.solver === ROUTER
-			? routedRows.get(`${trade.block}:${trade.settlementLogIndex}`)!
+		RELAYS.includes(trade.solver)
+			? relayedRows.get(`${trade.block}:${trade.settlementLogIndex}`)!
 			: rows.get(registry.identify(trade.solver).id)!;
 	let trades = 0;
 	let unpriced = 0;
@@ -203,7 +204,8 @@ export function windowReport(store: Store, registry: Registry, range: BlockRange
 	const settling = sorted.filter((entry) => entry.batches > 0).length;
 	const bps = surplusVolume > 0 ? ((surplus / surplusVolume) * 10_000).toFixed(2) : "—";
 	out.push(
-		`Batches    ${fmt(batches)} (${fmt(routed)} via the flash-loan router; ` +
+		`Batches    ${fmt(batches)} (${fmt(relayed.router)} via the flash-loan router, ` +
+			`${fmt(relayed.bundle)} via Atomic Bundles; ` +
 			`${fmt(store.zeroTradeSettlements(range))} zero-trade settlements excluded)`,
 		`Trades     ${fmt(trades)} (${fmt(trades - unpriced - oneSided)} priced on both sides, ` +
 			`${fmt(oneSided)} on one side, ${fmt(unpriced)} unpriced)`,

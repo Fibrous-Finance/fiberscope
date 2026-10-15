@@ -12,6 +12,21 @@ import type { OrderTerms } from "./terms.ts";
 export const SETTLEMENT = NETWORK.contracts.settlement;
 export const ROUTER = NETWORK.contracts.flashLoanRouter;
 
+/**
+ * A relay calls `settle` on behalf of a solver, so the Settlement event names the relay, not the
+ * solver: CoW's flash-loan router, or one of the network's Atomic Bundles.
+ */
+export type Relay = "router" | "bundle";
+
+/** The addresses of the network's relays, the router first. */
+export const RELAYS: readonly string[] = [ROUTER, ...NETWORK.contracts.bundles];
+
+/** The kind of relay an address is; null when it is none. */
+export function relayOf(address: string): Relay | null {
+	if (address === ROUTER) return "router";
+	return NETWORK.contracts.bundles.includes(address) ? "bundle" : null;
+}
+
 export const TOPIC = {
 	settlement: "0x40338ce1a7c49204f0099533b1e9a7ee0a3d261f84974ab7af36105b8c4e9db4",
 	trade: "0xa07a543ab8a018198e99ca0184c93fe9050a79400a0a723441f84de1d972cc17",

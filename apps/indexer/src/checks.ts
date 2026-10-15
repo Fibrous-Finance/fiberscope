@@ -4,11 +4,11 @@ import {
 	getLogs,
 	orderUidOf,
 	parseSettlementLogs,
-	ROUTER,
+	relayOf,
 	SETTLEMENT,
 	TOPIC,
 } from "./chain.ts";
-import type { Log } from "./chain.ts";
+import type { Log, Relay } from "./chain.ts";
 import type { CowApi } from "./cow.ts";
 import { creditedBatches } from "./facts.ts";
 import { fmt } from "./log.ts";
@@ -27,12 +27,20 @@ import { coverageWarnings, windowLine } from "./window.ts";
 /** Disagreements printed in full; any beyond are counted. */
 const LISTED = 20;
 
+/** Relay batches of one kind: how their address was chosen, and how many match CoW's winner. */
+interface RelayTally {
+	batches: number;
+	bySource: Record<CreditSource, number>;
+	withWinner: number;
+	matched: number;
+}
+
 /**
  * Attribution against CoW's competition data, from the database alone: every batch should be
- * credited to the solver address of the winning solution that settled its transaction. Flash-loan
- * router batches are broken down by how their address was chosen; one credited to CoW's winner
- * matches it by construction, so the check is independent of the competition data only for the
- * others.
+ * credited to the solver address of the winning solution that settled its transaction. Relay
+ * batches, the flash-loan router's and the Atomic Bundles', are broken down by how their address
+ * was chosen; one credited to CoW's winner matches it by construction, so the check is
+ * independent of the competition data only for the others.
  */
 export function attributionReport(store: Store, registry: Registry, range: BlockRange): string {
 	const out = [windowLine(store, range), ...coverageWarnings(store, range, ["chain", "auction"])];
@@ -42,19 +50,28 @@ export function attributionReport(store: Store, registry: Registry, range: Block
 	let unchecked = 0;
 	let noCompetition = 0;
 	let noWinner = 0;
-	const bySource: Record<CreditSource, number> = {
-		event: 0,
-		recipient: 0,
-		sender: 0,
-		winner: 0,
-		unverified: 0,
+	const relayed: Record<Relay, RelayTally> = {
+		router: {
+			batches: 0,
+			bySource: { event: 0, recipient: 0, sender: 0, winner: 0, unverified: 0 },
+			withWinner: 0,
+			matched: 0,
+		},
+		bundle: {
+			batches: 0,
+			bySource: { event: 0, recipient: 0, sender: 0, winner: 0, unverified: 0 },
+			withWinner: 0,
+			matched: 0,
+		},
 	};
-	let routedWithWinner = 0;
-	let routedMatched = 0;
 	const mismatches: string[] = [];
 	for (const batch of creditedBatches(store, registry, range)) {
 		batches++;
-		bySource[batch.credit]++;
+		const relay = batch.relay === null ? null : relayed[batch.relay];
+		if (relay !== null) {
+			relay.batches++;
+			relay.bySource[batch.credit]++;
+		}
 		const winner = store.apiWinner(batch.tx);
 		if (winner === null) {
 			const link = store.competitionLink(batch.tx);
@@ -64,10 +81,10 @@ export function attributionReport(store: Store, registry: Registry, range: Block
 			continue;
 		}
 		withWinner++;
-		if (batch.viaRouter) routedWithWinner++;
+		if (relay !== null) relay.withWinner++;
 		if (batch.address === winner) {
 			matched++;
-			if (batch.viaRouter) routedMatched++;
+			if (relay !== null) relay.matched++;
 		} else {
 			mismatches.push(
 				`  ${batch.tx} log ${batch.logIndex}: credited ${batch.address} (${batch.credit}), ` +
@@ -81,19 +98,30 @@ export function attributionReport(store: Store, registry: Registry, range: Block
 			`${fmt(noCompetition)} without a competition, ${fmt(noWinner)} in a competition with no ` +
 			`winning solution for that transaction)`,
 		`Credited   ${fmt(matched)} of ${fmt(withWinner)} to that solution's solver address`,
-		`Router     ${fmt(batches - bySource.event)} via the flash-loan router: ` +
-			`${fmt(bySource.recipient)} credited to the transaction's recipient, ` +
-			`${fmt(bySource.sender)} to its sender, ${fmt(bySource.winner)} to CoW's winner, ` +
-			`${fmt(bySource.unverified)} to the unverified sender; ${fmt(routedMatched)} of ` +
-			`${fmt(routedWithWinner)} match the winner`,
+		relayLine("Router", "the flash-loan router", relayed.router),
+		relayLine("Bundles", "Atomic Bundles", relayed.bundle),
 		...listed("Mismatches", mismatches),
 		""
 	);
 	return out.join("\n");
 }
 
+/** A kind of relay's line in the attribution report. */
+function relayLine(label: string, via: string, tally: RelayTally): string {
+	const head = `${label.padEnd(10)} ${fmt(tally.batches)} via ${via}`;
+	if (tally.batches === 0) return head;
+	const { recipient, sender, winner, unverified } = tally.bySource;
+	return (
+		`${head}: ${fmt(recipient)} credited to the transaction's recipient, ` +
+		`${fmt(sender)} to its sender, ${fmt(winner)} to CoW's winner, ` +
+		`${fmt(unverified)} to the unverified sender; ${fmt(tally.matched)} of ` +
+		`${fmt(tally.withWinner)} match the winner`
+	);
+}
+
 /** How a settlement's calldata reached the settlement contract, by the transaction's recipient. */
-type Route = "direct call" | "flash-loan router" | "solver contract" | "recipient unknown";
+type Route =
+	"direct call" | "flash-loan router" | "Atomic Bundle" | "solver contract" | "recipient unknown";
 
 /**
  * Order terms against the trades and CoW's order book. From the database: the share of trades
@@ -114,14 +142,17 @@ export async function termsReport(
 	let trades = 0;
 	let read = 0;
 	for (const row of store.termRows(range)) {
+		const relay = row.recipient === null ? null : relayOf(row.recipient);
 		const route: Route =
 			row.recipient === null
 				? "recipient unknown"
 				: row.recipient === SETTLEMENT
 					? "direct call"
-					: row.recipient === ROUTER
+					: relay === "router"
 						? "flash-loan router"
-						: "solver contract";
+						: relay === "bundle"
+							? "Atomic Bundle"
+							: "solver contract";
 		let entry = routes.get(route);
 		if (!entry) {
 			entry = { trades: 0, read: [] };

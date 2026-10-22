@@ -1,7 +1,7 @@
 # <img src="docs/images/mark.svg" width="28" height="28" alt=""> Fiberscope
 
 Open-source analytics for [CoW Protocol](https://cow.fi) solvers on Base and BNB Chain: who wins
-the batch auctions, by how much, whether that is changing, and how efficiently each solver settles.
+the batch auctions, by how much, whether that is changing and how efficiently each solver settles.
 
 [![CI](https://github.com/Fibrous-Finance/fiberscope/actions/workflows/ci.yml/badge.svg)](https://github.com/Fibrous-Finance/fiberscope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)

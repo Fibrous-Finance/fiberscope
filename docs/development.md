@@ -91,7 +91,7 @@ An unlisted network's page and data work as a listed one's, but only its own pag
 stays unlisted until its history is complete and its batches, trades, DEX swaps and gas have been
 checked against Dune's Spellbook (see [Validation](methodology.md#validation)). To launch a
 network, set its `listed` to `true` in `apps/web/lib/networks.ts`: every page's menu then shows its
-row, the sitemap lists its page, and its page may be indexed as the others are.
+row, the sitemap lists its page and its page may be indexed as the others are.
 
 ## The indexer
 
@@ -431,15 +431,16 @@ both networks' history complete.
 - **Indexers.** Both networks' indexers run as two containers on one AWS EC2 t4g.medium in
   Frankfurt (2 Graviton vCPUs, 4 GB of memory) with a 16 GB gp3 disk.
 
-    Base's database takes about 420 MB at 180 days of settlements and 90 days of auctions, BNB
-    Chain's about 1.05 GB, and `--prune` keeps them there.
+    At 180 days of settlements and 90 days of auctions, Base's database takes about 420 MB and BNB
+    Chain's about 1.05 GB. `--prune` keeps them there.
 
     Caught up, a run takes about 30–45 seconds on Base and 80–105 seconds on BNB Chain, every 10
-    minutes; building the snapshot takes about 27 and 61 seconds of it. While a network's history is
-    being filled, its runs use the whole 10 minutes. During a run the containers peak at about
-    0.3 GB (Base) and 1 GB (BNB Chain, of which about 0.4 GB is page cache); BNB Chain's peaked at
-    1.1 GB while its history was being filled. Between runs the host has about 3.4 GB of its 4 GB
-    available.
+    minutes. Building the snapshot takes about 27 and 61 seconds, respectively. While a network's
+    history is being filled, its runs use the whole 10 minutes.
+
+    During a run the containers peak at about 0.3 GB (Base) and 1 GB (BNB Chain, of which about
+    0.4 GB is page cache); BNB Chain's peaked at 1.1 GB while its history was being filled. Between
+    runs the host has about 3.4 GB of its 4 GB available.
 
     On demand, the instance costs $0.0384 an hour, the disk $0.0952 per GB-month and its public IPv4
     address $0.005 an hour ([EC2](https://aws.amazon.com/ec2/pricing/on-demand/),

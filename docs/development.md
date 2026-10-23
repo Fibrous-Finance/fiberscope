@@ -235,9 +235,11 @@ provider's quota. At 5 CoW API requests per second, filling in the details of a 
 with 90 days of auctions on Base takes about a day: about 200,000 auctions to score again and
 240,000 orders whose trades are looked up one order at a time. Requests to CoW's API go through
 `node:https` and offer at most TLS 1.2. Since 23 Oct 2026, the CDN in front of the API has returned
-HTTP 429 to requests from the indexers' host on AWS when their TLS handshake has Node's default
-fingerprint, regardless of the request rate. The same requests from a home connection succeed. The
-indexer's requests name it and the site in their User-Agent (`apps/indexer/src/cow.ts`).
+HTTP 429 to requests whose TLS handshake has Node's default fingerprint, from the indexers' host on
+AWS and from a home connection alike, regardless of the request rate; its message offers custom
+rate limits through CoW's Discord. A Node built with OpenSSL 4, such as Homebrew's, has another
+default fingerprint and gets through, so test with an official build. The indexer's requests name
+it and the site in their User-Agent (`apps/indexer/src/cow.ts`).
 
 ### Keep it running
 

@@ -2,7 +2,8 @@
 # Node 24 runs the TypeScript sources directly and neither the indexer nor @fiberscope/core has
 # third-party dependencies, so the image is Node plus the workspace link. The database and the
 # local snapshot live on a volume mounted at /data.
-FROM node:24-slim
+# The Node release in .nvmrc, which CI uses too; change them together.
+FROM node:24.22.1-slim
 
 WORKDIR /app
 RUN corepack enable

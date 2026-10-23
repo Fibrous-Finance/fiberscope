@@ -397,9 +397,10 @@ Manage API tokens); the indexer signs S3 requests with the token's S3 credential
 nowhere else in the account.
 
 `apps/indexer/Dockerfile` builds an image that runs `loop.sh` with 180 days of settlements, 90 days
-of auctions, a 10-minute budget and `--prune`. Build the image from the repository root, using a
-clean checkout of the commit you want to run. Pass that commit as the `GIT_COMMIT` build argument
-so every snapshot records it and the page's footer can link to it.
+of auctions, a 10-minute budget and `--prune`. The image uses the Node release in `.nvmrc`, as CI
+does. Build the image from the repository root, using a clean checkout of the commit you want to
+run. Pass that commit as the `GIT_COMMIT` build argument so every snapshot records it and the
+page's footer can link to it.
 
 ```sh
 docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD) -f apps/indexer/Dockerfile -t fiberscope-indexer .

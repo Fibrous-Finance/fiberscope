@@ -103,12 +103,15 @@ const TIMEOUT_MS = 60_000;
 const TRADES_PAGE = 1_000;
 /**
  * The agent of every request to CoW's API. Since 23 Oct 2026, the CloudFront distribution in front
- * of the API answers HTTP 429 to every request whose TLS handshake has Node's default fingerprint,
- * from any address and at any rate, while other clients' requests succeed. A handshake that offers
- * at most TLS 1.2 has another fingerprint. `fetch` takes no TLS options, so these requests go
- * through `node:https`.
+ * of the API has returned HTTP 429 to requests from the indexers' host on AWS when their TLS
+ * handshake has Node's default fingerprint, regardless of the request rate. Requests sent by curl
+ * from that host and by Node from a home connection succeed. A handshake that offers at most
+ * TLS 1.2 has another fingerprint. `fetch` takes no TLS options, so these requests go through
+ * `node:https`.
  */
 const AGENT = new Agent({ keepAlive: true, maxVersion: "TLSv1.2" });
+/** Says whose requests these are, since their handshake no longer looks like Node's. */
+const USER_AGENT = "fiberscope-indexer (+https://fiberscope.org)";
 const unzip = promisify(gunzip);
 
 /** A polite client for CoW's solver-competition API: paced, and backing off when told to. */
@@ -251,6 +254,7 @@ async function send(url: string, body?: unknown): Promise<Reply> {
 			agent: AGENT,
 			headers: {
 				"accept-encoding": "gzip",
+				"user-agent": USER_AGENT,
 				...(payload === undefined ? {} : { "content-type": "application/json" }),
 			},
 			signal: AbortSignal.timeout(TIMEOUT_MS),

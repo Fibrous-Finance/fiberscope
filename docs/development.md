@@ -87,11 +87,11 @@ does, so no sentence, title or source line splits it.
 ### Launching a network
 
 An unlisted network's page and data work as a listed one's, but only its own page's menu shows it,
-`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain is
-unlisted until its history is complete and its batches, trades, DEX swaps and gas have been checked
-against Dune's Spellbook, as Base's were (see [Validation](methodology.md#validation)). To launch a
+`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. A network
+stays unlisted until its history is complete and its batches, trades, DEX swaps and gas have been
+checked against Dune's Spellbook (see [Validation](methodology.md#validation)). To launch a
 network, set its `listed` to `true` in `apps/web/lib/networks.ts`: every page's menu then shows its
-row, the sitemap lists its page, and its page may be indexed as the others are.
+row, the sitemap lists its page and its page may be indexed as the others are.
 
 ## The indexer
 
@@ -359,9 +359,8 @@ search results.
   page that robots.txt blocks keeps its `noindex` unread and can still be listed. It names the
   sitemap only on the indexed host.
 - `/sitemap.xml` lists each listed network's page, last modified at the newest block of its
-  snapshot: `/`, and `/bnb` once BNB Chain is launched (see
-  [Launching a network](#launching-a-network)). It is rendered per request, because `SITE_URL` is
-  a Worker variable that `next build` does not see.
+  snapshot: `/` and `/bnb`. It is rendered per request, because `SITE_URL` is a Worker variable
+  that `next build` does not see.
 - Each network's page has a canonical link to itself, `/` or `/bnb`: query strings such as
   `?period=7d` are views of the same page. An unlisted network's page is `noindex` on every host.
 - The home page carries WebSite structured data (JSON-LD), which gives search results the site's
@@ -426,27 +425,30 @@ again.
 
 ## Running costs
 
-Measured on the live deployment: the site on 3–5 Oct 2026, the indexers on 15 Oct 2026.
+Measured on the live deployment: the site on 3–5 Oct 2026, the indexers on 19–22 Oct 2026, with
+both networks' history complete.
 
 - **Site.** The Worker is 5.47 MB, 1.14 MB gzipped, within the Workers Free plan's
   [size limit](https://developers.cloudflare.com/workers/platform/limits/#worker-size). Requests and
   CPU time per request depend on the plan: see
   [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/#workers).
-- **Snapshots.** One R2 object per network, about 400 KB for Base and 250 KB for BNB Chain,
+- **Snapshots.** One R2 object per network, about 400 KB for Base and 350 KB for BNB Chain,
   rewritten every 10 minutes and read once per page view and once per update of an open page. That
   is well within [R2's free tier](https://developers.cloudflare.com/r2/pricing/#free-tier): 10
   GB-month of storage, 1 million writes and 10 million reads a month.
 - **Indexers.** Both networks' indexers run as two containers on one AWS EC2 t4g.medium in
   Frankfurt (2 Graviton vCPUs, 4 GB of memory) with a 16 GB gp3 disk.
 
-    Base's database takes about 420 MB at 180 days of settlements and 90 days of auctions, and
-    `--prune` keeps it there. BNB Chain's takes about 620 MB with 25 of its 90 days of auctions, and
-    about 1.1 GB once they are all in (estimated).
+    At 180 days of settlements and 90 days of auctions, Base's database takes about 420 MB and BNB
+    Chain's about 1.05 GB. `--prune` keeps them there.
 
-    Caught up, a Base run takes 30–40 seconds every 10 minutes, about 26 of them building the
-    snapshot. While a network's history is being filled, its runs use the whole 10 minutes. During a
-    run the containers peak at about 0.55 GB (Base) and 0.85 GB (BNB Chain, filling its history), and
-    the host keeps about 2.8 GB free.
+    Caught up, a run takes about 30–45 seconds on Base and 80–105 seconds on BNB Chain, every 10
+    minutes. Building the snapshot takes about 27 and 61 seconds, respectively. While a network's
+    history is being filled, its runs use the whole 10 minutes.
+
+    During a run the containers peak at about 0.3 GB (Base) and 1 GB (BNB Chain, of which about
+    0.4 GB is page cache); BNB Chain's peaked at 1.1 GB while its history was being filled. Between
+    runs the host has about 3.4 GB of its 4 GB available.
 
     On demand, the instance costs $0.0384 an hour, the disk $0.0952 per GB-month and its public IPv4
     address $0.005 an hour ([EC2](https://aws.amazon.com/ec2/pricing/on-demand/),
@@ -456,8 +458,8 @@ Measured on the live deployment: the site on 3–5 Oct 2026, the indexers on 15 
 - **Data.** The indexer reads public endpoints without API keys for Base: its RPC, CoW's API and
   CoW's solver registry. BNB Chain requires an archive RPC endpoint (`BNB_RPC_URL`); the live
   indexer uses NodeReal's free plan, 10 million compute units a month. It makes about two calls per
-  settlement, a receipt and a transaction: about 14,000 calls a day on BNB Chain, an estimated 7–8
-  million compute units a month.
+  settlement, a receipt and a transaction: about 14,400 calls a day on BNB Chain, about 7 million
+  compute units a month.
 
 ## Repository layout
 

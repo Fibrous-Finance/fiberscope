@@ -1,7 +1,7 @@
 # <img src="docs/images/mark.svg" width="28" height="28" alt=""> Fiberscope
 
-Open-source analytics for [CoW Protocol](https://cow.fi) solvers on Base: who wins the batch
-auctions, by how much, whether that is changing, and how efficiently each solver settles.
+Open-source analytics for [CoW Protocol](https://cow.fi) solvers on Base and BNB Chain: who wins
+the batch auctions, by how much, whether that is changing and how efficiently each solver settles.
 
 [![CI](https://github.com/Fibrous-Finance/fiberscope/actions/workflows/ci.yml/badge.svg)](https://github.com/Fibrous-Finance/fiberscope/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -58,7 +58,7 @@ copied as Markdown or downloaded as CSV, and the page's Methodology defines ever
 
 ```mermaid
 flowchart LR
-    rpc["Base RPC"] --> indexer["Indexer"]
+    rpc["Base and BNB Chain RPCs"] --> indexer["Indexer"]
     cow["CoW API"] --> indexer
     registry["CoW solver registry"] --> indexer
     indexer --> db[("SQLite")]
@@ -68,12 +68,13 @@ flowchart LR
     worker --> browser["Browser"]
 ```
 
-The indexer reads settlements, receipts, calldata and Chainlink's ETH/USD rate from Base; the
-auction behind each settlement, with every solution's score, and each traded order's quote and
-protocol fees from CoW's API; and solver names from CoW's registry, into SQLite. Every 10 minutes
-it catches up with the chain, writes a snapshot with every figure the page shows and uploads it to
-R2; then it backfills history until the next run is due. The site, Next.js on a Cloudflare
-Worker, reads the snapshot from R2 and derives every window, share and rank from it.
+The indexer reads settlements, receipts, calldata and Chainlink's ETH/USD or BNB/USD rate from
+Base or BNB Chain; the auction behind each settlement, with every solution's score, and each traded
+order's quote and protocol fees from CoW's API; and solver names from CoW's registry, into one
+SQLite database per network. Every 10 minutes it catches up with the chain, writes a snapshot with
+every figure the network's page shows and uploads it to R2; then it backfills history until the
+next run is due. The site, Next.js on a Cloudflare Worker, reads each network's snapshot from R2
+and derives every window, share and rank from it.
 
 ## Accuracy
 

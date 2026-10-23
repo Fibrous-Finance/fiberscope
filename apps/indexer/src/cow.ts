@@ -103,10 +103,10 @@ const TIMEOUT_MS = 60_000;
 const TRADES_PAGE = 1_000;
 /**
  * The agent of every request to CoW's API. Since 23 Oct 2026, the CloudFront distribution in front
- * of the API answers HTTP 429, whatever the rate, to requests from the indexers' host on AWS
- * whose TLS handshake has Node's default fingerprint; curl's requests from that host, and Node's
- * from a home connection, succeed. A handshake that offers at most TLS 1.2 has another
- * fingerprint. `fetch` takes no TLS options, so these requests go through `node:https`.
+ * of the API answers HTTP 429, whatever the rate, to requests from the indexers' host on AWS whose
+ * TLS handshake has Node's default fingerprint; curl's requests from that host, and Node's from a
+ * home connection, succeed. A handshake that offers at most TLS 1.2 has another fingerprint.
+ * `fetch` takes no TLS options, so these requests go through `node:https`.
  */
 const AGENT = new Agent({ keepAlive: true, maxVersion: "TLSv1.2" });
 /** Says whose requests these are, since their handshake no longer looks like Node's. */

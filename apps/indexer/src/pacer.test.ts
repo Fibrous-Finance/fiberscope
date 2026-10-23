@@ -9,7 +9,8 @@ const TIMEOUT = new DOMException("The operation was aborted due to timeout", "Ti
 
 describe("a failed request's reason", () => {
 	test("reads the same for a timeout through node:https as through fetch", async () => {
-		// fetch rejects with the signal's reason; node:https with an AbortError that it causes.
+		// fetch rejects with the signal's reason; node:https rejects with an AbortError whose cause
+		// is the signal's reason.
 		const aborted: unknown = await once(new EventEmitter(), "never", {
 			signal: AbortSignal.abort(TIMEOUT),
 		}).catch((error: unknown) => error);

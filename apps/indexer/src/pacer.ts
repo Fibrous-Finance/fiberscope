@@ -21,7 +21,7 @@ export function retryAfterMs(header: string | null): number | null {
 /**
  * A short reason for a failed request: its message, with the network error's code when the message
  * lacks it (fetch puts that error in `cause`; `node:https` sets `code` on the error itself). An
- * aborted request gives its abort's reason instead, such as a timeout.
+ * `AbortError` whose `cause` is an `Error` is described using that cause, as with a timeout.
  */
 export function describeError(error: unknown): string {
 	if (!(error instanceof Error)) return String(error);

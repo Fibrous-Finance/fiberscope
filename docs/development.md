@@ -234,10 +234,10 @@ again on schedule. Each run's summary counts its RPC calls by method, the figure
 provider's quota. At 5 CoW API requests per second, filling in the details of a version 2 database
 with 90 days of auctions on Base takes about a day: about 200,000 auctions to score again and
 240,000 orders whose trades are looked up one order at a time. Requests to CoW's API go through
-`node:https` and offer at most TLS 1.2: since 23 Oct 2026, the CDN in front of the API answers
-HTTP 429, whatever the rate, to requests from the indexers' host on AWS whose TLS handshake has
-Node's default fingerprint, while the same requests from a home connection succeed. The indexer's
-requests name it and the site in their User-Agent (`apps/indexer/src/cow.ts`).
+`node:https` and offer at most TLS 1.2. Since 23 Oct 2026, the CDN in front of the API has returned
+HTTP 429 to requests from the indexers' host on AWS when their TLS handshake has Node's default
+fingerprint, regardless of the request rate. The same requests from a home connection succeed. The
+indexer's requests name it and the site in their User-Agent (`apps/indexer/src/cow.ts`).
 
 ### Keep it running
 

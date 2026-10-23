@@ -233,7 +233,10 @@ more than a minute ends the run at once, and the log gives the endpoint's answer
 again on schedule. Each run's summary counts its RPC calls by method, the figure to compare with a
 provider's quota. At 5 CoW API requests per second, filling in the details of a version 2 database
 with 90 days of auctions on Base takes about a day: about 200,000 auctions to score again and
-240,000 orders whose trades are looked up one order at a time.
+240,000 orders whose trades are looked up one order at a time. Requests to CoW's API go through
+`node:https` and offer at most TLS 1.2: since 23 Oct 2026, the CDN in front of the API answers
+HTTP 429 to every request whose TLS handshake has Node's default fingerprint, whatever its rate
+(`apps/indexer/src/cow.ts`).
 
 ### Keep it running
 

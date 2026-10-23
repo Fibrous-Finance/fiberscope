@@ -1,4 +1,9 @@
+import type { IncomingMessage } from "node:http";
+import { Agent, request } from "node:https";
+import { buffer } from "node:stream/consumers";
 import { setTimeout as sleep } from "node:timers/promises";
+import { promisify } from "node:util";
+import { gunzip } from "node:zlib";
 
 import { isInteger, isOptionalString, isRecord, isStringArray, isStringRecord } from "./guards.ts";
 import { backoff, describeError, Pacer, retryAfterMs } from "./pacer.ts";
@@ -96,6 +101,15 @@ const ATTEMPTS = 10;
 const TIMEOUT_MS = 60_000;
 /** Trades per page of `/api/v2/trades`, the API's maximum. */
 const TRADES_PAGE = 1_000;
+/**
+ * The agent of every request to CoW's API. Since 23 Oct 2026, the CloudFront distribution in front
+ * of the API answers HTTP 429 to every request whose TLS handshake has Node's default fingerprint,
+ * from any address and at any rate, while other clients' requests succeed. A handshake that offers
+ * at most TLS 1.2 has another fingerprint. `fetch` takes no TLS options, so these requests go
+ * through `node:https`.
+ */
+const AGENT = new Agent({ keepAlive: true, maxVersion: "TLSv1.2" });
+const unzip = promisify(gunzip);
 
 /** A polite client for CoW's solver-competition API: paced, and backing off when told to. */
 export class CowApi {
@@ -198,27 +212,14 @@ export class CowApi {
 			await this.#pacer.take();
 			let status: number;
 			try {
-				const response = await fetch(this.root + path, {
-					method,
-					signal: AbortSignal.timeout(TIMEOUT_MS),
-					...(body === undefined
-						? {}
-						: {
-								headers: { "content-type": "application/json" },
-								body: JSON.stringify(body),
-							}),
-				});
+				const response = await send(this.root + path, body);
 				status = response.status;
-				if (response.ok) {
-					const text = await response.text();
-					this.stats.bytes += text.length;
-					return JSON.parse(text);
+				if (status >= 200 && status < 300) {
+					this.stats.bytes += response.text.length;
+					return JSON.parse(response.text);
 				}
-				await response.body?.cancel();
 				if (status === 429) {
-					this.#pacer.throttle(
-						retryAfterMs(response.headers.get("retry-after")) ?? 5_000
-					);
+					this.#pacer.throttle(retryAfterMs(response.retryAfter) ?? 5_000);
 				}
 			} catch (error) {
 				problem = describeError(error);
@@ -231,6 +232,41 @@ export class CowApi {
 		}
 		throw new Error(`${method} ${path} failed ${ATTEMPTS} times: ${problem}`);
 	}
+}
+
+interface Reply {
+	status: number;
+	retryAfter: string | null;
+	text: string;
+}
+
+/** GETs `url`, or POSTs `body` to it as JSON, through AGENT; the body read whole and unzipped. */
+async function send(url: string, body?: unknown): Promise<Reply> {
+	const payload = body === undefined ? undefined : JSON.stringify(body);
+	const { promise, resolve, reject } = Promise.withResolvers<IncomingMessage>();
+	const outgoing = request(
+		url,
+		{
+			method: payload === undefined ? "GET" : "POST",
+			agent: AGENT,
+			headers: {
+				"accept-encoding": "gzip",
+				...(payload === undefined ? {} : { "content-type": "application/json" }),
+			},
+			signal: AbortSignal.timeout(TIMEOUT_MS),
+		},
+		resolve
+	);
+	outgoing.on("error", reject);
+	outgoing.end(payload);
+	const response = await promise;
+	const raw = await buffer(response);
+	const bytes = response.headers["content-encoding"] === "gzip" ? await unzip(raw) : raw;
+	return {
+		status: response.statusCode ?? 0,
+		retryAfter: response.headers["retry-after"] ?? null,
+		text: bytes.toString("utf8"),
+	};
 }
 
 /** Keeps what the indexer uses from a competition; `auction.orders` (most of the bytes) is dropped. */

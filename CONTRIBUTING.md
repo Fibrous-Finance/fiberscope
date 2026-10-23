@@ -28,7 +28,7 @@ pnpm format && pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && 
   code uses only syntax that types can be stripped from: no enums, namespaces or parameter
   properties.
 - `apps/indexer` and `packages/core` have no third-party dependencies; they use Node's built-ins
-  (`node:sqlite`, `fetch`, `node:test`).
+  (`node:sqlite`, `fetch`, `node:https`, `node:test`).
 - Prettier formats everything: tabs (width 4), lines up to 100 characters, double quotes, trailing
   commas where ES5 allows them, and sorted imports. `pnpm format` applies it.
 - Each rule used to calculate a figure is a pure function with tests next to it (`*.test.ts`).

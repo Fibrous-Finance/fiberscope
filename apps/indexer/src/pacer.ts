@@ -18,11 +18,26 @@ export function retryAfterMs(header: string | null): number | null {
 	return Number.isNaN(date) ? null : Math.max(0, date - Date.now());
 }
 
-/** A short reason for a failed request, including the network cause fetch hides. */
+/**
+ * A short reason for a failed request: its message, with the network error's code when the message
+ * lacks it (fetch puts that error in `cause`; `node:https` sets `code` on the error itself). An
+ * aborted request gives its abort's reason instead, such as a timeout.
+ */
 export function describeError(error: unknown): string {
 	if (!(error instanceof Error)) return String(error);
-	const cause = (error.cause as { code?: string } | undefined)?.code;
-	return cause ? `${error.message} (${cause})` : error.message;
+	if (error.name === "AbortError" && error.cause instanceof Error) {
+		return describeError(error.cause);
+	}
+	const code = codeOf(error.cause) ?? codeOf(error);
+	return code === undefined || error.message.includes(code)
+		? error.message
+		: `${error.message} (${code})`;
+}
+
+/** An error's code when it is a name such as "ECONNRESET", not a DOMException's number. */
+function codeOf(error: unknown): string | undefined {
+	const code = (error as { code?: unknown } | null | undefined)?.code;
+	return typeof code === "string" ? code : undefined;
 }
 
 /**

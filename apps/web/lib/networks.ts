@@ -49,7 +49,6 @@ export const SITE_NETWORKS: Record<NetworkId, SiteNetwork> = {
 		image: "/og-image.png",
 		listed: true,
 	},
-	// Unlisted until its history is complete and its figures match Dune's Spellbook.
 	bnb: {
 		...BNB,
 		nameFrom: 820,
@@ -58,9 +57,9 @@ export const SITE_NETWORKS: Record<NetworkId, SiteNetwork> = {
 		wordNameFrom: 881,
 		wordFrom: 780,
 		image: "/og-image-bnb.png",
-		listed: false,
+		listed: true,
 	},
-	// Unlisted until its launch with BNB Chain's (pull request #47). It keeps only its last 30 days.
+	// Listed without the Dune check Base and BNB Chain passed: it keeps only its last 30 days.
 	ethereum: {
 		...ETHEREUM,
 		nameFrom: 813,
@@ -69,7 +68,7 @@ export const SITE_NETWORKS: Record<NetworkId, SiteNetwork> = {
 		wordNameFrom: 874,
 		wordFrom: 780,
 		image: "/og-image-ethereum.png",
-		listed: false,
+		listed: true,
 	},
 };
 

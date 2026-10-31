@@ -92,10 +92,10 @@ does, so no sentence, title or source line splits it.
 ### Launching a network
 
 An unlisted network's page and data work as a listed one's, but only its own page's menu shows it,
-`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain and
-Ethereum are unlisted until their history is complete and their batches, trades, DEX swaps and gas
-have been checked against Dune's Spellbook, as Base's were (see
-[Validation](methodology.md#validation)). To launch a
+`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain is
+unlisted until its history is complete and its batches, trades, DEX swaps and gas have been checked
+against Dune's Spellbook, as Base's were (see [Validation](methodology.md#validation)). Ethereum is
+listed without that check: it keeps only its last 30 days, from 30 Oct 2026 on. To launch a
 network, set its `listed` to `true` in `apps/web/lib/networks.ts`: every page's menu then shows its
 row, the sitemap lists its page, and its page may be indexed as the others are.
 
@@ -197,14 +197,14 @@ anchor before the chain data, so its first block keeps its time.
 Run them from `apps/indexer`. Every command takes `--db <path>`; `node src/cli.ts --help` prints
 the same summary.
 
-| Command                                                                                                       | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune] [--snapshot <path>]` | Catches up with the network's safe block, then backfills at least N days of settlements and M days of auctions. With `--snapshot`, writes the snapshot once caught up, and again at the end if it would show more. With `--budget-minutes`, the backfill stops B minutes after the start, and the next run resumes it. With `--prune`, deletes the data older than those depths once caught up (see below); with both at 0 it deletes nothing.                                                           |
-| `node src/cli.ts snapshot [--out <path>]`                                                                     | Writes the snapshot from the database (default `apps/web/data/<network>/snapshot.json`).                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `node src/cli.ts window --from <block> --to <block>`                                                          | Prints totals (batches, trades, DEX swaps, volume, surplus, gas and cost; scores and filtered-out solutions; quotes; protocol and partner fees) and the per-solver table for a block range, from the database.                                                                                                                                                                                                                                                                                           |
-| `node src/cli.ts attribution --from <block> --to <block>`                                                     | Uses the database to compare each batch's credited solver address in a block range with the solver address of the winning solution for its transaction in CoW's competition data. Breaks down relay batches (through the flash-loan router or an Atomic Bundle) by how the credited address was chosen. See [Attribution](methodology.md#attribution) and [Validation](methodology.md#validation).                                                                                                       |
-| `node src/cli.ts terms --from <block> --to <block> [--sample N]`                                              | Counts trades with order terms decoded from `settle()` calldata, grouped by how the calldata reached the settlement contract. It then samples trades across the block range and routes, targeting N trades (default: 90). For each sampled trade, it rereads and decodes the transaction from the RPC, compares the executed fee with the fee in its `Trade` event, and compares the signed-order fields with the corresponding fields in CoW's order book. See [Validation](methodology.md#validation). |
-| `node src/cli.ts seed --url <url>`                                                                            | Downloads a database from `<url>` when there is none yet, so a new host does not index again. It never overwrites a database and runs SQLite's integrity check on the download before using it.                                                                                                                                                                                                                                                                                                          |
+| Command                                                                                                                       | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--no-backfill] [--prune] [--snapshot <path>]` | Catches up with the network's safe block, then backfills at least N days of settlements and M days of auctions. With `--snapshot`, writes the snapshot once caught up, and again at the end if it would show more. With `--budget-minutes`, the backfill stops B minutes after the start, and the next run resumes it. With `--no-backfill`, nothing older than the data held is fetched: the data grows from the head only, and N and M only set what `--prune` keeps; an empty database needs one run without it. With `--prune`, deletes the data older than those depths once caught up (see below); with both at 0 it deletes nothing. |
+| `node src/cli.ts snapshot [--out <path>]`                                                                                     | Writes the snapshot from the database (default `apps/web/data/<network>/snapshot.json`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `node src/cli.ts window --from <block> --to <block>`                                                                          | Prints totals (batches, trades, DEX swaps, volume, surplus, gas and cost; scores and filtered-out solutions; quotes; protocol and partner fees) and the per-solver table for a block range, from the database.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `node src/cli.ts attribution --from <block> --to <block>`                                                                     | Uses the database to compare each batch's credited solver address in a block range with the solver address of the winning solution for its transaction in CoW's competition data. Breaks down relay batches (through the flash-loan router or an Atomic Bundle) by how the credited address was chosen. See [Attribution](methodology.md#attribution) and [Validation](methodology.md#validation).                                                                                                                                                                                                                                          |
+| `node src/cli.ts terms --from <block> --to <block> [--sample N]`                                                              | Counts trades with order terms decoded from `settle()` calldata, grouped by how the calldata reached the settlement contract. It then samples trades across the block range and routes, targeting N trades (default: 90). For each sampled trade, it rereads and decodes the transaction from the RPC, compares the executed fee with the fee in its `Trade` event, and compares the signed-order fields with the corresponding fields in CoW's order book. See [Validation](methodology.md#validation).                                                                                                                                    |
+| `node src/cli.ts seed --url <url>`                                                                                            | Downloads a database from `<url>` when there is none yet, so a new host does not index again. It never overwrites a database and runs SQLite's integrity check on the download before using it.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 The package's `sync` and `snapshot` scripts (`pnpm --filter @fiberscope/indexer snapshot`, with the
 same options) also read `apps/indexer/.env` when it exists.
@@ -377,7 +377,7 @@ search results.
   page that robots.txt blocks keeps its `noindex` unread and can still be listed. It names the
   sitemap only on the indexed host.
 - `/sitemap.xml` lists each listed network's page, last modified at the newest block of its
-  snapshot: `/`, and `/bnb` and `/ethereum` once BNB Chain and Ethereum are launched (see
+  snapshot: `/`, `/ethereum`, and `/bnb` once BNB Chain is launched (see
   [Launching a network](#launching-a-network)). It is rendered per request, because `SITE_URL` is
   a Worker variable that `next build` does not see.
 - Each network's page has a canonical link to itself, `/`, `/bnb` or `/ethereum`: query strings such as
@@ -439,10 +439,11 @@ docker run -v fiberscope-bnb:/data --env-file apps/indexer/.env.bnb -e NETWORK=b
 docker run -v fiberscope-ethereum:/data --env-file apps/indexer/.env.ethereum -e NETWORK=ethereum fiberscope-indexer
 ```
 
-The live indexer runs from this image on an AWS EC2 instance: systemd starts the container, its
+The live indexers run from this image on an AWS EC2 instance: systemd starts each container, its
 variables come from SSM Parameter Store, and its output goes to CloudWatch Logs. `SEED_DB_URL`, for
 example a presigned R2 link to a copy of the database, moves it to a new host without indexing
-again.
+again. Ethereum's container runs `loop.sh --snapshot /data/snapshot.json --chain-days 30
+--auction-days 30 --no-backfill --prune`: it never fills history, and keeps its last 30 days.
 
 ## Running costs
 
@@ -456,12 +457,13 @@ Measured on the live deployment: the site on 3–5 Oct 2026, the indexers on 15 
   rewritten every 10 minutes and read once per page view and once per update of an open page. That
   is well within [R2's free tier](https://developers.cloudflare.com/r2/pricing/#free-tier): 10
   GB-month of storage, 1 million writes and 10 million reads a month.
-- **Indexers.** Both networks' indexers run as two containers on one AWS EC2 t4g.medium in
+- **Indexers.** The three networks' indexers run as three containers on one AWS EC2 t4g.medium in
   Frankfurt (2 Graviton vCPUs, 4 GB of memory) with a 16 GB gp3 disk.
 
     Base's database takes about 420 MB at 180 days of settlements and 90 days of auctions, and
     `--prune` keeps it there. BNB Chain's takes about 620 MB with 25 of its 90 days of auctions, and
-    about 1.1 GB once they are all in (estimated).
+    about 1.1 GB once they are all in (estimated). Ethereum's grows about 10 MB a day, to about 300
+    MB at its 30 days.
 
     Caught up, a Base run takes 30–40 seconds every 10 minutes, about 26 of them building the
     snapshot. While a network's history is being filled, its runs use the whole 10 minutes. During a
@@ -477,10 +479,10 @@ Measured on the live deployment: the site on 3–5 Oct 2026, the indexers on 15 
   CoW's solver registry. BNB Chain requires an archive RPC endpoint (`BNB_RPC_URL`); the live
   indexer uses NodeReal's free plan, 10 million compute units a month. It makes about two calls per
   settlement, a receipt and a transaction: about 14,000 calls a day on BNB Chain, an estimated 7–8
-  million compute units a month. Ethereum, not yet deployed, also requires an archive endpoint
-  (`ETHEREUM_RPC_URL`). A day held 5,873 batches on 29 Oct 2026, so about 12,000 calls a day; its
-  auctions took 38 minutes a day to look up at CoW's API rate of 3 requests a second, so 90 days of
-  auctions take about two and a half days to fill.
+  million compute units a month. Ethereum also requires an archive endpoint (`ETHEREUM_RPC_URL`);
+  the live indexer uses MEV Blocker's public one, `https://rpc.mevblocker.io`, without a key. A day
+  held 5,873 batches on 29 Oct 2026, so about 12,000 calls a day, and as many auction lookups at
+  CoW's API.
 
 ## Repository layout
 

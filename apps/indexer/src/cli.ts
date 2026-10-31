@@ -20,12 +20,15 @@ import { uploadSnapshot } from "./upload.ts";
 import { windowReport } from "./window.ts";
 
 const USAGE = `Usage:
-  node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune]
-                       [--snapshot <path>]
+  node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--no-backfill]
+                       [--prune] [--snapshot <path>]
       Catch up with the network's safe block, then backfill at least N days of chain data and M
       days of auction data, with the auctions' scores and the quotes and fees of the orders
       traded. Resumable and idempotent: a re-run fetches only what is missing. With
       --budget-minutes the backfill stops B minutes after the start and the next run resumes it.
+      With --no-backfill nothing older than the data held is fetched: the data grows from the
+      head only, and N and M only set what --prune keeps (an empty database needs one run
+      without it).
       With --prune, once the head is caught up, chain data older than N days (at least M, as for
       the backfill) is deleted with its auction data, and so is the auction data of settlements
       older than M days; with both at 0 nothing is deleted. With --snapshot the snapshot is
@@ -65,6 +68,7 @@ async function main(): Promise<void> {
 			"chain-days": { type: "string" },
 			"auction-days": { type: "string" },
 			"budget-minutes": { type: "string" },
+			"no-backfill": { type: "boolean" },
 			prune: { type: "boolean" },
 			snapshot: { type: "string" },
 			out: { type: "string" },
@@ -105,6 +109,7 @@ async function main(): Promise<void> {
 				auctionDays: wholeNumber(values["auction-days"], "auction-days", 0),
 				budgetMinutes:
 					budget === undefined ? null : wholeNumber(budget, "budget-minutes", null),
+				backfill: values["no-backfill"] !== true,
 				prune: values.prune === true,
 				writeSnapshot:
 					snapshotPath === undefined

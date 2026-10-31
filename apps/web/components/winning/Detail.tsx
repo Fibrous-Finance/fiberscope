@@ -447,7 +447,7 @@ function useDetail(row: Row) {
 								},
 							]),
 				],
-				cow: `https://explorer.cow.fi/${chain.explorerSlug}/tx/${s.tx}`,
+				cow: `${chain.cowExplorer}/tx/${s.tx}`,
 				cowLabel: tc("cowExplorerLabel", link),
 				scan: `${chain.scan}/tx/${s.tx}`,
 				scanLabel: tc("chainExplorerLabel", { explorer: chain.scanName, ...link }),

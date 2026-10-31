@@ -98,7 +98,8 @@ pnpm dev   # http://localhost:3000
 
 The `sync` command indexes the last day of Base and takes about 20 minutes from scratch. The site
 reads each network's snapshot from `apps/web/data/<network>/snapshot.json`: Base's page is `/`,
-BNB Chain's `/bnb`. [docs/development.md](docs/development.md) covers indexing BNB Chain, longer
+BNB Chain's `/bnb`, Ethereum's `/ethereum`. [docs/development.md](docs/development.md) covers
+indexing BNB Chain and Ethereum, longer
 histories, keeping the data live, configuration, checks and deployment.
 
 ## Repository layout

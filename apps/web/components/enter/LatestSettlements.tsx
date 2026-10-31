@@ -126,7 +126,7 @@ export function LatestSettlements({ rankIndex }: { rankIndex: Map<string, number
 				t("items.partnerFee", { fee: partnerFee }),
 				...(s.quotedBy ? [t("items.quotedBy", { solver: s.quotedBy.label })] : []),
 			],
-			cow: `https://explorer.cow.fi/${network.explorerSlug}/tx/${s.tx}`,
+			cow: `${network.cowExplorer}/tx/${s.tx}`,
 			scan: `${network.scan}/tx/${s.tx}`,
 			// Every row has the same two links: their names say which settlement they open.
 			cowLabel: tc("cowExplorerLabel", { time, pair: pairText }),

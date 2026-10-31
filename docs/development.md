@@ -13,7 +13,7 @@ pnpm install
 
 ## Run the site
 
-The site has a page for each network: Base at `/` and BNB Chain at `/bnb`. Each page reads its
+The site has a page for each network: Base at `/`, BNB Chain at `/bnb` and Ethereum at `/ethereum`. Each page reads its
 network's snapshot: one JSON file, written by the indexer, that holds every figure the page shows.
 Index a day of Base to create its snapshot:
 
@@ -30,8 +30,9 @@ settlements and 7 days of auctions take hours. A run can be stopped and started 
 where it stopped, and later runs fetch only what is new.
 
 `pnpm dev` reads each network's snapshot from `apps/web/data/<network>/snapshot.json`:
-`base/snapshot.json` for `/` and `bnb/snapshot.json` for `/bnb` (see
-[Choosing the network](#choosing-the-network) to index BNB Chain). To read them from another
+`base/snapshot.json` for `/`, `bnb/snapshot.json` for `/bnb` and `ethereum/snapshot.json` for
+`/ethereum` (see [Choosing the network](#choosing-the-network) to index BNB Chain or Ethereum). To
+read them from another
 directory laid out the same way, give its absolute path:
 
 ```sh
@@ -48,10 +49,12 @@ build.
 ## Networks on the site
 
 Every network's page is the same page component with that network's data and facts: Base at `/`,
-BNB Chain at `/bnb`. Two modules describe a network:
+BNB Chain at `/bnb`, Ethereum at `/ethereum`. Two modules describe a network:
 
 - `packages/core/src/networks.ts` holds each network's facts, used by the indexer and the page: its
-  page's path, its block explorer (`scan`, `scanName`), its native and wrapped tokens, whether a
+  page's path, its block explorer (`scan`, `scanName`), its CoW Explorer root (`cowExplorer`: the
+  explorer's root for Ethereum, `/<segment>` under it for every other network), its native and
+  wrapped tokens, whether a
   transaction pays an L1 data fee (`l1DataFee`), Dune's table of its trades (`duneTable`), its
   Atomic Bundles (`contracts.bundles`) and its registry overrides (`overrides`), with supporting
   evidence for each override.
@@ -71,7 +74,9 @@ does, so no sentence, title or source line splits it.
    networks, with `listed: false` until its launch. Measure the header widths with the network's
    name in every data state so the header stays inside the content edge at every width. `nameFrom`
    and `liveFrom` set the minimum widths at which the name and the Live label appear next to the
-   Live dot (Base 760 and 980px, BNB Chain 820 and 1,020px, with at least 4px to spare).
+   Live dot (Base 760 and 980px, BNB Chain 820 and 1,020px, Ethereum 813 and 1,013px, with at least
+   4px to spare). A name narrower or wider than a measured network's moves each width that shows
+   the name by the difference: "Ethereum" is 8px narrower than "BNB Chain".
    `compactWordNameFrom`, `wordNameFrom` and `wordFrom` control when the network name and status
    word appear in the Delayed, Loading and No data states. If it was a SOON network, take it out of
    `UPCOMING`.
@@ -87,15 +92,16 @@ does, so no sentence, title or source line splits it.
 ### Launching a network
 
 An unlisted network's page and data work as a listed one's, but only its own page's menu shows it,
-`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain is
-unlisted until its history is complete and its batches, trades, DEX swaps and gas have been checked
-against Dune's Spellbook, as Base's were (see [Validation](methodology.md#validation)). To launch a
+`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain and
+Ethereum are unlisted until their history is complete and their batches, trades, DEX swaps and gas
+have been checked against Dune's Spellbook, as Base's were (see
+[Validation](methodology.md#validation)). To launch a
 network, set its `listed` to `true` in `apps/web/lib/networks.ts`: every page's menu then shows its
 row, the sitemap lists its page, and its page may be indexed as the others are.
 
 ## The indexer
 
-`apps/indexer` reads data from Base or BNB Chain (see [Choosing the network](#choosing-the-network))
+`apps/indexer` reads data from Base, BNB Chain or Ethereum (see [Choosing the network](#choosing-the-network))
 and from CoW's API into a SQLite database (`apps/indexer/.data/base.db` for Base) and writes the
 snapshot from it. Node 24 runs the indexer's TypeScript directly. The indexer has no build step or
 third-party dependencies; it uses `node:sqlite` for SQLite. Settlements and trades are stored by
@@ -124,18 +130,22 @@ These details cover the detail range, which lies within the auction range.
 
 ### Choosing the network
 
-One indexer process covers one network, which `NETWORK` names: `base` (the default) or `bnb` for
-BNB Chain. The network sets CoW's API root, the contracts, the native token and its Chainlink
-feed, and the defaults that are named after it: the RPC variables (`BASE_RPC_URL` and
-`BASE_RPC_RPS`, or `BNB_RPC_URL` and `BNB_RPC_RPS`), the database
+One indexer process covers one network, which `NETWORK` names: `base` (the default), `bnb` for
+BNB Chain or `ethereum` for Ethereum. The network sets CoW's API root, the contracts, the native
+token and its Chainlink feed, and the defaults that are named after it: the RPC variables
+(`BASE_RPC_URL` and `BASE_RPC_RPS`, `BNB_RPC_URL` and `BNB_RPC_RPS`, or `ETHEREUM_RPC_URL` and
+`ETHEREUM_RPC_RPS`), the database
 (`apps/indexer/.data/<network>.db`), the `snapshot` command's output
 (`apps/web/data/<network>/snapshot.json`, where the site reads it) and the R2 key
-(`<network>/snapshot.json`). Base's RPC defaults to its public endpoint. BNB Chain's public
-endpoints refuse old logs and archive calls, or rate-limit them far below a backfill's pace, so
-`BNB_RPC_URL` has no default: it must name an archive node. A node that serves narrower
+(`<network>/snapshot.json`). Base's RPC defaults to its public endpoint. BNB Chain's and
+Ethereum's public endpoints mostly refuse old logs and archive calls, or rate-limit them far below
+a backfill's pace, so `BNB_RPC_URL` and `ETHEREUM_RPC_URL` have no default: each must name an
+archive node. A node that serves narrower
 `eth_getLogs` ranges works too, with more requests: when the node refuses a range as too wide, the
 indexer keeps to the limit the refusal states or, if it states none, halves the range until the
 node accepts it and uses that width for later ranges, but never fewer than 100 blocks.
+A range whose logs exceed what the node returns in one response (Ethereum's settlements emit about
+4.7 a block, many nodes return at most 10,000) is halved for that range only.
 
 ```sh
 cd apps/indexer
@@ -143,12 +153,15 @@ export BNB_RPC_URL=https://…   # an archive node
 NETWORK=bnb node src/cli.ts sync --chain-days 1 --auction-days 1 --snapshot ../web/data/bnb/snapshot.json
 ```
 
+Ethereum likewise, with `ETHEREUM_RPC_URL` and `--snapshot ../web/data/ethereum/snapshot.json`.
+
 A database holds one network: it records the network's chain id, and the indexer refuses to open
-another network's database. To run a second network beside Base, run a second indexer with its
+another network's database. To run another network beside Base, run another indexer with its
 own `NETWORK`, RPC variables, database and snapshot path: another `loop.sh`, or another container
 from the same image with its own volume (see [The indexer](#the-indexer-1)). The default R2 keys
 already differ. Each indexer paces its own requests, so on one host their CoW API request rates
-add up. The site shows each network on its own page: Base at `/`, BNB Chain at `/bnb` (see
+add up. The site shows each network on its own page: Base at `/`, BNB Chain at `/bnb`, Ethereum
+at `/ethereum` (see
 [Networks on the site](#networks-on-the-site)).
 
 ### Block times
@@ -158,7 +171,9 @@ auction happened, but the chain data gives block numbers. Base makes a block eve
 exactly, so a formula would turn its block numbers into times. BNB Chain's block interval is about
 0.45 seconds but varies, with several blocks in the same second. Its pace has changed several
 times (3 seconds a block, then 1.5, 0.75 and, from January 2026, 0.45), so a formula based on a
-fixed block interval would be hours off for blocks 180 days back.
+fixed block interval would be hours off for blocks 180 days back. Ethereum's blocks come in
+12-second slots, but a slot that misses its block leaves a gap, so its times drift from a formula
+too.
 
 The indexer therefore keeps a clock (`apps/indexer/src/clock.ts`) based on anchors: blocks whose
 timestamps it has read and stored in the `anchors` table. When the node provides log timestamps
@@ -203,7 +218,9 @@ same options) also read `apps/indexer/.env` when it exists.
 3. Catches up: settlements, receipts and calldata up to the network's safe block, then the
    auctions behind the new settlements. On Base, the safe block is the newest block whose
    transactions Base has posted to Ethereum. On BNB Chain, it is the newest justified block; in
-   BNB Chain's fast finality, justification is the stage before finalization.
+   BNB Chain's fast finality, justification is the stage before finalization. On Ethereum, it is
+   the newest justified checkpoint's block, one to two epochs (32–64 blocks, about 6–13 minutes)
+   behind the head.
 4. With `--prune`, deletes settlements older than N days (at least M, as for the backfill) with
    their auction data, and the auction data, orders and fees of settlements older than M days. A
    relay settlement (through the flash-loan router or an Atomic Bundle) keeps its auction while it
@@ -265,10 +282,10 @@ at the network's default), it first downloads the database with `seed`.
 
 | Variable                                                            | Used by | Purpose                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NETWORK`                                                           | indexer | The network to index: `base` (default) or `bnb` for BNB Chain; see [Choosing the network](#choosing-the-network)                                                                                                            |
-| `BASE_RPC_URL`, `BNB_RPC_URL`                                       | indexer | The network's RPC endpoint: Base's defaults to `https://mainnet.base.org`; BNB Chain's has no default and must be an archive node                                                                                           |
+| `NETWORK`                                                           | indexer | The network to index: `base` (default), `bnb` for BNB Chain or `ethereum` for Ethereum; see [Choosing the network](#choosing-the-network)                                                                                   |
+| `BASE_RPC_URL`, `BNB_RPC_URL`, `ETHEREUM_RPC_URL`                   | indexer | The network's RPC endpoint: Base's defaults to `https://mainnet.base.org`; BNB Chain's and Ethereum's have no default and must be archive nodes                                                                             |
 | `DB_PATH`                                                           | indexer | The SQLite database (default `apps/indexer/.data/<network>.db`); `--db` overrides it                                                                                                                                        |
-| `BASE_RPC_RPS` or `BNB_RPC_RPS`, `COW_API_RPS`                      | indexer | Request rates per second for the network's RPC and CoW's API (defaults 15 and 3)                                                                                                                                            |
+| `BASE_RPC_RPS`, `BNB_RPC_RPS` or `ETHEREUM_RPC_RPS`, `COW_API_RPS`  | indexer | Request rates per second for the network's RPC and CoW's API (defaults 15 and 3)                                                                                                                                            |
 | `REFRESH_MINUTES`                                                   | indexer | `loop.sh`'s interval (default 10). Through the snapshot, an open page also learns when the next run is due and fetches a minute after it. At any interval, the page shows Delayed once its data is more than 30 minutes old |
 | `SEED_DB_URL`                                                       | indexer | With `loop.sh`, download the database from this URL when there is none yet                                                                                                                                                  |
 | `SNAPSHOT_R2_BUCKET`                                                | indexer | Also upload every snapshot to this R2 bucket, through R2's S3 API; needs the variables below                                                                                                                                |
@@ -343,7 +360,8 @@ copy, create an R2 bucket and set `bucket_name` and `SITE_URL` in `wrangler.json
 `ALLOW_INDEXING` to `"false"` unless the copy should appear in search results.
 `apps/web/public/_headers` sets the cache policy of static files: one year, immutable, for the
 fingerprinted files under `/_next/static/`, and one day for the icons and the social images
-(`favicon.svg`, `favicon.ico`, `apple-touch-icon.png`, `og-image.png` and `og-image-bnb.png`),
+(`favicon.svg`, `favicon.ico`, `apple-touch-icon.png`, `og-image.png`, `og-image-bnb.png` and
+`og-image-ethereum.png`),
 which keep their names when they change. `favicon.ico` is there for clients that ask for it by
 name; without the file, each such request would render the not-found page.
 
@@ -359,10 +377,10 @@ search results.
   page that robots.txt blocks keeps its `noindex` unread and can still be listed. It names the
   sitemap only on the indexed host.
 - `/sitemap.xml` lists each listed network's page, last modified at the newest block of its
-  snapshot: `/`, and `/bnb` once BNB Chain is launched (see
+  snapshot: `/`, and `/bnb` and `/ethereum` once BNB Chain and Ethereum are launched (see
   [Launching a network](#launching-a-network)). It is rendered per request, because `SITE_URL` is
   a Worker variable that `next build` does not see.
-- Each network's page has a canonical link to itself, `/` or `/bnb`: query strings such as
+- Each network's page has a canonical link to itself, `/`, `/bnb` or `/ethereum`: query strings such as
   `?period=7d` are views of the same page. An unlisted network's page is `noindex` on every host.
 - The home page carries WebSite structured data (JSON-LD), which gives search results the site's
   name.
@@ -411,12 +429,14 @@ docker run -v fiberscope-data:/data --env-file apps/indexer/.env fiberscope-inde
 ```
 
 The database and the local snapshot live on the volume at `/data`: the image links
-`apps/indexer/.data` there, so the database is `/data/base.db`, or `/data/bnb.db` with
-`NETWORK=bnb`. A second network runs from the same image in a container of its own, with its own
+`apps/indexer/.data` there, so the database is `/data/base.db`, `/data/bnb.db` with `NETWORK=bnb`
+or `/data/ethereum.db` with `NETWORK=ethereum`. Each further network runs from the same image in a
+container of its own, with its own
 volume, since the local snapshot's path is the same:
 
 ```sh
 docker run -v fiberscope-bnb:/data --env-file apps/indexer/.env.bnb -e NETWORK=bnb fiberscope-indexer
+docker run -v fiberscope-ethereum:/data --env-file apps/indexer/.env.ethereum -e NETWORK=ethereum fiberscope-indexer
 ```
 
 The live indexer runs from this image on an AWS EC2 instance: systemd starts the container, its
@@ -457,7 +477,10 @@ Measured on the live deployment: the site on 3–5 Oct 2026, the indexers on 15 
   CoW's solver registry. BNB Chain requires an archive RPC endpoint (`BNB_RPC_URL`); the live
   indexer uses NodeReal's free plan, 10 million compute units a month. It makes about two calls per
   settlement, a receipt and a transaction: about 14,000 calls a day on BNB Chain, an estimated 7–8
-  million compute units a month.
+  million compute units a month. Ethereum, not yet deployed, also requires an archive endpoint
+  (`ETHEREUM_RPC_URL`). A day held 5,873 batches on 29 Oct 2026, so about 12,000 calls a day; its
+  auctions took 38 minutes a day to look up at CoW's API rate of 3 requests a second, so 90 days of
+  auctions take about two and a half days to fill.
 
 ## Repository layout
 

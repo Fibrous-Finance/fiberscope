@@ -83,9 +83,7 @@ export function Solutions({
 	// on compact ones.
 	const hit = compact ? "min-h-11 min-w-11 justify-center" : "-my-1 py-1";
 	// CoW Explorer opens the settlement of the first winner that settled.
-	const href = auction?.tx
-		? `https://explorer.cow.fi/${network.explorerSlug}/tx/${auction.tx}`
-		: null;
+	const href = auction?.tx ? `${network.cowExplorer}/tx/${auction.tx}` : null;
 
 	return (
 		<div

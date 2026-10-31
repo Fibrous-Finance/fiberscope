@@ -1,4 +1,4 @@
-import { BASE, BNB, shortAddress } from "@fiberscope/core";
+import { BASE, BNB, ETHEREUM, shortAddress } from "@fiberscope/core";
 import type { Network, NetworkId, RegistryOverride } from "@fiberscope/core";
 
 /**
@@ -59,10 +59,21 @@ export const SITE_NETWORKS: Record<NetworkId, SiteNetwork> = {
 		image: "/og-image-bnb.png",
 		listed: true,
 	},
+	// Listed without the Dune check Base and BNB Chain passed: it keeps only its last 30 days.
+	ethereum: {
+		...ETHEREUM,
+		nameFrom: 813,
+		liveFrom: 1013,
+		compactWordNameFrom: 396,
+		wordNameFrom: 874,
+		wordFrom: 780,
+		image: "/og-image-ethereum.png",
+		listed: true,
+	},
 };
 
 /** The networks still to come, after the live ones in the menu (`Header.network.{id}`, their marks). */
-export const UPCOMING = ["ethereum", "arbitrum", "gnosis"] as const;
+export const UPCOMING = ["arbitrum", "gnosis"] as const;
 export type UpcomingId = (typeof UPCOMING)[number];
 
 /**

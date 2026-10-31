@@ -9,8 +9,9 @@ export interface Anchor {
  * interpolated linearly between the anchors around it, so it is exact on an anchor, and between
  * anchors wherever blocks came at a steady pace: on Base, one every 2 seconds exactly. BNB Chain's
  * blocks come about every 0.45 seconds, but not exactly, and the pace changed several times, so
- * no formula gives their times. Beyond the anchors, times are extrapolated with the network's
- * average block time. Times are whole seconds, as in block headers.
+ * no formula gives their times. Ethereum's come in 12-second slots, but a slot may have no block.
+ * Beyond the anchors, times are extrapolated with the network's average block time. Times are
+ * whole seconds, as in block headers.
  */
 export class Clock {
 	readonly #blocks: number[] = [];

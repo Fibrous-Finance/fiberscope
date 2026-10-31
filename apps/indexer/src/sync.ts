@@ -32,6 +32,11 @@ export interface SyncOptions {
 	auctionDays: number;
 	/** Minutes after the start of the sync at which the backfill stops; null for no limit. */
 	budgetMinutes: number | null;
+	/**
+	 * Whether to backfill history down to the requested depths. Without it the data grows only
+	 * from the head, and the depths only bound what --prune keeps.
+	 */
+	backfill: boolean;
 	/** Delete the data older than the requested depths once the head is caught up. */
 	prune: boolean;
 	/**
@@ -78,8 +83,10 @@ export async function sync(
 	const budget = budgetMinutes === null ? null : AbortSignal.timeout(budgetMinutes * 60_000);
 	const registry = await refreshRegistry(store, AbortSignal.timeout(CMS_TIMEOUT_MS));
 	const chainDays = Math.max(options.chainDays, options.auctionDays);
-	if (store.chainRange() === null && chainDays === 0) {
-		throw new Error("The database is empty: pass --chain-days to backfill");
+	if (store.chainRange() === null && (chainDays === 0 || !options.backfill)) {
+		throw new Error(
+			"The database is empty: pass --chain-days, without --no-backfill, to fill it"
+		);
 	}
 	const stats: SyncStats = {
 		chain: { receipts: 0, seconds: 0 },
@@ -151,7 +158,7 @@ export async function sync(
 	const stop = budget === null ? abort.signal : AbortSignal.any([abort.signal, budget]);
 	const chainWork = (async () => {
 		try {
-			if (chainDays > 0) {
+			if (options.backfill && chainDays > 0) {
 				const low = days.reach(chainDays);
 				await backfillChain(store, rpc, low, days.end, stats.chain, budget ?? undefined);
 			}
@@ -174,7 +181,7 @@ export async function sync(
 	})();
 	const auctionWork = (async () => {
 		try {
-			if (options.auctionDays > 0) {
+			if (options.backfill && options.auctionDays > 0) {
 				const low = days.reach(options.auctionDays);
 				await backfillAuctions(store, cow, low, chain, stats.auctions, stop);
 			}
@@ -192,7 +199,7 @@ export async function sync(
 	const detailWork = (async () => {
 		// What the catch-up before the snapshot left: all of it when it did not run.
 		await catchUpDetails(store, cow, stats.details);
-		if (options.auctionDays > 0) {
+		if (options.backfill && options.auctionDays > 0) {
 			const low = days.reach(options.auctionDays);
 			await backfillDetails(store, cow, low, details, stats.details, stop);
 		}
@@ -246,8 +253,9 @@ export function detailCatchUpWait(requests: number, requestsPerSecond: number): 
 /**
  * The network's safe block, with its time. On Base, the newest block whose transactions Base has
  * posted to Ethereum: blocks up to it change only if Ethereum reorganizes the blocks holding that
- * data. On BNB Chain, the newest justified block, a block or two behind the head. The indexer
- * never stores a block past it, so never one the network itself might replace.
+ * data. On BNB Chain, the newest justified block, a block or two behind the head. On Ethereum, the
+ * newest justified checkpoint's block, one to two epochs (32–64 blocks, about 6–13 minutes) behind
+ * the head. The indexer never stores a block past it, so never one the network itself might replace.
  */
 async function safeHead(rpc: Rpc): Promise<Anchor> {
 	const block = await rpc.call<{ number: string; timestamp: string } | null>(

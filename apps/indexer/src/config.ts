@@ -32,9 +32,9 @@ export interface R2Target {
 export interface Env {
 	/** The SQLite database (DB_PATH, default `apps/indexer/.data/<network>.db`). */
 	dbPath: string;
-	/** The network's RPC endpoint: BASE_RPC_URL or BNB_RPC_URL. */
+	/** The network's RPC endpoint: BASE_RPC_URL, BNB_RPC_URL or ETHEREUM_RPC_URL. */
 	rpcUrl: string;
-	/** Most RPC calls per second (BASE_RPC_RPS or BNB_RPC_RPS); every call in a batch counts. */
+	/** Most RPC calls per second (`<NETWORK>_RPC_RPS`); every call in a batch counts. */
 	rpcRps: number;
 	/** Most CoW API requests per second. */
 	cowApiRps: number;
@@ -53,8 +53,9 @@ export interface Env {
 }
 
 /**
- * The RPC endpoint used when the network's RPC_URL is unset. BNB Chain has none: its public nodes
- * refuse old logs or archive calls, or rate-limit them far below what a backfill needs.
+ * The RPC endpoint used when the network's RPC_URL is unset. BNB Chain and Ethereum have none:
+ * their public nodes refuse old logs or archive calls, or rate-limit them far below what a
+ * backfill needs.
  */
 const PUBLIC_RPC: Partial<Record<NetworkId, string>> = { base: "https://mainnet.base.org" };
 

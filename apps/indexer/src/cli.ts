@@ -20,12 +20,15 @@ import { uploadSnapshot } from "./upload.ts";
 import { windowReport } from "./window.ts";
 
 const USAGE = `Usage:
-  node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--prune]
-                       [--snapshot <path>]
+  node src/cli.ts sync [--chain-days N] [--auction-days M] [--budget-minutes B] [--no-backfill]
+                       [--prune] [--snapshot <path>]
       Catch up with the network's safe block, then backfill at least N days of chain data and M
       days of auction data, with the auctions' scores and the quotes and fees of the orders
       traded. Resumable and idempotent: a re-run fetches only what is missing. With
       --budget-minutes the backfill stops B minutes after the start and the next run resumes it.
+      With --no-backfill nothing older than the data held is fetched: the data grows from the
+      head only, and N and M only set what --prune keeps (an empty database needs one run
+      without it).
       With --prune, once the head is caught up, chain data older than N days (at least M, as for
       the backfill) is deleted with its auction data, and so is the auction data of settlements
       older than M days; with both at 0 nothing is deleted. With --snapshot the snapshot is
@@ -50,11 +53,12 @@ const USAGE = `Usage:
       host without indexing again. It is integrity-checked before it is used.
 
 Every command takes --db <path> (default DB_PATH, else ${relative(process.cwd(), DEFAULT_DB_PATH)}).
-Environment: NETWORK, the network to index (${Object.keys(NETWORKS).join(" or ")}, default base), and
-its RPC endpoint and rate: BASE_RPC_URL and BASE_RPC_RPS, or BNB_RPC_URL (required) and
-BNB_RPC_RPS. Also COW_API_RPS, REFRESH_MINUTES and GIT_COMMIT. With SNAPSHOT_R2_BUCKET (plus
-CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and optionally SNAPSHOT_R2_KEY,
-default ${NETWORK.id}/snapshot.json) every snapshot written is also uploaded to that R2 bucket.
+Environment: NETWORK, the network to index (${Object.keys(NETWORKS).join(", ")}; default base), and
+its RPC endpoint and rate: BASE_RPC_URL and BASE_RPC_RPS, BNB_RPC_URL (required) and BNB_RPC_RPS,
+or ETHEREUM_RPC_URL (required) and ETHEREUM_RPC_RPS. Also COW_API_RPS, REFRESH_MINUTES and
+GIT_COMMIT. With SNAPSHOT_R2_BUCKET (plus CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID,
+R2_SECRET_ACCESS_KEY and optionally SNAPSHOT_R2_KEY, default ${NETWORK.id}/snapshot.json) every
+snapshot written is also uploaded to that R2 bucket.
 `;
 
 async function main(): Promise<void> {
@@ -64,6 +68,7 @@ async function main(): Promise<void> {
 			"chain-days": { type: "string" },
 			"auction-days": { type: "string" },
 			"budget-minutes": { type: "string" },
+			"no-backfill": { type: "boolean" },
 			prune: { type: "boolean" },
 			snapshot: { type: "string" },
 			out: { type: "string" },
@@ -104,6 +109,7 @@ async function main(): Promise<void> {
 				auctionDays: wholeNumber(values["auction-days"], "auction-days", 0),
 				budgetMinutes:
 					budget === undefined ? null : wholeNumber(budget, "budget-minutes", null),
+				backfill: values["no-backfill"] !== true,
 				prune: values.prune === true,
 				writeSnapshot:
 					snapshotPath === undefined

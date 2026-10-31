@@ -92,10 +92,11 @@ does, so no sentence, title or source line splits it.
 ### Launching a network
 
 An unlisted network's page and data work as a listed one's, but only its own page's menu shows it,
-`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain is
-unlisted until its history is complete and its batches, trades, DEX swaps and gas have been checked
-against Dune's Spellbook, as Base's were (see [Validation](methodology.md#validation)). Ethereum is
-listed without that check: it keeps only its last 30 days, from 30 Oct 2026 on. To launch a
+`/sitemap.xml` leaves it out and its page is `noindex` whatever `ALLOW_INDEXING` says. BNB Chain and
+Ethereum are unlisted until their launch: BNB Chain's history must first be complete and its
+batches, trades, DEX swaps and gas checked against Dune's Spellbook, as Base's were (see
+[Validation](methodology.md#validation)); Ethereum keeps only its last 30 days, from 30 Oct 2026
+on. To launch a
 network, set its `listed` to `true` in `apps/web/lib/networks.ts`: every page's menu then shows its
 row, the sitemap lists its page, and its page may be indexed as the others are.
 
@@ -377,7 +378,7 @@ search results.
   page that robots.txt blocks keeps its `noindex` unread and can still be listed. It names the
   sitemap only on the indexed host.
 - `/sitemap.xml` lists each listed network's page, last modified at the newest block of its
-  snapshot: `/`, `/ethereum`, and `/bnb` once BNB Chain is launched (see
+  snapshot: `/`, and `/bnb` and `/ethereum` once BNB Chain and Ethereum are launched (see
   [Launching a network](#launching-a-network)). It is rendered per request, because `SITE_URL` is
   a Worker variable that `next build` does not see.
 - Each network's page has a canonical link to itself, `/`, `/bnb` or `/ethereum`: query strings such as

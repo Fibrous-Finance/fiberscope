@@ -60,7 +60,7 @@ export const SITE_NETWORKS: Record<NetworkId, SiteNetwork> = {
 		image: "/og-image-bnb.png",
 		listed: false,
 	},
-	// Listed without the Dune check BNB Chain waits for: its history starts on 30 Oct 2026.
+	// Unlisted until its launch with BNB Chain's (pull request #47). It keeps only its last 30 days.
 	ethereum: {
 		...ETHEREUM,
 		nameFrom: 813,
@@ -69,7 +69,7 @@ export const SITE_NETWORKS: Record<NetworkId, SiteNetwork> = {
 		wordNameFrom: 874,
 		wordFrom: 780,
 		image: "/og-image-ethereum.png",
-		listed: true,
+		listed: false,
 	},
 };
 

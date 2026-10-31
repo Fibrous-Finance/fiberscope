@@ -6,7 +6,7 @@ windows, shares, ranks and averages in `packages/core/src/view`.
 
 ## Data sources
 
-Every figure comes from public data on the page's network, Base or BNB Chain, and from CoW
+Every figure comes from public data on the page's network, Base, BNB Chain or Ethereum, and from CoW
 Protocol's public services.
 
 | Source                                                                                                                              | Provides                                                                                                                                                          |
@@ -19,6 +19,7 @@ Protocol's public services.
 | `GPv2AllowListAuthentication` (`0x2c4c28ddbdac9c5e7055b4c863b72ea0149d8afe`) `isSolver`                                             | Whether a relay settlement's sender or recipient is a solver, for attribution                                                                                     |
 | Chainlink ETH/USD on Base (`0x71041dddad3595f9ced3dccfbe3d1f4b0a16bb70`)                                                            | The dollar rate at each settlement: the latest answer at or before its block                                                                                      |
 | Chainlink BNB/USD on BNB Chain (`0x0567f2323251f0aab15c8dfb1967e4e8a7d42aee`)                                                       | The same on BNB Chain                                                                                                                                             |
+| Chainlink ETH/USD on Ethereum (`0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419`)                                                        | The same on Ethereum                                                                                                                                              |
 | ERC-20 `symbol()`                                                                                                                   | Token symbols for the latest settlements' pairs                                                                                                                   |
 
 Only the production settlement contract is read. CoW's barn (staging) environment settles through
@@ -37,7 +38,8 @@ counted.
   whose transactions Base has posted to Ethereum, usually a minute or two behind the chain head;
   such a block changes only if Ethereum reorganizes the blocks that hold its data. On BNB Chain, it
   is the newest justified block: in BNB Chain's fast finality, justification is the stage before
-  finalization.
+  finalization. On Ethereum, it is the newest justified checkpoint's block, one to two epochs
+  (about 6–13 minutes) behind the chain head.
 - **Coverage.** Only complete days count. Settlement history (batches, trades, gas, transaction
   cost, DEX swaps) reaches furthest back. Volume, Entered and Win rate also need auction data, and
   surplus also needs the terms each order was signed with. Auction details (scores, filtered-out
@@ -68,7 +70,7 @@ fill.
 
 The USD value of filled orders. Each trade counts at the lower of its sell and buy value, priced
 with the native token prices CoW used in that auction and Chainlink's rate for the network's native
-token at settlement: ETH/USD on Base, BNB/USD on BNB Chain. A trade priced on one side only counts
+token at settlement: ETH/USD on Base and Ethereum, BNB/USD on BNB Chain. A trade priced on one side only counts
 at that side; a trade priced on neither adds nothing. The native token is priced as its wrapped
 token: ETH as WETH, BNB as WBNB.
 
@@ -90,8 +92,9 @@ settlement data in the window, or every solver when none has that many.
 ### Transaction cost
 
 What a settlement transaction paid on its network: gas used × effective gas price, plus the L1 data
-fee on Base (BNB Chain has none). The cost is converted to USD at the Chainlink rate in the
-transaction's block: ETH/USD on Base, BNB/USD on BNB Chain. A transaction that holds several batches
+fee on Base (BNB Chain and Ethereum have none). The cost is converted to USD at the Chainlink rate
+in the transaction's block: ETH/USD on Base and Ethereum, BNB/USD on BNB Chain. A transaction that
+holds several batches
 splits its cost evenly, as it splits gas. Per trade: a solver's cost divided by the trades it
 filled.
 
@@ -185,8 +188,8 @@ detail also gives its wins as a share of all the window's auctions.
 
 The value CoW's protocol computes from each solution's executed amounts to choose winners
 (CIP-20): roughly the surplus the solution generates for traders. CoW's API gives it in the
-network's native token, ETH on Base and BNB on BNB Chain; the page converts it to USD at
-Chainlink's ETH/USD or BNB/USD rate at the auction's start block, to 6 significant figures.
+network's native token, ETH on Base and Ethereum and BNB on BNB Chain; the page converts it to USD
+at Chainlink's ETH/USD or BNB/USD rate at the auction's start block, to 6 significant figures.
 **Below winner** is (winning score − score) ÷ winning score. It is given only for auctions
 with a single winning solution. Only a filtered-out solution can score above that winner, since one
 that passed the filter with a higher score would have won; the page then shows how much higher:
@@ -237,6 +240,8 @@ contracts that CoW DAO allow-lists and that a solver calls instead of the settle
 BNB Chain, these are Euler's contracts for opening positions, closing positions and swapping
 collateral (`0x64c26b3a182826fe2ab8c04c8caf40b0c4bf9a66`,
 `0x4f4ce927188637b4a1d91350c3114f4bd301dd02` and `0xcc054cd4b814a2caeb63c6f6a446435480a383f3`);
+on Ethereum, Euler's contracts for the same three (`0x59684a689d4a1cac0f0632f54ec8cdd42612d728`,
+`0xa18c87849ef90190117ff1e1e8b4ace6dac7a54b` and `0x175fbd01874e92c9b081f493371fefe009760a42`);
 Base has none. A relay's settlements are credited to the solver behind them, in this order:
 
 1. the transaction's recipient, when it is a registered or allow-listed solver other than a relay
@@ -258,7 +263,7 @@ network, is on the settlement contract's on-chain allow-list and is not listed a
 network in the registry; it is shown as active. On Base there is one, Rizzolver's
 `0x8f5835e9d756c9bd934bce527157a4b0ef3c5cb7`. On BNB Chain there are two, both of which the
 registry lists for Ethereum only: Rizzolver's same address and Fractal's
-`0x95480d3f27658e73b2785d30beb0c847d78294c7`.
+`0x95480d3f27658e73b2785d30beb0c847d78294c7`. On Ethereum there are none.
 
 A retired address is one the registry marks inactive. A solver without a public name is shown by
 its address. The solver registry under the table lists every solver in CoW's registry for the

@@ -246,8 +246,9 @@ export function detailCatchUpWait(requests: number, requestsPerSecond: number): 
 /**
  * The network's safe block, with its time. On Base, the newest block whose transactions Base has
  * posted to Ethereum: blocks up to it change only if Ethereum reorganizes the blocks holding that
- * data. On BNB Chain, the newest justified block, a block or two behind the head. The indexer
- * never stores a block past it, so never one the network itself might replace.
+ * data. On BNB Chain, the newest justified block, a block or two behind the head. On Ethereum, the
+ * newest justified checkpoint's block, one to two epochs (32–64 blocks, about 6–13 minutes) behind
+ * the head. The indexer never stores a block past it, so never one the network itself might replace.
  */
 async function safeHead(rpc: Rpc): Promise<Anchor> {
 	const block = await rpc.call<{ number: string; timestamp: string } | null>(

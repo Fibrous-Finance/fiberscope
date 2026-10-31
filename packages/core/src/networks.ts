@@ -5,7 +5,7 @@
  * apps/web/lib/networks.ts; docs/development.md ("Networks on the site") lists what a new network
  * needs.
  */
-export type NetworkId = "base" | "bnb";
+export type NetworkId = "base" | "bnb" | "ethereum";
 
 /**
  * A submission address CoW's solver registry (its CMS) lacks for a network, though it is
@@ -29,8 +29,11 @@ export interface Network {
 	chainId: number;
 	/** CoW Protocol API root for this network. */
 	cowApi: string;
-	/** CoW Explorer path segment, as in `https://explorer.cow.fi/{slug}/tx/{hash}`. */
-	explorerSlug: string;
+	/**
+	 * CoW Explorer's root for this network, as in `{cowExplorer}/tx/{hash}`: Ethereum's at the
+	 * explorer's root, every other network's under a path segment of its own.
+	 */
+	cowExplorer: string;
 	/** Block explorer root. */
 	scan: string;
 	/** The block explorer's name, as the page's links name it. */
@@ -88,7 +91,7 @@ export const BASE: Network = {
 	path: "/",
 	chainId: 8453,
 	cowApi: "https://api.cow.fi/base",
-	explorerSlug: "base",
+	cowExplorer: "https://explorer.cow.fi/base",
 	scan: "https://basescan.org",
 	scanName: "Basescan",
 	l1DataFee: true,
@@ -129,7 +132,7 @@ export const BNB: Network = {
 	path: "/bnb",
 	chainId: 56,
 	cowApi: "https://api.cow.fi/bnb",
-	explorerSlug: "bnb",
+	cowExplorer: "https://explorer.cow.fi/bnb",
 	scan: "https://bscscan.com",
 	scanName: "BscScan",
 	l1DataFee: false,
@@ -183,4 +186,45 @@ export const BNB: Network = {
 	],
 };
 
-export const NETWORKS: Record<NetworkId, Network> = { base: BASE, bnb: BNB };
+export const ETHEREUM: Network = {
+	id: "ethereum",
+	name: "Ethereum",
+	path: "/ethereum",
+	chainId: 1,
+	cowApi: "https://api.cow.fi/mainnet",
+	cowExplorer: "https://explorer.cow.fi",
+	scan: "https://etherscan.io",
+	scanName: "Etherscan",
+	l1DataFee: false,
+	duneTable: "cow_protocol_ethereum.trades",
+	// A slot every 12 seconds; a missed slot makes no block, so blocks come a little less often.
+	blockTime: 12,
+	// About 3 hours of blocks and, at some 4.7 logs a block (2,816 Interaction, 992 Trade and 907
+	// Settlement logs in 1,000 blocks), half the 10,000 logs a response may hold on many nodes.
+	logRange: 1_000,
+	// Auctions end 2–3 blocks after their start.
+	sameAuctionBlocks: 5,
+	native: {
+		symbol: "ETH",
+		wrapped: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+		wrappedSymbol: "WETH",
+		usdFeed: "0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419",
+	},
+	contracts: {
+		settlement: "0x9008d19f58aabd9ed0d60971565aa8510560ab41",
+		allowList: "0x2c4c28ddbdac9c5e7055b4c863b72ea0149d8afe",
+		flashLoanRouter: "0x9da8b48441583a2b93e2ef8213aad0ec0b392c69",
+		// Euler's, to open, close and collateral-swap positions: COWSWAP_CHAIN_CONFIG[1] in
+		// euler-xyz/euler-sdks, as for BNB Chain. Each is allow-listed, embeds the settlement
+		// contract and gives the `name()` of its contract ("Euler EVC - Open Position", ...).
+		bundles: [
+			"0x59684a689d4a1cac0f0632f54ec8cdd42612d728",
+			"0xa18c87849ef90190117ff1e1e8b4ace6dac7a54b",
+			"0x175fbd01874e92c9b081f493371fefe009760a42",
+		],
+	},
+	// None: the CMS lists Ethereum's prod addresses, Rizzolver's and Fractal's among them.
+	overrides: [],
+};
+
+export const NETWORKS: Record<NetworkId, Network> = { base: BASE, bnb: BNB, ethereum: ETHEREUM };

@@ -50,11 +50,12 @@ const USAGE = `Usage:
       host without indexing again. It is integrity-checked before it is used.
 
 Every command takes --db <path> (default DB_PATH, else ${relative(process.cwd(), DEFAULT_DB_PATH)}).
-Environment: NETWORK, the network to index (${Object.keys(NETWORKS).join(" or ")}, default base), and
-its RPC endpoint and rate: BASE_RPC_URL and BASE_RPC_RPS, or BNB_RPC_URL (required) and
-BNB_RPC_RPS. Also COW_API_RPS, REFRESH_MINUTES and GIT_COMMIT. With SNAPSHOT_R2_BUCKET (plus
-CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and optionally SNAPSHOT_R2_KEY,
-default ${NETWORK.id}/snapshot.json) every snapshot written is also uploaded to that R2 bucket.
+Environment: NETWORK, the network to index (${Object.keys(NETWORKS).join(", ")}; default base), and
+its RPC endpoint and rate: BASE_RPC_URL and BASE_RPC_RPS, BNB_RPC_URL (required) and BNB_RPC_RPS,
+or ETHEREUM_RPC_URL (required) and ETHEREUM_RPC_RPS. Also COW_API_RPS, REFRESH_MINUTES and
+GIT_COMMIT. With SNAPSHOT_R2_BUCKET (plus CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID,
+R2_SECRET_ACCESS_KEY and optionally SNAPSHOT_R2_KEY, default ${NETWORK.id}/snapshot.json) every
+snapshot written is also uploaded to that R2 bucket.
 `;
 
 async function main(): Promise<void> {

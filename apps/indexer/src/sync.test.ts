@@ -141,6 +141,7 @@ async function snapshots(
 		chainDays: 0,
 		auctionDays: 0,
 		budgetMinutes: null,
+		backfill: true,
 		prune: false,
 		...options,
 		writeSnapshot: async () => {
@@ -238,6 +239,38 @@ describe("a run's snapshots", () => {
 			{ from: auctionsFrom, to: END },
 			{ from: END - 3 * DAY + 1, to: END },
 		]);
+	});
+});
+
+describe("a run without backfill", () => {
+	test("prunes to the depths but fetches nothing older than the data held", async (t) => {
+		offline(t);
+		// Four days of chain data, auction data and details for the last 2.5 of them.
+		const auctionsFrom = END - 108_000;
+		const older = [{ label: "older", block: auctionsFrom - 1_000 }];
+		const store = chainStore(older);
+		store.setAuctionRange({ from: auctionsFrom, to: END });
+		store.setDetailRange({ from: auctionsFrom, to: END });
+		await snapshots(store, cowApi(older, 5), {
+			chainDays: 3,
+			auctionDays: 3,
+			backfill: false,
+			prune: true,
+		});
+		// The chain data loses its oldest day; the auctions stay 2.5 days deep, short of the 3 a
+		// backfill would reach.
+		assert.deepEqual(store.chainRange(), { from: END - 3 * DAY + 1, to: END });
+		assert.deepEqual(store.auctionRange(), { from: auctionsFrom, to: END });
+		assert.deepEqual(store.detailRange(), { from: auctionsFrom, to: END });
+	});
+
+	test("refuses an empty database, which has nothing to grow from", async (t) => {
+		offline(t);
+		const store = new Store(":memory:");
+		await assert.rejects(
+			snapshots(store, cowApi([], 5), { chainDays: 30, backfill: false }),
+			/The database is empty/
+		);
 	});
 });
 
